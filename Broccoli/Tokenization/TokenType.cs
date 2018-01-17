@@ -3,7 +3,7 @@ namespace Broccoli.Tokenization
     public enum TokenType
         {
             // Structure
-            LeftParen, RIGHT_PAREN,
+            LeftParen, RightParen,
             
             // Literals
             String, Integer, Float,
