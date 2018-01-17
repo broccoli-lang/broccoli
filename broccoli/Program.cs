@@ -31,8 +31,8 @@ namespace broccoli
             }
 
             var code = (file == "-") ? Console.In.ReadToEnd() : File.ReadAllText(file);
-
-            Console.WriteLine("Hello World! -\U0001F966");
+            var broccoli = new Broccoli(code);
+            broccoli.Run();
 
             return 0;
         }
