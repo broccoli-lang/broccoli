@@ -16,7 +16,10 @@ namespace broccoli
             OptionSet options = new OptionSet(){
                 {"h|help", "Show help", n=>{if(n!=null)GetHelp();}},
                 {"<>", "File containing code to read, or - for StdIn.", f=>{
-                        if (file == null)file=f; else GetHelp();
+                        if (file == null)
+                            file=f;
+                        else // Can't read code from multiple files
+                            GetHelp();
                     }
                 }
             };
