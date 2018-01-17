@@ -1,6 +1,6 @@
 using System;
 
-namespace broccoli {
+namespace Broccoli {
     public class Broccoli
     {
         private string _code;

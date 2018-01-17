@@ -1,4 +1,5 @@
-﻿namespace broccoli
+﻿using System;
+namespace Broccoli.Tokenization
 {
     public class Tokenizer
     {
@@ -14,6 +15,7 @@
         public Token[] scanToken()
         {
             // TODO
+            throw new NotImplementedException();
         }
     }
 }

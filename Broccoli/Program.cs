@@ -2,7 +2,7 @@
 using NDesk.Options;
 using System.IO;
 
-namespace broccoli
+namespace Broccoli
 {
     class Program
     {
@@ -32,6 +32,7 @@ namespace broccoli
 
             var code = (file == "-") ? Console.In.ReadToEnd() : File.ReadAllText(file);
             var broccoli = new Broccoli(code);
+
             broccoli.Run();
 
             return 0;
