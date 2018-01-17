@@ -3,15 +3,15 @@ namespace Broccoli.Tokenization
     public enum TokenType
         {
             // Structure
-            LEFT_PAREN, RIGHT_PAREN,
+            LeftParen, RIGHT_PAREN,
             
             // Literals
-            STRING, INTEGER, FLOAT,
+            String, Integer, Float,
             
             // Identifiers
-            IDENTIFIER, SCALAR, LIST,
+            Identifier, Scalar, List,
             
             // Miscellaneous
-            EOF
+            Eof
         }
 }
