@@ -5,13 +5,13 @@
                
         public TokenType Type { get; }
         public string Literal { get; }
-        public uint LineNumber { get; }
+        public (uint line, uint column) Position { get; }
 
-        public Token(TokenType type, string literal, uint line)
+        public Token(TokenType type, string literal, uint line, uint column)
         {
             Type = type;
             Literal = literal;
-            LineNumber = line;
+            Position = (line, column);
         }
     }
 }
