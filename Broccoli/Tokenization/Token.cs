@@ -5,7 +5,7 @@
                
         public TokenType Type { get; }
         public string Literal { get; }
-        public (uint line, uint column) Position { get; }
+        public (uint Line, uint Column) Position { get; }
 
         public Token(TokenType type, string literal, uint line, uint column)
         {
