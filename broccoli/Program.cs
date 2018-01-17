@@ -6,7 +6,7 @@ namespace broccoli
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
+            Console.WriteLine("Hello World! -\U0001F966");
         }
     }
 }
