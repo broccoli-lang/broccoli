@@ -59,17 +59,20 @@ namespace Broccoli.Tokenization
             string result = string.Empty;
             char c;
 
-            while (!IsValidIdentifier(c = NextChar()))
+            while (Char.IsLetterOrDigit(c = NextChar()) || c == '_')
             {
                 result += c;
             }
+            
+            if (!IsValidIdentifier(result)) throw new Exception(); // TODO: Custom exception class?
 
             return result;
         }
 
-        private bool IsValidIdentifier(char c)
+        private bool IsValidIdentifier(string s)
         {
-            return c == '_' || Char.IsLetterOrDigit(c);
+            // TODO: Allow letters or digits or underscores, but numbers are not allowed at the start
+            throw new NotImplementedException();
         }
     }
 }
