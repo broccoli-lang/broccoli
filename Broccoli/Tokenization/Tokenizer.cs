@@ -69,7 +69,7 @@ namespace Broccoli.Tokenization
 
         private bool IsValidIdentifier(char c)
         {
-            return c == '_' || !(Char.IsWhiteSpace(c) || Char.IsPunctuation(c));
+            return c == '_' || Char.IsLetterOrDigit(c);
         }
     }
 }
