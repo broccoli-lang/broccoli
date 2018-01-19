@@ -5,14 +5,14 @@ namespace Broccoli.Tokenization
 {
     public class Tokenizer
     {
-        private string[] source;
-        private uint row = 1;
-        private uint column = 0;
-        private List<Token> tokens = new List<Token>();
+        private string[] _source;
+        private uint _row = 1;
+        private uint _column = 0;
+        private List<Token> _tokens = new List<Token>();
 
         public Tokenizer(string _source)
         {
-            source = _source.Split('\n');
+            this._source = _source.Split('\n');
         }
 
         public void ScanToken()
@@ -23,35 +23,35 @@ namespace Broccoli.Tokenization
                 {
                     // Single-char tokens
                     case '(':
-                        tokens.Add(new Token(TokenType.LeftParen, "(", row, column));
+                        _tokens.Add(new Token(TokenType.LeftParen, "(", _row, _column));
                         break;
                     case ')':
-                        tokens.Add(new Token(TokenType.RightParen, ")", row, column));
+                        _tokens.Add(new Token(TokenType.RightParen, ")", _row, _column));
                         break;
                     // Variables
                     case '$':
-                        tokens.Add(new Token(TokenType.Scalar, "$" + NextIdentifier(), row, column));
+                        _tokens.Add(new Token(TokenType.Scalar, "$" + NextIdentifier(), _row, _column));
                         break;
                     case '@':
-                        tokens.Add(new Token(TokenType.List, "@" + NextIdentifier(), row, column));
+                        _tokens.Add(new Token(TokenType.List, "@" + NextIdentifier(), _row, _column));
                         break;
                 }
             }
             catch (IndexOutOfRangeException)
             {
-                tokens.Add(new Token(TokenType.Eof, "", row, column));
+                _tokens.Add(new Token(TokenType.Eof, "", _row, _column));
             }
         }
 
         private char NextChar()
         {
-            return source[row - 1][(int) column];
+            return _source[_row - 1][(int) _column];
         }
 
         private void NextLine()
         {
-            row++;
-            column = 0;
+            _row++;
+            _column = 0;
         }
 
         private string NextIdentifier()
@@ -59,20 +59,17 @@ namespace Broccoli.Tokenization
             string result = string.Empty;
             char c;
 
-            while (Char.IsLetterOrDigit(c = NextChar()) || c == '_')
+            while (!IsValidIdentifier(c = NextChar()))
             {
                 result += c;
             }
-            
-            if (!IsValidIdentifier(result)) throw new Exception(); // TODO: Custom exception class?
 
             return result;
         }
 
-        private bool IsValidIdentifier(string s)
+        private bool IsValidIdentifier(char c)
         {
-            // TODO: Allow letters or digits or underscores, but numbers are not allowed at the start
-            throw new NotImplementedException();
+            return c == '_' || !(Char.IsWhiteSpace(c) || Char.IsPunctuation(c));
         }
     }
 }
