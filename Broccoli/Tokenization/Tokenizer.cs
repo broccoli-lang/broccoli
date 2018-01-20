@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Broccoli.Tokenization
 {
@@ -71,8 +72,15 @@ namespace Broccoli.Tokenization
 
         private bool IsValidIdentifier(string s)
         {
-            // TODO: Allow letters or digits or underscores, but numbers are not allowed at the start
-            throw new NotImplementedException();
+            if (s[0]!= '_' && ! char.IsLetter(s[0]))
+                return false;
+
+            foreach (var i in s.Skip(1))
+            {
+                if (i != '_' && ! char.IsLetterOrDigit(i))
+                    return false;
+            }
+            return true;
         }
     }
 }
