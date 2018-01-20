@@ -72,7 +72,7 @@ namespace Broccoli.Tokenization
 
         private bool IsValidIdentifier(string s)
         {
-            if (s[0]!= '_' && ! char.IsLetter(s[0]))
+            if (s.Length == 0 || s[0]!= '_' && ! char.IsLetter(s[0]))
                 return false;
 
             foreach (var i in s.Skip(1))
