@@ -36,6 +36,12 @@ namespace Broccoli.Tokenization
                     case '@':
                         _tokens.Add(new Token(TokenType.List, "@" + NextIdentifier(), _row, _column));
                         break;
+                    // Misc
+                    case '\n':
+                        NextLine();
+                        break;
+                    default:
+                        throw new Exception($"Unrecognized character at {_row}:{_column}"); // TODO: Custom exception class?
                 }
             }
             catch (IndexOutOfRangeException)
@@ -60,12 +66,12 @@ namespace Broccoli.Tokenization
             string result = string.Empty;
             char c;
 
-            while (Char.IsLetterOrDigit(c = NextChar()) || c == '_')
+            while (char.IsLetterOrDigit(c = NextChar()) || c == '_')
             {
                 result += c;
             }
             
-            if (!IsValidIdentifier(result)) throw new Exception(); // TODO: Custom exception class?
+            if (!IsValidIdentifier(result)) throw new Exception($"Invalid identifier at {_row}:{_column}"); // TODO: Custom exception class?
 
             return result;
         }
