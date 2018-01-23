@@ -36,6 +36,21 @@ namespace Broccoli.Tokenization
                     case '@':
                         _tokens.Add(new Token(TokenType.List, "@" + NextIdentifier(), _row, _column));
                         break;
+                    // Strings
+                    case '"':
+                        string str = string.Empty;
+                        char c;
+    
+                        while ((c = NextChar()) != '"')
+                        {
+                            // The original interpreter only supports \\ and \" escape sequences
+                            if (c == '\\') c = NextChar();
+    
+                            str += c;
+                        }
+
+                        _tokens.Add(new Token(TokenType.String, str, _row, _column));
+                        break;
                     // Misc
                     case '\n':
                         NextLine();
