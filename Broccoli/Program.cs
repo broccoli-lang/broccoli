@@ -1,6 +1,8 @@
 ﻿using System;
 using NDesk.Options;
 using System.IO;
+using System.Linq;
+using Broccoli.Tokenization;
 
 namespace Broccoli
 {
@@ -8,6 +10,8 @@ namespace Broccoli
     {
         static int Main(string[] args)
         {
+            TestTokenizer();
+            
             if (args.Length == 0) {
                 // todo start repl
             }
@@ -15,9 +19,10 @@ namespace Broccoli
             string file = null;
             OptionSet options = new OptionSet(){
                 {"h|help", "Show help", n=>{if(n!=null)GetHelp();}},
-                {"<>", "File containing code to read, or - for StdIn.", f=>{
+                {"<>", "File containing code to read, or - for StdIn.", f=>
+                    {
                         if (file == null)
-                            file=f;
+                            file = f;
                         else // Can't read code from multiple files
                             GetHelp();
                     }
@@ -41,7 +46,32 @@ namespace Broccoli
         private static void GetHelp() {
             Console.Error.WriteLine("\tBroccoli .NET: C# based Broccoli interpreter.");
             Console.Error.WriteLine("Usage: broccoli <filename>");
+
             Environment.Exit(1);
+        }
+
+        private static void TestTokenizer()
+        {
+            var tokenizer = new Tokenizer(
+@"(fn p ($a)
+    (:= $d 0)
+    (for $i in (range 2 $a)
+        (if (= $a (* $i (int (/ $a $i))))
+            (:= $d (+ $d 1))
+        )
+    )
+    (= $d 1)
+)
+(map p (range 1 20))"
+            );
+
+            do
+            {
+                tokenizer.ScanToken();
+            } while (tokenizer._tokens.Last().Type != TokenType.Eof);
+
+            Console.WriteLine(string.Join(", ", tokenizer._tokens.Select(t => (t.Type, t.Literal))));
+            Environment.Exit(0);
         }
 
     }

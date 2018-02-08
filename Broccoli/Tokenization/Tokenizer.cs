@@ -9,7 +9,7 @@ namespace Broccoli.Tokenization
         private string[] _source;
         private uint _row = 1;
         private uint _column = 0;
-        private List<Token> _tokens = new List<Token>();
+        public List<Token> _tokens = new List<Token>() ;
 
         public Tokenizer(string _source)
         {
@@ -18,9 +18,11 @@ namespace Broccoli.Tokenization
 
         public void ScanToken()
         {
+            Console.WriteLine(string.Join(", ", _tokens.Select(t => (t.Type, t.Literal))));
             try
             {
-                switch (NextChar())
+                char c;
+                switch (c = NextChar())
                 {
                     // Single-char tokens
                     case '(':
@@ -39,7 +41,6 @@ namespace Broccoli.Tokenization
                     // Strings
                     case '"':
                         string str = string.Empty;
-                        char c;
     
                         while ((c = NextChar()) != '"')
                         {
@@ -51,12 +52,26 @@ namespace Broccoli.Tokenization
 
                         _tokens.Add(new Token(TokenType.String, str, _row, _column));
                         break;
+                    // Numbers
+                    case char d when char.IsDigit(c):
+                        string num = string.Empty;
+
+                        while (char.IsDigit(c = NextChar()) || c == '.')
+                            num += c;
+                        
+                        _tokens.Add(new Token(num.Contains('.') ? TokenType.Float : TokenType.Integer, d + num, _row, _column));
+                        break;
                     // Misc
+                    case '\r': // TODO: Make this handle unexpected carriage returns
                     case '\n':
                         NextLine();
                         break;
+                    case ' ':
+                        break;
                     default:
-                        throw new Exception($"Unrecognized character at {_row}:{_column}"); // TODO: Custom exception class?
+                        _column--;
+                        _tokens.Add(new Token(TokenType.Identifier, NextIdentifier(), _row, _column));
+                        break;
                 }
             }
             catch (IndexOutOfRangeException)
@@ -67,7 +82,7 @@ namespace Broccoli.Tokenization
 
         private char NextChar()
         {
-            return _source[_row - 1][(int) _column];
+            return _source[_row - 1][(int) _column++];
         }
 
         private void NextLine()
@@ -81,24 +96,25 @@ namespace Broccoli.Tokenization
             string result = string.Empty;
             char c;
 
-            while (char.IsLetterOrDigit(c = NextChar()) || c == '_')
+            while (char.IsLetterOrDigit(c = NextChar()) || c.In("_:=+-*/"))
             {
                 result += c;
             }
             
             if (!IsValidIdentifier(result)) throw new Exception($"Invalid identifier at {_row}:{_column}"); // TODO: Custom exception class?
 
+            _column--;
             return result;
         }
 
         private bool IsValidIdentifier(string s)
         {
-            if (s.Length == 0 || s[0]!= '_' && ! char.IsLetter(s[0]))
+            if (s.Length == 0 || !s[0].In("_:=+-*/") && ! char.IsLetter(s[0]))
                 return false;
 
             foreach (var i in s.Skip(1))
             {
-                if (i != '_' && ! char.IsLetterOrDigit(i))
+                if (!(i.In("_:=+-*/") || char.IsLetterOrDigit(i)))
                     return false;
             }
             return true;
