@@ -18,7 +18,6 @@ namespace Broccoli.Tokenization
 
         public void ScanToken()
         {
-            Console.WriteLine(string.Join(", ", Tokens.Select(t => (t.Type, t.Literal))));
             try
             {
                 char c;
@@ -41,12 +40,12 @@ namespace Broccoli.Tokenization
                     // Strings
                     case '"':
                         string str = string.Empty;
-    
+
                         while ((c = NextChar()) != '"')
                         {
                             // The original interpreter only supports \\ and \" escape sequences
                             if (c == '\\') c = NextChar();
-    
+
                             str += c;
                         }
 
@@ -58,7 +57,7 @@ namespace Broccoli.Tokenization
 
                         while (char.IsDigit(c = NextChar()) || c == '.')
                             num += c;
-                        
+
                         Tokens.Add(new Token(num.Contains('.') ? TokenType.Float : TokenType.Integer, d + num, _row, _column));
                         break;
                     // Misc
@@ -100,7 +99,7 @@ namespace Broccoli.Tokenization
             {
                 result += c;
             }
-            
+
             if (!IsValidIdentifier(result)) throw new Exception($"Invalid identifier at {_row}:{_column}"); // TODO: Custom exception class?
 
             _column--;
