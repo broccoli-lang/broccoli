@@ -68,9 +68,9 @@ namespace Broccoli
             do
             {
                 tokenizer.ScanToken();
-            } while (tokenizer._tokens.Last().Type != TokenType.Eof);
+            } while (tokenizer.Tokens.Last().Type != TokenType.Eof);
 
-            Console.WriteLine(string.Join(", ", tokenizer._tokens.Select(t => (t.Type, t.Literal))));
+            Console.WriteLine(string.Join(", ", tokenizer.Tokens.Select(t => (t.Type, t.Literal))));
             Environment.Exit(0);
         }
 
