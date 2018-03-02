@@ -9,14 +9,20 @@ namespace Broccoli.Tokenization
         private string[] _source;
         private uint _row = 1;
         private uint _column = 0;
-        public readonly List<Token> Tokens = new List<Token>() ;
+        public List<Token> Tokens { get; } = new List<Token>();
 
         public Tokenizer(string source)
         {
             _source = source.Split('\n');
+            
+            do
+            {
+                var token = ScanToken();
+                if (token.HasValue) Tokens.Add(token.Value);
+            } while (Tokens.Last().Type != TokenType.Eof);
         }
 
-        public void ScanToken()
+        public Token? ScanToken()
         {
             try
             {
@@ -25,18 +31,14 @@ namespace Broccoli.Tokenization
                 {
                     // Single-char tokens
                     case '(':
-                        Tokens.Add(new Token(TokenType.LeftParen, "(", _row, _column));
-                        break;
+                        return new Token(TokenType.LeftParen, "(", _row, _column);
                     case ')':
-                        Tokens.Add(new Token(TokenType.RightParen, ")", _row, _column));
-                        break;
+                        return new Token(TokenType.RightParen, ")", _row, _column);
                     // Variables
                     case '$':
-                        Tokens.Add(new Token(TokenType.Scalar, "$" + NextIdentifier(), _row, _column));
-                        break;
+                        return new Token(TokenType.Scalar, "$" + NextIdentifier(), _row, _column);
                     case '@':
-                        Tokens.Add(new Token(TokenType.List, "@" + NextIdentifier(), _row, _column));
-                        break;
+                        return new Token(TokenType.List, "@" + NextIdentifier(), _row, _column);
                     // Strings
                     case '"':
                         string str = string.Empty;
@@ -49,8 +51,7 @@ namespace Broccoli.Tokenization
                             str += c;
                         }
 
-                        Tokens.Add(new Token(TokenType.String, str, _row, _column));
-                        break;
+                        return new Token(TokenType.String, str, _row, _column);
                     // Numbers
                     case char d when char.IsDigit(c):
                         string num = string.Empty;
@@ -58,24 +59,22 @@ namespace Broccoli.Tokenization
                         while (char.IsDigit(c = NextChar()) || c == '.')
                             num += c;
 
-                        Tokens.Add(new Token(num.Contains('.') ? TokenType.Float : TokenType.Integer, d + num, _row, _column));
-                        break;
+                        return new Token(num.Contains('.') ? TokenType.Float : TokenType.Integer, d + num, _row, _column);
                     // Misc
                     case '\r': // TODO: Make this handle unexpected carriage returns
                     case '\n':
                         NextLine();
-                        break;
+                        return null;
                     case ' ':
-                        break;
+                        return null;
                     default:
                         _column--;
-                        Tokens.Add(new Token(TokenType.Identifier, NextIdentifier(), _row, _column));
-                        break;
+                        return new Token(TokenType.Identifier, NextIdentifier(), _row, _column);
                 }
             }
             catch (IndexOutOfRangeException)
             {
-                Tokens.Add(new Token(TokenType.Eof, "", _row, _column));
+                return new Token(TokenType.Eof, "", _row, _column);
             }
         }
 

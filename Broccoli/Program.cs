@@ -65,11 +65,6 @@ namespace Broccoli
 (map p (range 1 20))"
             );
 
-            do
-            {
-                tokenizer.ScanToken();
-            } while (tokenizer.Tokens.Last().Type != TokenType.Eof);
-
             Console.WriteLine(string.Join(", ", tokenizer.Tokens.Select(t => (t.Type, t.Literal))));
             Environment.Exit(0);
         }
