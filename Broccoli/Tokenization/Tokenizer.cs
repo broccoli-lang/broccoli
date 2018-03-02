@@ -9,17 +9,20 @@ namespace Broccoli.Tokenization
         private string[] _source;
         private uint _row = 1;
         private uint _column = 0;
-        public readonly List<Token> Tokens = new List<Token>();
+        public readonly SExpression RootSExp;
 
         public Tokenizer(string source)
         {
             _source = source.Split('\n');
-            
+
+            var tokens = new List<Token>();
             do
             {
                 var token = ScanToken();
-                if (token != null) Tokens.Add(token);
-            } while (Tokens.Last().Type != TokenType.Eof);
+                if (token != null) tokens.Add(token);
+            } while (tokens.Last().Type != TokenType.Eof);
+
+            RootSExp = new SExpression(tokens);
         }
 
         private Token ScanToken()

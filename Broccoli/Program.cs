@@ -11,7 +11,7 @@ namespace Broccoli
         static int Main(string[] args)
         {
             TestTokenizer();
-            
+
             if (args.Length == 0) {
                 // todo start repl
             }
@@ -65,7 +65,7 @@ namespace Broccoli
 (map p (range 1 20))"
             );
 
-            Console.WriteLine(string.Join(", ", tokenizer.Tokens.Select(t => (t.Type, t.Literal))));
+            Console.WriteLine(string.Join(", ", tokenizer.RootSExp.Values.OfType<Token>().Select(t => (t.Type, t.Literal))));
             Environment.Exit(0);
         }
 
