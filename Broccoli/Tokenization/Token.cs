@@ -1,6 +1,6 @@
 ﻿namespace Broccoli.Tokenization
 {
-    public struct Token
+    public class Token : ISExpressible
     {
                
         public TokenType Type { get; }

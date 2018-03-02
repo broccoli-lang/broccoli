@@ -3,15 +3,17 @@ using System.Collections.Immutable;
 
 namespace Broccoli.Tokenization
 {
-    public struct SExpression
+    public interface ISExpressible { }
+    
+    public class SExpression : ISExpressible
     {
-        // TODO: Make this more typesafe. It should only be able to store Tokens and other SExpressions.
-        public ImmutableList<object> Values { get; }
+        public readonly ImmutableList<ISExpressible> Values;
 
         public SExpression(List<Token> tokens)
         {
-            // TODO: Get all values between a LeftParen and a RightParen and create new SExpressions if nested.
-            Values = ImmutableList<object>.Empty;
+            // No idea why I have to type cast here, but I do
+            Values = ImmutableList.CreateRange((IEnumerable<ISExpressible>) tokens);
+            // TODO: Get all values between a LeftParen and a RightParen and create new SExpressions inside them if nested.
         }
     }
 }

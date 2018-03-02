@@ -9,7 +9,7 @@ namespace Broccoli.Tokenization
         private string[] _source;
         private uint _row = 1;
         private uint _column = 0;
-        public List<Token> Tokens { get; } = new List<Token>();
+        public readonly List<Token> Tokens = new List<Token>();
 
         public Tokenizer(string source)
         {
@@ -18,11 +18,11 @@ namespace Broccoli.Tokenization
             do
             {
                 var token = ScanToken();
-                if (token.HasValue) Tokens.Add(token.Value);
+                if (token != null) Tokens.Add(token);
             } while (Tokens.Last().Type != TokenType.Eof);
         }
 
-        private Token? ScanToken()
+        private Token ScanToken()
         {
             try
             {
