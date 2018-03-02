@@ -22,7 +22,7 @@ namespace Broccoli.Tokenization
             } while (Tokens.Last().Type != TokenType.Eof);
         }
 
-        public Token? ScanToken()
+        private Token? ScanToken()
         {
             try
             {
