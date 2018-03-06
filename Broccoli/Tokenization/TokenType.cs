@@ -4,13 +4,13 @@ namespace Broccoli.Tokenization
     {
         // Structure
         LeftParen, RightParen,
-        
+
         // Literals
         String, Integer, Float,
-        
+
         // Identifiers
         Identifier, Scalar, List,
-        
+
         // Miscellaneous
         Eof
     }

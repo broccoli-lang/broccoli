@@ -22,6 +22,9 @@ namespace Broccoli.Tokenization
                 if (token != null) tokens.Add(token);
             } while (tokens.Last().Type != TokenType.Eof);
 
+            // TODO: Figure out if Eof needs to stay in the overall tokens.
+            tokens.RemoveAt(tokens.Count - 1);
+
             RootSExp = new SExpression(tokens);
         }
 
@@ -39,9 +42,9 @@ namespace Broccoli.Tokenization
                         return new Token(TokenType.RightParen, ")", _row, _column);
                     // Variables
                     case '$':
-                        return new Token(TokenType.Scalar, "$" + NextIdentifier(), _row, _column);
+                        return new Token(TokenType.Scalar, NextIdentifier(), _row, _column);
                     case '@':
-                        return new Token(TokenType.List, "@" + NextIdentifier(), _row, _column);
+                        return new Token(TokenType.List, NextIdentifier(), _row, _column);
                     // Strings
                     case '"':
                         string str = string.Empty;
