@@ -17,21 +17,16 @@ namespace Broccoli.Tokenization
             if (tokens.Last().Type != TokenType.RightParen) throw new Exception("Last token in sexp must be right paren!");
 
             var innerTokens = tokens.GetRange(1, tokens.Count - 1);
+            var sexpRanges = new List<(int, int)>();
             int parenIndex = 0;
 
             while (parenIndex != -1)
             {
-                Console.WriteLine(string.Join(", ", innerTokens.Skip(parenIndex).Select(t => (t.Type, t.Literal))));
-                Console.WriteLine($"before calc: {parenIndex}\n");
-
                 parenIndex = innerTokens.Select(t => t.Type).ToList().IndexOf(TokenType.LeftParen, parenIndex + 1);
+                int rightParenIndex = MatchingCloseParenIndex(innerTokens.Skip(parenIndex + 1).ToList());
 
-                Console.WriteLine(string.Join(", ", innerTokens.Skip(parenIndex).Select(t => (t.Type, t.Literal))));
-                Console.WriteLine($"after calc: {parenIndex}\n");
-
-                parenIndex += MatchingCloseParenIndex(innerTokens.Skip(parenIndex + 1).ToList());
-                Console.WriteLine(string.Join(", ", innerTokens.Skip(parenIndex++).Select(t => (t.Type, t.Literal))));
-                Console.WriteLine($"after paren: {parenIndex}\n\n");
+                sexpRanges.Add((parenIndex, rightParenIndex));
+                parenIndex = rightParenIndex;
             }
 
             Values = ImmutableList.CreateRange((IEnumerable<ISExpressible>) innerTokens);
