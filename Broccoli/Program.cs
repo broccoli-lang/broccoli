@@ -65,7 +65,7 @@ namespace Broccoli
 (map p (range 1 20))"
             );
 
-            Console.WriteLine(string.Join(", ", tokenizer.RootSExp.Values.OfType<Token>().Select(t => (t.Type, t.Literal))));
+//            Console.WriteLine(string.Join(", ", tokenizer.RootSExp.Values.OfType<Token>().Select(t => (t.Type, t.Literal))));
             Environment.Exit(0);
         }
 

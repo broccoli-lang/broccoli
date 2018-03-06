@@ -17,9 +17,39 @@ namespace Broccoli.Tokenization
             if (tokens.Last().Type != TokenType.RightParen) throw new Exception("Last token in sexp must be right paren!");
 
             var innerTokens = tokens.GetRange(1, tokens.Count - 1);
-            // TODO: Get all inner tokens and create new SExpressions inside them if nested.
+            int parenIndex = 0;
+
+            while (parenIndex != -1)
+            {
+                Console.WriteLine(string.Join(", ", innerTokens.Skip(parenIndex).Select(t => (t.Type, t.Literal))));
+                Console.WriteLine($"before calc: {parenIndex}\n");
+
+                parenIndex = innerTokens.Select(t => t.Type).ToList().IndexOf(TokenType.LeftParen, parenIndex + 1);
+
+                Console.WriteLine(string.Join(", ", innerTokens.Skip(parenIndex).Select(t => (t.Type, t.Literal))));
+                Console.WriteLine($"after calc: {parenIndex}\n");
+
+                parenIndex += MatchingCloseParenIndex(innerTokens.Skip(parenIndex + 1).ToList());
+                Console.WriteLine(string.Join(", ", innerTokens.Skip(parenIndex++).Select(t => (t.Type, t.Literal))));
+                Console.WriteLine($"after paren: {parenIndex}\n\n");
+            }
 
             Values = ImmutableList.CreateRange((IEnumerable<ISExpressible>) innerTokens);
+        }
+
+        private int MatchingCloseParenIndex(List<Token> tokens)
+        {
+            uint amountOpen = 1;
+
+            foreach ((var token, var index) in tokens.WithIndex())
+            {
+                if (token.Type == TokenType.LeftParen) amountOpen++;
+                if (token.Type == TokenType.RightParen) amountOpen--;
+                if (amountOpen == 0) return index;
+                Console.WriteLine($"amount open: {amountOpen}, index: {index}");
+            }
+
+            throw new Exception("Unmatched left parenthesis!");
         }
     }
 }
