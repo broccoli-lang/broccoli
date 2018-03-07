@@ -1,7 +1,6 @@
 ﻿using System;
 using NDesk.Options;
 using System.IO;
-using System.Linq;
 using Broccoli.Tokenization;
 
 namespace Broccoli
@@ -18,8 +17,8 @@ namespace Broccoli
 
             string file = null;
             OptionSet options = new OptionSet(){
-                {"h|help", "Show help", n=>{if(n!=null)GetHelp();}},
-                {"<>", "File containing code to read, or - for StdIn.", f=>
+                {"h|help", "Show help", n => { if (n!=null) GetHelp(); }},
+                {"<>", "File containing code to read, or - for StdIn.", f =>
                     {
                         if (file == null)
                             file = f;
@@ -65,7 +64,7 @@ namespace Broccoli
 (map p (range 1 20))"
             );
 
-//            Console.WriteLine(string.Join(", ", tokenizer.RootSExp.Values.OfType<Token>().Select(t => (t.Type, t.Literal))));
+            Console.WriteLine(string.Join<SExpression>('\n', tokenizer.RootSExps));
             Environment.Exit(0);
         }
 

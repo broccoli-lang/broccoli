@@ -6,10 +6,10 @@ namespace Broccoli.Tokenization
 {
     public class Tokenizer
     {
-        private string[] _source;
+        private readonly string[] _source;
         private uint _row = 1;
         private uint _column = 0;
-        public readonly SExpression RootSExp;
+        public readonly SExpression[] RootSExps;
 
         public Tokenizer(string source)
         {
@@ -25,7 +25,8 @@ namespace Broccoli.Tokenization
             // TODO: Figure out if Eof needs to stay in the overall tokens.
             tokens.RemoveAt(tokens.Count - 1);
 
-            RootSExp = new SExpression(tokens);
+            RootSExps = SExpression.GetSexpRangesList(tokens)
+                .Select(t => new SExpression(tokens.GetRange(t.Item1, t.Item2 - t.Item1 + 1))).ToArray();
         }
 
         private Token ScanToken()
@@ -42,9 +43,9 @@ namespace Broccoli.Tokenization
                         return new Token(TokenType.RightParen, ")", _row, _column);
                     // Variables
                     case '$':
-                        return new Token(TokenType.Scalar, NextIdentifier(), _row, _column);
+                        return new Token(TokenType.Scalar, '$' + NextIdentifier(), _row, _column);
                     case '@':
-                        return new Token(TokenType.List, NextIdentifier(), _row, _column);
+                        return new Token(TokenType.List, '@' + NextIdentifier(), _row, _column);
                     // Strings
                     case '"':
                         string str = string.Empty;
@@ -65,6 +66,8 @@ namespace Broccoli.Tokenization
                         while (char.IsDigit(c = NextChar()) || c == '.')
                             num += c;
 
+                        RewindChar();
+
                         return new Token(num.Contains('.') ? TokenType.Float : TokenType.Integer, d + num, _row, _column);
                     // Misc
                     case '\r': // TODO: Make this handle unexpected carriage returns
@@ -74,13 +77,26 @@ namespace Broccoli.Tokenization
                     case ' ':
                         return null;
                     default:
-                        _column--;
+                        RewindChar();
                         return new Token(TokenType.Identifier, NextIdentifier(), _row, _column);
                 }
             }
             catch (IndexOutOfRangeException)
             {
                 return new Token(TokenType.Eof, "", _row, _column);
+            }
+        }
+
+        private void RewindChar()
+        {
+            if (_column == 0)
+            {
+                _row--;
+                _column = (uint) _source[_row - 1].Length - 1;
+            }
+            else
+            {
+                _column--;
             }
         }
 
@@ -111,17 +127,12 @@ namespace Broccoli.Tokenization
             return result;
         }
 
-        private bool IsValidIdentifier(string s)
+        private static bool IsValidIdentifier(string s)
         {
             if (s.Length == 0 || !s[0].In("_:=+-*/") && ! char.IsLetter(s[0]))
                 return false;
 
-            foreach (var i in s.Skip(1))
-            {
-                if (!(i.In("_:=+-*/") || char.IsLetterOrDigit(i)))
-                    return false;
-            }
-            return true;
+            return s.Skip(1).All(i => i.In("_:=+-*/") || char.IsLetterOrDigit(i));
         }
     }
 }
