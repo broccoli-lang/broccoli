@@ -1,5 +1,9 @@
-﻿namespace Broccoli
+﻿using System.Collections.Generic;
+
+namespace Broccoli
 {
+    public delegate IValue Function(Broccoli context, uint argc, IValue[] argv);
+
     public interface IValue { }
 
     public interface IValue<out T> : IValue
@@ -44,6 +48,16 @@
         public Atom(string a)
         {
             Value = a;
+        }
+    }
+
+    public struct IValueList : IValue
+    {
+        public readonly List<IValue> Values;
+
+        public IValueList(List<IValue> values)
+        {
+            Values = values;
         }
     }
 }
