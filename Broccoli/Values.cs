@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace Broccoli {
     public interface IValue { }
@@ -55,27 +56,37 @@ namespace Broccoli {
         }
     }
 
-    public struct ValueList : IValue {
-        public readonly List<IValue> Values;
+    public struct ValueList : IValue<List<IValue>> {
+        public List<IValue> Value { get; }
 
         public ValueList(List<IValue> values) {
-            Values = values;
+            Value = values;
         }
     }
 
     public struct Function {
         public delegate IValue Call(Broccoli context, IValue[] argv);
 
-        private uint _argc;
-        private Call _call;
+        private string _name;
+        private int _argc;
+        private readonly Call _call;
 
-        public Function(uint argc, Call call) {
+        // If the function has variadic arguments, argc is -n-1, where n is the number of required args
+        public Function(string name, int argc, Call call) {
+            _name = name;
             _argc = argc;
             _call = call;
         }
 
+        // ReSharper disable once UnusedMethodReturnValue.Global
         public IValue Invoke(Broccoli context, IValue[] argv) {
-            // TODO: argc checking
+            bool isVariadic = _argc < 0;
+            int requiredArgc = isVariadic ? -_argc - 1 : _argc;
+
+            if (argv.Length < requiredArgc) {
+                throw new Exception($"Function {_name} requires {(isVariadic ? "at least" : "exactly")} {requiredArgc} arguments, only {argv.Length} provided");
+            }
+
             return _call(context, argv);
         }
     }

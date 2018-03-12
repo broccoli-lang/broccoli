@@ -6,7 +6,8 @@ using Broccoli.Tokenization;
 namespace Broccoli {
     class Program {
         static int Main(string[] args) {
-            TestTokenizer();
+            TestFunctions();
+//            TestTokenizer();
 
             if (args.Length == 0) {
                 // todo start repl
@@ -65,6 +66,16 @@ namespace Broccoli {
 
             Console.WriteLine(string.Join<SExpression>('\n', tokenizer.RootSExps));
             Environment.Exit(0);
+        }
+
+        private static void TestFunctions() {
+            var brocc = new Broccoli("");
+            var assignFn = brocc.Functions[":="];
+
+            assignFn.Invoke(brocc, new IValue[] {new ScalarVar("test"), new Int(5)});
+            Console.WriteLine(((Int) brocc.Scalars["test"]).Value);
+
+            assignFn.Invoke(brocc, new IValue[] {new ScalarVar("thisShouldThrow")});
         }
     }
 }
