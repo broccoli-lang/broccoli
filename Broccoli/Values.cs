@@ -51,11 +51,11 @@ namespace Broccoli
         }
     }
 
-    public struct IValueList : IValue
+    public struct ValueList : IValue
     {
         public readonly List<IValue> Values;
 
-        public IValueList(List<IValue> values)
+        public ValueList(List<IValue> values)
         {
             Values = values;
         }
