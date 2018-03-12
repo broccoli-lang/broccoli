@@ -3,23 +3,17 @@ using NDesk.Options;
 using System.IO;
 using Broccoli.Tokenization;
 
-namespace Broccoli
-{
-    class Program
-    {
-        static int Main(string[] args)
-        {
-            TestTokenizer();
-
-            if (args.Length == 0) {
-                // todo start repl
-            }
-
+namespace Broccoli {
+    class Program {
+        static int Main(string[] args) {
             string file = null;
-            OptionSet options = new OptionSet(){
-                {"h|help", "Show help", n => { if (n!=null) GetHelp(); }},
-                {"<>", "File containing code to read, or - for StdIn.", f =>
-                    {
+            OptionSet options = new OptionSet() {
+                {
+                    "h|help", "Show help", n => {
+                        if (n != null) GetHelp();
+                    }
+                }, {
+                    "<>", "File containing code to read, or - for StdIn.", f => {
                         if (file == null)
                             file = f;
                         else // Can't read code from multiple files
@@ -30,7 +24,7 @@ namespace Broccoli
 
             options.Parse(args);
 
-            if(file == null) {
+            if (file == null) {
                 GetHelp();
             }
 
@@ -49,10 +43,9 @@ namespace Broccoli
             Environment.Exit(1);
         }
 
-        private static void TestTokenizer()
-        {
+        private static void TestTokenizer() {
             var tokenizer = new Tokenizer(
-@"(fn p ($a)
+                @"(fn p ($a)
     (:= $d 0)
     (for $i in (range 2 $a)
         (if (= $a (* $i (int (/ $a $i))))
@@ -67,6 +60,5 @@ namespace Broccoli
             Console.WriteLine(string.Join<SExpression>('\n', tokenizer.RootSExps));
             Environment.Exit(0);
         }
-
     }
 }

@@ -1,15 +1,18 @@
-namespace Broccoli.Tokenization
-{
-    public enum TokenType
-    {
+namespace Broccoli.Tokenization {
+    public enum TokenType {
         // Structure
-        LeftParen, RightParen,
+        LeftParen,
+        RightParen,
 
         // Literals
-        String, Integer, Float,
+        String,
+        Integer,
+        Float,
 
         // Identifiers
-        Identifier, Scalar, List,
+        Identifier,
+        Scalar,
+        List,
 
         // Miscellaneous
         Eof

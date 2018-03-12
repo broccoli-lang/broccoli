@@ -4,11 +4,11 @@ using System.Linq;
 using System.Collections.Generic;
 
 
-namespace Broccoli
-{
+namespace Broccoli {
     public static class Extensions {
         // Used for creating foreach-with-index loops, `foreach(var (value, index) in collection.WithIndex())`
-        public static IEnumerable<(T value, int index)> WithIndex<T>(this IEnumerable<T> enumerable) {
+        public static IEnumerable<(T value, int index)>
+            WithIndex<T>(this IEnumerable<T> enumerable) {
             return enumerable.Select((v, i) => (v, i));
         }
 
@@ -16,6 +16,7 @@ namespace Broccoli
         public static bool In<T>(this T obj, params T[] values) {
             return values.Contains(obj);
         }
+
         public static bool In<T>(this T obj, IEnumerable<T> values) {
             return values.Contains(obj);
         }
