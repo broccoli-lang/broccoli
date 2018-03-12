@@ -1,26 +1,24 @@
 using System;
 using System.Collections.Generic;
+using Broccoli.Tokenization;
 
 namespace Broccoli {
-    public class Broccoli {
+    public partial class Broccoli {
         public readonly Dictionary<string, IValue> Scalars = new Dictionary<string, IValue>();
         public readonly Dictionary<string, ValueList> Lists = new Dictionary<string, ValueList>();
 
-        public readonly Dictionary<string, Function> Functions = new Dictionary<string, Function> {
-            {":=", new Function(":=", 2, (context, argv) => {
-                context.Scalars[((ScalarVar) argv[0]).Value] = argv[1];
-                return argv[1];
-            })}
-        };
+        // Functions dictionary defined in Builtins.cs
 
-        private string _code;
+        private readonly SExpression[] _rootExpressions;
 
         public Broccoli(string code) {
-            _code = code;
+            _rootExpressions = new Tokenizer(code).RootSExps;
         }
 
         public void Run() {
-            throw new NotImplementedException();
+            foreach (var sexp in _rootExpressions) {
+                // TODO
+            }
         }
     }
 }

@@ -21,7 +21,7 @@ namespace Broccoli.Tokenization {
 
             for (var i = 0; i < innerTokens.Count; i++) {
                 try {
-                    var range = sexpRanges.First(r => (i >= r.Item1) && (i <= r.Item2));
+                    var range = sexpRanges.First(r => i >= r.Item1 && i <= r.Item2);
                     newValues.Add(new SExpression(innerTokens.GetRange(range.Item1,
                         range.Item2 - range.Item1 + 1)));
                     i = range.Item2; // Easy way to skip ahead in a for loop
@@ -33,7 +33,7 @@ namespace Broccoli.Tokenization {
             Values = ImmutableList.CreateRange(newValues);
         }
 
-        public static IEnumerable<(int, int)> GetSexpRangesList(List<Token> tokens) {
+        public static List<(int, int)> GetSexpRangesList(List<Token> tokens) {
             var sexpRanges = new List<(int, int)>();
             int parenIndex = 0;
 

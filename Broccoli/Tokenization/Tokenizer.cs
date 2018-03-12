@@ -6,6 +6,7 @@ namespace Broccoli.Tokenization {
     public class Tokenizer {
         private readonly string[] _source;
         private uint _row = 1;
+        // ReSharper disable once RedundantDefaultMemberInitializer
         private uint _column = 0;
         public readonly SExpression[] RootSExps;
 
