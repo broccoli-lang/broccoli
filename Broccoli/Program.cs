@@ -72,8 +72,8 @@ namespace Broccoli {
             var brocc = new Broccoli("");
             var assignFn = brocc.Functions[":="];
 
-            assignFn.Invoke(brocc, new IValue[] {new ScalarVar("test"), new Int(5)});
-            Console.WriteLine(((Int) brocc.Scalars["test"]).Value);
+            assignFn.Invoke(brocc, new IValue[] {new ScalarVar("test"), new Integer(5)});
+            Console.WriteLine(((Integer) brocc.Scalars["test"]).Value);
 
             assignFn.Invoke(brocc, new IValue[] {new ScalarVar("thisShouldThrow")});
         }

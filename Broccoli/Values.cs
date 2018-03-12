@@ -7,10 +7,10 @@ namespace Broccoli {
         T Value { get; }
     }
 
-    public struct Int : IValue<int> {
+    public struct Integer : IValue<int> {
         public int Value { get; }
 
-        public Int(int i) {
+        public Integer(int i) {
             Value = i;
         }
     }
