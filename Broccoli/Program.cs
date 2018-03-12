@@ -6,6 +6,12 @@ using Broccoli.Tokenization;
 namespace Broccoli {
     class Program {
         static int Main(string[] args) {
+            TestTokenizer();
+
+            if (args.Length == 0) {
+                // todo start repl
+            }
+
             string file = null;
             OptionSet options = new OptionSet() {
                 {

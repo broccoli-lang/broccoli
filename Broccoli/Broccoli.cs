@@ -7,7 +7,7 @@ namespace Broccoli {
         public readonly Dictionary<string, ValueList> Lists = new Dictionary<string, ValueList>();
 
         public readonly Dictionary<string, Function> Functions = new Dictionary<string, Function> {
-            {":=", (context, argc, argv) => context.Scalars[((ScalarVar) argv[0]).Value] = argv[1]}
+            {":=", new Function(2, (context, argv) => context.Scalars[((ScalarVar) argv[0]).Value] = argv[1])}
         };
 
         private string _code;

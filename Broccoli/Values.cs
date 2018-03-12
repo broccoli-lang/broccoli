@@ -1,8 +1,6 @@
 ﻿using System.Collections.Generic;
 
 namespace Broccoli {
-    public delegate IValue Function(Broccoli context, uint argc, IValue[] argv);
-
     public interface IValue { }
 
     public interface IValue<out T> : IValue {
@@ -62,6 +60,23 @@ namespace Broccoli {
 
         public ValueList(List<IValue> values) {
             Values = values;
+        }
+    }
+
+    public struct Function {
+        public delegate IValue Call(Broccoli context, IValue[] argv);
+
+        private uint _argc;
+        private Call _call;
+
+        public Function(uint argc, Call call) {
+            _argc = argc;
+            _call = call;
+        }
+
+        public IValue Invoke(Broccoli context, IValue[] argv) {
+            // TODO: argc checking
+            return _call(context, argv);
         }
     }
 }
