@@ -10,15 +10,14 @@ namespace Broccoli {
                     // According to Rider, pattern matching isn't allowed to be used in lambdas in field initializers
                     // This was fixed in .NET in https://github.com/dotnet/roslyn/pull/17101
                     // Looks like it's allowed in Visual Studio, but not in Rider for whatever reason
-                    // I'll just ignore it
-                    case ScalarVar s:
+                    case ScalarVar _:
                         if (argv[1] is ValueList) throw new Exception("Lists cannot be assigned to scalar ($) variables");
-                        context.Scalars[s.Value] = argv[1];
+                        context.Scalars[((ScalarVar) arg).Value] = argv[1];
                         break;
-                    case ListVar l:
+                    case ListVar _:
                         var list = argv[1] as ValueList?;
                         if (!list.HasValue) throw new Exception("Scalars cannot be assigned to list (@) variables");
-                        context.Lists[l.Value] = list.Value;
+                        context.Lists[((ListVar) arg).Value] = list.Value;
                         break;
                     default:
                         throw new Exception("Values can only be assigned to scalar ($) or list (@) variables");
