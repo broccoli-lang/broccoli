@@ -24,7 +24,7 @@ namespace Broccoli {
                 }
 
                 return argv[1];
-            }, true)}
+            })}
         };
     }
 }

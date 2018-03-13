@@ -23,8 +23,44 @@ namespace Broccoli {
             }
         }
 
-        private IValue EvaluateExpression(ValueExpression vexp) {
-            throw new NotImplementedException();
+        private IValue EvaluateExpression(IValueExpressible expr) {
+            switch (expr) {
+                case ScalarVar s:
+                    return Scalars[s.Value];
+                case ListVar l:
+                    return Lists[l.Value];
+                case ValueList l:
+                    return new ValueList(l.Value.Select(EvaluateExpression).ToList());
+                case ValueExpression vexp:
+                    var first = vexp.Values.First();
+                    var fnAtom = first as Atom?;
+                    if (fnAtom == null)
+                        throw new Exception($"Function name {first} must be an identifier");
+
+                    var args = vexp.Values.Skip(1).ToArray();
+                    var fnName = fnAtom.Value.Value;
+                    switch (fnName) {
+                        // Pre-evaluation/substitution syntactic "functions"
+                        case ":=":
+                            Function.ValidateArgs(2, args, ":=");
+                            // TODO
+                            return null;
+                        case "if":
+                            // TODO
+                            return null;
+                        case "for":
+                            // TODO
+                            return null;
+//                        default:
+//                            Functions[fnName].Invoke(this, args);
+                    }
+                    break;
+                default:
+                    return (IValue) expr;
+            }
+
+            // The compiler yells at me if this isn't here
+            return null;
         }
     }
 }
