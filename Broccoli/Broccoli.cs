@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using Broccoli.Tokenization;
 
 namespace Broccoli {
@@ -8,16 +10,21 @@ namespace Broccoli {
 
         // Functions dictionary defined in Builtins.cs
 
-        private readonly SExpression[] _rootExpressions;
+        private readonly ValueExpression[] _rootExpressions;
 
         public Broccoli(string code) {
-            _rootExpressions = new Tokenizer(code).RootSExps;
+            _rootExpressions = new Tokenizer(code).RootSExps.Select(s => (ValueExpression) s).ToArray();
         }
 
         public void Run() {
-            foreach (var sexp in _rootExpressions) {
-                // TODO
+            foreach (var vexp in _rootExpressions) {
+                // TODO: Does this need to be expanded?
+                EvaluateExpression(vexp);
             }
+        }
+
+        private IValue EvaluateExpression(ValueExpression vexp) {
+            throw new NotImplementedException();
         }
     }
 }

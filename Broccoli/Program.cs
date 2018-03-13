@@ -6,7 +6,7 @@ using Broccoli.Tokenization;
 namespace Broccoli {
     class Program {
         static int Main(string[] args) {
-            TestFunctions();
+//            TestFunctions();
 //            TestTokenizer();
 
             if (args.Length == 0) {

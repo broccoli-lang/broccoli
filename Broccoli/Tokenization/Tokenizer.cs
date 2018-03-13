@@ -11,7 +11,8 @@ namespace Broccoli.Tokenization {
         public readonly SExpression[] RootSExps;
 
         public Tokenizer(string source) {
-            _source = source.Split('\n');
+            // Feels really hacky. Don't particularly care at the moment.
+            _source = source.Split('\n').Select(s => s + '\n').ToArray();
 
             var tokens = new List<Token>();
             do {
@@ -29,8 +30,8 @@ namespace Broccoli.Tokenization {
 
         private Token ScanToken() {
             try {
-                char c;
-                switch (c = NextChar()) {
+                char c = NextChar();
+                switch (c) {
                     // Single-char tokens
                     case '(':
                         return new Token(TokenType.LeftParen, "(", _row, _column);

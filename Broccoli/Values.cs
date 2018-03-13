@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 
 namespace Broccoli {
-    public interface IValue { }
+    public interface IValue : IValueExpressible { }
 
     public interface IValue<out T> : IValue {
         T Value { get; }
@@ -13,6 +13,10 @@ namespace Broccoli {
         public Integer(int i) {
             Value = i;
         }
+
+        public override string ToString() {
+            return $"Integer[{Value}]";
+        }
     }
 
     public struct Float : IValue<double> {
@@ -20,6 +24,10 @@ namespace Broccoli {
 
         public Float(double f) {
             Value = f;
+        }
+
+        public override string ToString() {
+            return $"Float[{Value}]";
         }
     }
 
@@ -29,6 +37,10 @@ namespace Broccoli {
         public String(string s) {
             Value = s;
         }
+
+        public override string ToString() {
+            return $"String[\"{Value}\"]";
+        }
     }
 
     public struct Atom : IValue<string> {
@@ -36,6 +48,10 @@ namespace Broccoli {
 
         public Atom(string a) {
             Value = a;
+        }
+
+        public override string ToString() {
+            return $"Atom[{Value}]";
         }
     }
 
@@ -45,6 +61,10 @@ namespace Broccoli {
         public ScalarVar(string s) {
             Value = s;
         }
+
+        public override string ToString() {
+            return $"ScalarVar[{Value}]";
+        }
     }
 
     public struct ListVar : IValue<string> {
@@ -53,6 +73,10 @@ namespace Broccoli {
         public ListVar(string l) {
             Value = l;
         }
+
+        public override string ToString() {
+            return $"ListVar[{Value}]";
+        }
     }
 
     public struct ValueList : IValue<List<IValue>> {
@@ -60,6 +84,10 @@ namespace Broccoli {
 
         public ValueList(List<IValue> values) {
             Value = values;
+        }
+
+        public override string ToString() {
+            return $"ValueList[{string.Join(", ", Value)}]";
         }
     }
 }
