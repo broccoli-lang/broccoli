@@ -54,7 +54,6 @@ namespace Broccoli {
         // ReSharper disable once UnusedMethodReturnValue.Global
         public IValue Invoke(Broccoli broccoli, IValueExpressible[] args) {
             Function.ValidateArgs(_argc, args, _name);
-            var self = this;
             return _call(broccoli, args);
         }
     }

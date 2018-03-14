@@ -19,9 +19,8 @@ namespace Broccoli {
         public IValue Get(ScalarVar s) {
             if (Scalars.ContainsKey(s.Value))
                 return Scalars[s.Value];
-            if (Parent != null)
-                return Parent.Get(s);
-            return null;
+
+            return Parent?.Get(s);
         }
 
         public bool Set(ScalarVar s, IValue value, bool self = true, bool initial = true) {
@@ -31,11 +30,10 @@ namespace Broccoli {
             }
             if (Parent != null && Parent.Set(s, value, false))
                 return true;
-            if (initial) {
-                Scalars[s.Value] = value;
-                return true;
-            }
-            return false;
+            if (!initial) return false;
+
+            Scalars[s.Value] = value;
+            return true;
         }
 
         public IValue this[ScalarVar s] {
@@ -51,9 +49,8 @@ namespace Broccoli {
         public ValueList Get(ListVar l) {
             if (Lists.ContainsKey(l.Value))
                 return Lists[l.Value];
-            if (Parent != null)
-                return Parent.Get(l);
-            return null;
+
+            return Parent?.Get(l);
         }
 
         public bool Set(ListVar l, ValueList value, bool self = true, bool initial = true) {
@@ -63,11 +60,10 @@ namespace Broccoli {
             }
             if (Parent != null && Parent.Set(l, value, false))
                 return true;
-            if (initial) {
-                Lists[l.Value] = value;
-                return true;
-            }
-            return false;
+            if (!initial) return false;
+
+            Lists[l.Value] = value;
+            return true;
         }
 
         public ValueList this[ListVar l] {
@@ -83,9 +79,8 @@ namespace Broccoli {
         public IFunction Get(string l) {
             if (Functions.ContainsKey(l))
                 return Functions[l];
-            if (Parent != null)
-                return Parent.Get(l);
-            return null;
+
+            return Parent?.Get(l);
         }
 
         public bool Set(string l, IFunction value, bool self = true, bool initial = true) {
@@ -93,13 +88,11 @@ namespace Broccoli {
                 Functions[l] = value;
                 return true;
             }
-            if (Parent != null && Parent.Set(l, value, false))
-                return true;
-            if (initial) {
-                Functions[l] = value;
-                return true;
-            }
-            return false;
+            if (Parent != null && Parent.Set(l, value, false)) return true;
+            if (!initial) return false;
+
+            Functions[l] = value;
+            return true;
         }
 
         public IFunction this[string l] {
@@ -163,6 +156,7 @@ namespace Broccoli {
                     var args = e.Values.Skip(1).ToArray();
                     var fnName = fnAtom.Value.Value;
                     IFunction fn = Scope[fnName];
+
                     if (fn == null) {
                         if (Builtins.ContainsKey(fnName))
                             fn = Builtins[fnName];

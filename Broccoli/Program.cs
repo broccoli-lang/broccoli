@@ -19,6 +19,7 @@ namespace Broccoli {
                     Console.ForegroundColor = ConsoleColor.Green;
                     Console.Write("broccoli> ");
                     Console.ForegroundColor = ConsoleColor.White;
+
                     var parsed = Parser.Parse(Console.ReadLine());
                     while (!parsed.Finished) {
                         Console.ForegroundColor = ConsoleColor.Green;
@@ -26,6 +27,7 @@ namespace Broccoli {
                         Console.ForegroundColor = ConsoleColor.White;
                         parsed = Parser.Parse(Console.ReadLine(), parsed);
                     }
+
                     var result = broccoli.Run(parsed);
                     if (result != null)
                         Console.WriteLine(result);

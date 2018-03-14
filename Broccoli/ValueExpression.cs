@@ -16,7 +16,7 @@ namespace Broccoli {
             Values = values.ToArray();
         }
 
-        public static explicit operator ValueExpression(ParseNode n) {
+        public static implicit operator ValueExpression(ParseNode n) {
             IValueExpressible Selector(ParseNode node) {
                 if (node.Token != null)
                     return node.Token.ToIValue();

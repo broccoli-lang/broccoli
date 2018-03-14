@@ -19,15 +19,15 @@ namespace Broccoli {
         }
 
         public static bool operator ==(Integer left, object right) {
-            return right is Integer && left.Value == ((Integer) right).Value;
+            return right is Integer integer && left.Value == integer.Value;
         }
 
         public static bool operator !=(Integer left, object right) {
-            return right is Integer && left.Value != ((Integer) right).Value;
+            return right is Integer integer && left.Value != integer.Value;
         }
 
         public override bool Equals(object other) {
-            return (other is Integer) && Value == ((Integer) other).Value;
+            return other is Integer integer && Value == integer.Value;
         }
 
         public override int GetHashCode() {
@@ -53,15 +53,15 @@ namespace Broccoli {
         }
 
         public static bool operator ==(Float left, object right) {
-            return right is Float && left.Value == ((Float) right).Value;
+            return right is Float f && left.Value == f.Value;
         }
 
         public static bool operator !=(Float left, object right) {
-            return right is Float && left.Value != ((Float) right).Value;
+            return right is Float f && left.Value != f.Value;
         }
 
         public override bool Equals(object other) {
-            return (other is Float) && Value == ((Float) other).Value;
+            return other is Float f && Value == f.Value;
         }
 
         public override int GetHashCode() {
@@ -83,15 +83,15 @@ namespace Broccoli {
         }
 
         public static bool operator ==(String left, object right) {
-            return right is String && left.Value == ((String) right).Value;
+            return right is String s && left.Value == s.Value;
         }
 
         public static bool operator !=(String left, object right) {
-            return right is String && left.Value != ((String) right).Value;
+            return right is String s && left.Value != s.Value;
         }
 
         public override bool Equals(object other) {
-            return (other is String) && Value == ((String) other).Value;
+            return (other is String s) && Value == s.Value;
         }
 
         public override int GetHashCode() {
@@ -116,15 +116,15 @@ namespace Broccoli {
         }
 
         public static bool operator ==(Atom left, object right) {
-            return right is Atom && left.Value == ((Atom) right).Value;
+            return right is Atom atom && left.Value == atom.Value;
         }
 
         public static bool operator !=(Atom left, object right) {
-            return right is Atom && left.Value != ((Atom) right).Value;
+            return right is Atom atom && left.Value != atom.Value;
         }
 
         public override bool Equals(object other) {
-            return (other is Atom) && Value == ((Atom) other).Value;
+            return (other is Atom atom) && Value == atom.Value;
         }
 
         public override int GetHashCode() {
@@ -170,11 +170,11 @@ namespace Broccoli {
         }
 
         public static bool operator ==(ValueList left, object right) {
-            return right is ValueList && left.Equals((ValueList) right);
+            return right is ValueList list && left.Equals(list);
         }
 
         public static bool operator !=(ValueList left, object right) {
-            return right is ValueList && !left.Equals((ValueList) right);
+            return right is ValueList list && !left.Equals(list);
         }
 
         public override bool Equals(object other) {
