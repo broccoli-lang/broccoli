@@ -2,16 +2,34 @@
 using NDesk.Options;
 using System.IO;
 using System.Linq;
-using Broccoli.Tokenization;
+using Broccoli.Parsing;
 
 namespace Broccoli {
     class Program {
         public static int Main(string[] args) {
-//            TestFunctions();
-//            TestTokenizer();
+            // TODO: remove as many try/catches as possible, this isn't Python, nor is it Java
+            // TODO: do we even need row/col in ParseNode
+            Broccoli broccoli;
 
             if (args.Length == 0) {
-                // todo start repl
+                broccoli = new Broccoli();
+                while (true) {
+                    if (Console.CursorLeft != 0)
+                        Console.WriteLine();
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.Write("broccoli> ");
+                    Console.ForegroundColor = ConsoleColor.White;
+                    var parsed = Parser.Parse(Console.ReadLine());
+                    while (!parsed.Finished) {
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.Write("        > ");
+                        Console.ForegroundColor = ConsoleColor.White;
+                        parsed = Parser.Parse(Console.ReadLine(), parsed);
+                    }
+                    var result = broccoli.Run(parsed);
+                    if (result != null)
+                        Console.WriteLine(result);
+                }
             }
 
             string file = null;
@@ -22,7 +40,7 @@ namespace Broccoli {
                         if (n != null) getHelp = true;
                     }
                 }, {
-                    "<>", "File containing code to read, or - for StdIn.", f => {
+                    "<>", "File containing code to read, or - for stdin.", f => {
                         if (file == null) file = f;
                     }
                 }
@@ -35,13 +53,13 @@ namespace Broccoli {
             }
 
             var code = file == "-" ? Console.In.ReadToEnd() : File.ReadAllText(file);
-            var broccoli = new Broccoli(code);
+            broccoli = new Broccoli(code);
 
             broccoli.Run();
 
             Console.WriteLine("\n--- Debugging Info ---");
-            broccoli.Scalars.ToList().ForEach(kv => Console.WriteLine($"{kv.Key} => {kv.Value}"));
-            broccoli.Lists.ToList().ForEach(kv => Console.WriteLine($"{kv.Key} => {kv.Value}"));
+            broccoli.Scope.Scalars.ToList().ForEach(kv => Console.WriteLine($"{kv.Key} => {kv.Value}"));
+            broccoli.Scope.Lists.ToList().ForEach(kv => Console.WriteLine($"{kv.Key} => {kv.Value}"));
 
             return 0;
         }
@@ -51,35 +69,7 @@ namespace Broccoli {
             Console.Error.WriteLine("Usage: broccoli [options] <filename>");
             o.WriteOptionDescriptions(Console.Out);
 
-            Environment.Exit(1);
-        }
-
-        private static void TestTokenizer() {
-            var tokenizer = new Tokenizer(
-                @"(fn p ($a)
-    (:= $d 0)
-    (for $i in (range 2 $a)
-        (if (= $a (* $i (int (/ $a $i))))
-            (:= $d (+ $d 1))
-        )
-    )
-    (= $d 1)
-)
-(map p (range 1 20))"
-            );
-
-            Console.WriteLine(string.Join<SExpression>('\n', tokenizer.RootSExps));
             Environment.Exit(0);
-        }
-
-        private static void TestFunctions() {
-            var brocc = new Broccoli("");
-            var assignFn = brocc.Functions[":="];
-
-            assignFn.Invoke(new IValue[] {new ScalarVar("test"), new Integer(5)});
-            Console.WriteLine(((Integer) brocc.Scalars["test"]).Value);
-
-            assignFn.Invoke(new IValue[] {new ScalarVar("thisShouldThrow")});
         }
     }
 }

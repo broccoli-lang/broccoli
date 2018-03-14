@@ -3,20 +3,22 @@
 Broccoli is an exciting new programming language that is guaranteed to make you pee your
 pants (in a good way).
 
-*this guide can be found online at http://www.earthvssoup.com/projects/broccoli/quickstart.html*
+*this guide can be found online [here](https://github.com/broccoli-lang/broccoli/blob/master/quickstart.md)*
 
-{menu: {menuStyle: section, options: {maxLevels: 4, numberSections: false}}}
+
 
 ## Getting Started
 Get the executable:
 
-- [Email me with your desired OS target](mailto:broccoli@earthvssoup.com "email")
+- Post an issue with desired OS target if it's not [here](https://github.com/broccoli-lang/broccoli/releases)
 
 Quick Start:
 
 0. Unpack the Broccoli binary
 1. To run Broccoli's REPL type the following `./broccoli`
 2. To see a list of commands available type `(help)`
+
+
 
 ## Data Types
 Broccoli supports the following datatypes:
@@ -26,11 +28,13 @@ Broccoli supports the following datatypes:
 - boolean (t, nil)
 - atom
 - string
-- lists
+- list
+
+
 
 ## Variables
-Scalar variables (e.g. int, float, boolean, atom, string) in Broccoli take the form $name
-Collection variables (e.g. lists) take the form @name
+Scalar variables (e.g. int, float, boolean, atom, string) in Broccoli take the form `$name`  
+Collection variables (e.g. list) take the form `@name`
 
 
 
@@ -58,14 +62,14 @@ Takes a function name and 0<sup>*</sup> arguments and *calls* the former with th
 `(call + 2 3)`  => 5
 
 #### `(run)`
-Takes a string pertaining to an external file and evaluates its contents as if they had been typed
+Takes a string pointing to an external file and evaluates its contents as if they had been typed
 into the command prompt.
 
 #### `(import)`
-Takes a string pertaining to an external file and evaluates only its constructs (i.e. functions and bindings).
+Takes a string pointing to an external file and evaluates only its constructs (i.e. functions and bindings).
 
 #### `(bench)`
-Takes any validate Broccoli expression and times its execution, returning the number of seconds it took to execute.
+Takes any valid Broccoli expression and times its execution, returning the number of seconds it took to execute.
 
 ### I/O Commands
 #### `(print)`

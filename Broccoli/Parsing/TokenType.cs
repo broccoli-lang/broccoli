@@ -1,20 +1,16 @@
-namespace Broccoli.Tokenization {
+namespace Broccoli.Parsing {
     public enum TokenType {
-        // Structure
-        LeftParen,
-        RightParen,
-
         // Literals
         String,
         Integer,
         Float,
 
         // Identifiers
-        Identifier,
+        Atom,
         Scalar,
         List,
 
         // Miscellaneous
-        Eof
+        None
     }
 }

@@ -1,6 +1,6 @@
-﻿using System;
+﻿using System.Collections.Generic;
 using System.Linq;
-using Broccoli.Tokenization;
+using Broccoli.Parsing;
 
 namespace Broccoli {
     public interface IValueExpressible { }
@@ -12,20 +12,18 @@ namespace Broccoli {
             Values = values;
         }
 
-        public static explicit operator ValueExpression(SExpression sexp) {
-            IValueExpressible Selector(ISExpressible v) {
-                switch (v) {
-                    case Token t:
-                        return t.ToIValue();
-                    case SExpression s:
-                        return new ValueExpression(s.Values.Select(Selector).ToArray());
-                    default:
-                        // Should never happen
-                        throw new ArgumentOutOfRangeException();
-                }
+        public ValueExpression(IEnumerable<IValueExpressible> values) {
+            Values = values.ToArray();
+        }
+
+        public static explicit operator ValueExpression(ParseNode n) {
+            IValueExpressible Selector(ParseNode node) {
+                if (node.Token != null)
+                    return node.Token.ToIValue();
+                return new ValueExpression(node.Children.Select(Selector));
             }
 
-            return new ValueExpression(sexp.Values.Select(Selector).ToArray());
+            return new ValueExpression(n.Children.Select(Selector).ToArray());
         }
 
         public override string ToString() {

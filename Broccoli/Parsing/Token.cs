@@ -1,15 +1,13 @@
 ﻿using System;
 
-namespace Broccoli.Tokenization {
-    public class Token : ISExpressible {
+namespace Broccoli.Parsing {
+    public class Token {
         public TokenType Type { get; }
         public string Literal { get; }
-        public (uint Line, uint Column) Position { get; }
 
-        public Token(TokenType type, string literal, uint line, uint column) {
+        public Token(TokenType type, string literal) {
             Type = type;
             Literal = literal;
-            Position = (line, column);
         }
 
         public override string ToString() {
@@ -24,7 +22,7 @@ namespace Broccoli.Tokenization {
                     return new Integer(int.Parse(Literal));
                 case TokenType.Float:
                     return new Float(double.Parse(Literal));
-                case TokenType.Identifier:
+                case TokenType.Atom:
                     return new Atom(Literal);
                 case TokenType.Scalar:
                     return new ScalarVar(Literal);
