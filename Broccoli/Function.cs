@@ -2,7 +2,7 @@
 
 namespace Broccoli {
     public struct Function {
-        public delegate IValue Call(Broccoli context, IValue[] argv);
+        public delegate IValue Call(IValue[] args);
 
         private readonly string _name;
         private readonly int _argc;
@@ -16,17 +16,17 @@ namespace Broccoli {
         }
 
         // ReSharper disable once UnusedMethodReturnValue.Global
-        public IValue Invoke(Broccoli context, IValue[] argv) {
-            ValidateArgs(_argc, argv, _name);
-            return _call(context, argv);
+        public IValue Invoke(IValue[] args) {
+            ValidateArgs(_argc, args, _name);
+            return _call(args);
         }
 
-        public static void ValidateArgs<T>(int argc, T[] argv, string name) {
+        public static void ValidateArgs<T>(int argc, T[] args, string name) {
             bool isVariadic = argc < 0;
             int requiredArgc = isVariadic ? -argc - 1 : argc;
 
-            if (argv.Length < requiredArgc) {
-                throw new Exception($"Function {name} requires {(isVariadic ? "at least" : "exactly")} {requiredArgc} arguments, {argv.Length} provided");
+            if (args.Length < requiredArgc) {
+                throw new Exception($"Function {name} requires {(isVariadic ? "at least" : "exactly")} {requiredArgc} arguments, {args.Length} provided");
             }
         }
     }

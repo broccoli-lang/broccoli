@@ -1,11 +1,12 @@
 ﻿using System;
 using NDesk.Options;
 using System.IO;
+using System.Linq;
 using Broccoli.Tokenization;
 
 namespace Broccoli {
     class Program {
-        static int Main(string[] args) {
+        public static int Main(string[] args) {
 //            TestFunctions();
 //            TestTokenizer();
 
@@ -14,38 +15,41 @@ namespace Broccoli {
             }
 
             string file = null;
-            OptionSet options = new OptionSet() {
+            bool getHelp = false;
+            OptionSet options = new OptionSet {
                 {
                     "h|help", "Show help", n => {
-                        if (n != null) GetHelp();
+                        if (n != null) getHelp = true;
                     }
                 }, {
                     "<>", "File containing code to read, or - for StdIn.", f => {
-                        if (file == null)
-                            file = f;
-                        else // Can't read code from multiple files
-                            GetHelp();
+                        if (file == null) file = f;
                     }
                 }
             };
 
             options.Parse(args);
 
-            if (file == null) {
-                GetHelp();
+            if (file == null || getHelp) {
+                GetHelp(options);
             }
 
-            var code = (file == "-") ? Console.In.ReadToEnd() : File.ReadAllText(file);
+            var code = file == "-" ? Console.In.ReadToEnd() : File.ReadAllText(file);
             var broccoli = new Broccoli(code);
 
             broccoli.Run();
 
+            Console.WriteLine("\n--- Debugging Info ---");
+            broccoli.Scalars.ToList().ForEach(kv => Console.WriteLine($"{kv.Key} => {kv.Value}"));
+            broccoli.Lists.ToList().ForEach(kv => Console.WriteLine($"{kv.Key} => {kv.Value}"));
+
             return 0;
         }
 
-        private static void GetHelp() {
-            Console.Error.WriteLine("\tBroccoli .NET: C# based Broccoli interpreter.");
-            Console.Error.WriteLine("Usage: broccoli <filename>");
+        private static void GetHelp(OptionSet o) {
+            Console.Error.WriteLine("Broccoli .NET: C# based Broccoli interpreter.\n");
+            Console.Error.WriteLine("Usage: broccoli [options] <filename>");
+            o.WriteOptionDescriptions(Console.Out);
 
             Environment.Exit(1);
         }
@@ -72,10 +76,10 @@ namespace Broccoli {
             var brocc = new Broccoli("");
             var assignFn = brocc.Functions[":="];
 
-            assignFn.Invoke(brocc, new IValue[] {new ScalarVar("test"), new Integer(5)});
+            assignFn.Invoke(new IValue[] {new ScalarVar("test"), new Integer(5)});
             Console.WriteLine(((Integer) brocc.Scalars["test"]).Value);
 
-            assignFn.Invoke(brocc, new IValue[] {new ScalarVar("thisShouldThrow")});
+            assignFn.Invoke(new IValue[] {new ScalarVar("thisShouldThrow")});
         }
     }
 }

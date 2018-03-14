@@ -43,24 +43,38 @@ namespace Broccoli {
                         // Pre-evaluation/substitution syntactic "functions"
                         case ":=":
                             Function.ValidateArgs(2, args, ":=");
+
+                            var toAssign = EvaluateExpression(args[1]);
+                            switch (args[0]) {
+                                case ScalarVar s:
+                                    if (toAssign is ValueList) throw new Exception("Lists cannot be assigned to scalar ($) variables");
+                                    Scalars[s.Value] = toAssign;
+                                    break;
+                                case ListVar l:
+                                    var list = toAssign as ValueList?;
+                                    if (!list.HasValue) throw new Exception("Scalars cannot be assigned to list (@) variables");
+                                    Lists[l.Value] = list.Value;
+                                    break;
+                                default:
+                                    throw new Exception("Values can only be assigned to scalar ($) or list (@) variables");
+                            }
+
+                            return toAssign;
+                        case "if":
                             // TODO
                             return null;
-                        case "if":
+                        case "fn":
                             // TODO
                             return null;
                         case "for":
                             // TODO
                             return null;
-//                        default:
-//                            Functions[fnName].Invoke(this, args);
+                        default:
+                            return Functions[fnName].Invoke(args.Select(EvaluateExpression).ToArray());
                     }
-                    break;
                 default:
                     return (IValue) expr;
             }
-
-            // The compiler yells at me if this isn't here
-            return null;
         }
     }
 }
