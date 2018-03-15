@@ -19,7 +19,7 @@ namespace Broccoli {
                 var argNames = argExpressions.Values.ToArray();
                 var statements = args.Skip(2);
                 IValue result = null;
-                broccoli.Scope.Functions[name.Value] = new Function(name.Value, -1, innerArgs => {
+                broccoli.Scope.Functions[name.Value] = new Function(name.Value, argNames.Length, innerArgs => {
                     broccoli.Scope = new BroccoliScope(broccoli.Scope);
                     for (int i = 0; i < innerArgs.Length; i++) {
                         var toAssign = innerArgs[i];
