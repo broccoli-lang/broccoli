@@ -96,7 +96,7 @@ Creates a list of the arguments given.
 Returns the number of items in a list
 
 #### `(first)`
-Given a list, returns a list of its first element
+Given a list, returns its first element
 
 #### `(rest)`
 Given a list, returns a list of all **but** its first element
@@ -144,6 +144,19 @@ Checks if the first value is equal to every other value.
 
 #### `(/=)`
 Checks if the first value is not equal to every other value.
+
+#### `(<)`
+Checks if the numeric values are in strictly descending order.
+
+#### `(>)`
+Checks if the numeric values are in strictly ascending order.
+
+#### `(<=)`
+Checks if the numeric values are in descending order.
+
+#### `(>=)`
+Checks if the numeric values are in ascending order.
+
 
 ### Logic
 #### `(not)`
@@ -195,7 +208,7 @@ The broccoli.broc file contains extended functions written in the Broccoli langu
 
 ### Extended functions
 #### `(fib)`
-Takes a number and returns its [Fibonacci number](http://en.wikipedia.org/wiki/Fibonacci_number).
+Takes a number n and returns the nth [Fibonacci number](http://en.wikipedia.org/wiki/Fibonacci_number) (1-indexed).
 
 #### `(fact)`
 Calculates the factorial of a given number.
@@ -215,7 +228,7 @@ Takes a function name and a list and reduces the list according to the function,
 `(reduce + (list 1 2 3 4 5))`  => 15
 
 #### `(filter)`
-Takes a function name and a list and filters out the values that the function returns false for.
+Takes a function name and a list and returns the values that the function returns true for.
 
 *Example*
 

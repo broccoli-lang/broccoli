@@ -1,75 +1,70 @@
 ﻿using System;
+using static System.Console;
 using NDesk.Options;
 using System.IO;
-using System.Linq;
 using Broccoli.Parsing;
 
 namespace Broccoli {
     class Program {
-        public static int Main(string[] args) {
+        public static void Main(string[] args) {
             // TODO: remove as many try/catches as possible, this isn't Python, nor is it Java
             // TODO: do we even need row/col in ParseNode
-            Broccoli broccoli;
-
-            if (args.Length == 0) {
-                broccoli = new Broccoli();
-                while (true) {
-                    if (Console.CursorLeft != 0)
-                        Console.WriteLine();
-                    Console.ForegroundColor = ConsoleColor.Green;
-                    Console.Write("broccoli> ");
-                    Console.ForegroundColor = ConsoleColor.White;
-
-                    var parsed = Parser.Parse(Console.ReadLine());
-                    while (!parsed.Finished) {
-                        Console.ForegroundColor = ConsoleColor.Green;
-                        Console.Write("        > ");
-                        Console.ForegroundColor = ConsoleColor.White;
-                        parsed = Parser.Parse(Console.ReadLine(), parsed);
-                    }
-
-                    var result = broccoli.Run(parsed);
-                    if (result != null)
-                        Console.WriteLine(result);
-                }
-            }
-
+            Broccoli broccoli = new Broccoli();
             string file = null;
-            bool getHelp = false;
+            bool getHelp = false, useREPL = args.Length == 0, useCauliflower = false;
+
             OptionSet options = new OptionSet {
                 {
-                    "h|help", "Show help", n => {
-                        if (n != null) getHelp = true;
-                    }
+                    "h|help", "Show help", n => getHelp = n != null
                 }, {
-                    "<>", "File containing code to read, or - for stdin.", f => {
-                        if (file == null) file = f;
-                    }
+                    "<>", "File containing code to read, or - for stdin.", f => file = file ?? f
+                }, {
+                    "r|repl", "Use REPL", n => useREPL = n != null
+                }, {
+                    "c|cauliflower", "Use Cauliflower", n => useCauliflower = n != null
                 }
             };
 
             options.Parse(args);
 
-            if (file == null || getHelp) {
+            if (useCauliflower)
+                broccoli.Builtins = Broccoli.AlternativeEnvironments["cauliflower"];
+
+            if (useREPL)
+                while (true) {
+                    if (CursorLeft != 0)
+                        WriteLine();
+                    ForegroundColor = ConsoleColor.Green;
+                    Write("broccoli> ");
+                    ForegroundColor = ConsoleColor.White;
+
+                    var parsed = Parser.Parse(ReadLine());
+                    while (!parsed.Finished) {
+                        ForegroundColor = ConsoleColor.Green;
+                        Write("        > ");
+                        ForegroundColor = ConsoleColor.White;
+                        parsed = Parser.Parse(ReadLine(), parsed);
+                    }
+
+                    try {
+                        var result = broccoli.Run(parsed);
+                        if (result != null)
+                            WriteLine(result);
+                    } catch (Exception e) {
+                        WriteLine($"Error: {e.Message}");
+                    }
+                }
+
+            if (file == null || getHelp)
                 GetHelp(options);
-            }
 
-            var code = file == "-" ? Console.In.ReadToEnd() : File.ReadAllText(file);
-            broccoli = new Broccoli(code);
-
-            broccoli.Run();
-
-            Console.WriteLine("\n--- Debugging Info ---");
-            broccoli.Scope.Scalars.ToList().ForEach(kv => Console.WriteLine($"{kv.Key} => {kv.Value}"));
-            broccoli.Scope.Lists.ToList().ForEach(kv => Console.WriteLine($"{kv.Key} => {kv.Value}"));
-
-            return 0;
+            broccoli.Run(file == "-" ? In.ReadToEnd() : File.ReadAllText(file));
         }
 
         private static void GetHelp(OptionSet o) {
-            Console.Error.WriteLine("Broccoli .NET: C# based Broccoli interpreter.\n");
-            Console.Error.WriteLine("Usage: broccoli [options] <filename>");
-            o.WriteOptionDescriptions(Console.Out);
+            Error.WriteLine("Broccoli .NET: C# based Broccoli interpreter.\n");
+            Error.WriteLine("Usage: broccoli [options] <filename>");
+            o.WriteOptionDescriptions(Out);
 
             Environment.Exit(0);
         }

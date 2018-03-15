@@ -23,12 +23,12 @@ namespace Broccoli {
             return Parent?.Get(s);
         }
 
-        public bool Set(ScalarVar s, IValue value, bool self = true, bool initial = true) {
+        public bool Set(ScalarVar s, IValue value, bool self = false, bool initial = true) {
             if (self || Scalars.ContainsKey(s.Value)) {
                 Scalars[s.Value] = value;
                 return true;
             }
-            if (Parent != null && Parent.Set(s, value, false))
+            if (Parent != null && Parent.Set(s, value))
                 return true;
             if (!initial) return false;
 
@@ -53,7 +53,7 @@ namespace Broccoli {
             return Parent?.Get(l);
         }
 
-        public bool Set(ListVar l, ValueList value, bool self = true, bool initial = true) {
+        public bool Set(ListVar l, ValueList value, bool self = false, bool initial = true) {
             if (self || Lists.ContainsKey(l.Value)) {
                 Lists[l.Value] = value;
                 return true;
@@ -83,7 +83,7 @@ namespace Broccoli {
             return Parent?.Get(l);
         }
 
-        public bool Set(string l, IFunction value, bool self = true, bool initial = true) {
+        public bool Set(string l, IFunction value, bool self = false, bool initial = true) {
             if (self || Functions.ContainsKey(l)) {
                 Functions[l] = value;
                 return true;
@@ -108,22 +108,9 @@ namespace Broccoli {
 
     public partial class Broccoli {
         public BroccoliScope Scope = new BroccoliScope();
-
-        // Functions dictionary defined in Builtins.cs
-
-        private readonly IEnumerable<ValueExpression> _rootExpressions;
+        public Dictionary<string, IFunction> Builtins = DefaultBuiltins;
 
         public Broccoli() { }
-
-        public Broccoli(string code) {
-            _rootExpressions = Parser.Parse(code).Children.Select(s => (ValueExpression) s);
-        }
-
-        public void Run() {
-            foreach (var e in _rootExpressions)
-                // TODO: Does this need to be expanded?
-                EvaluateExpression(e);
-        }
 
         public IValue Run(string code) {
             IValue result = null;
@@ -140,21 +127,29 @@ namespace Broccoli {
         }
 
         public IValue EvaluateExpression(IValueExpressible expr) {
+            IValue result;
             switch (expr) {
                 case ScalarVar s:
-                    return Scope[s];
+                    result = Scope[s];
+                    if (result == null)
+                        throw new Exception($"Scalar {s.Value} not found");
+                    return result;
                 case ListVar l:
-                    return Scope[l];
+                    result = Scope[l];
+                    if (result == null)
+                        throw new Exception($"Scalar {l.Value} not found");
+                    return result;
                 case ValueList l:
                     return new ValueList(l.Value.Select(EvaluateExpression).ToList());
                 case ValueExpression e:
+                    if (e.IsValue)
+                        return EvaluateExpression(e.Values.First());
                     var first = e.Values.First();
-                    var fnAtom = first as Atom?;
-                    if (fnAtom == null)
+                    if (!(first is Atom fnAtom))
                         throw new Exception($"Function name {first} must be an identifier");
 
                     var args = e.Values.Skip(1).ToArray();
-                    var fnName = fnAtom.Value.Value;
+                    var fnName = fnAtom.Value;
                     IFunction fn = Scope[fnName];
 
                     if (fn == null) {
@@ -164,8 +159,10 @@ namespace Broccoli {
                             throw new Exception($"Function {fnName} does not exist");
                     }
                     return fn.Invoke(this, args);
+                case IValue i:
+                    return i;
                 default:
-                    return (IValue) expr;
+                    throw new Exception($"Unexpected expression type {expr.GetType()}");
             }
         }
     }

@@ -18,21 +18,13 @@ namespace Broccoli {
             return new Integer(i);
         }
 
-        public static bool operator ==(Integer left, object right) {
-            return right is Integer integer && left.Value == integer.Value;
-        }
+        public static bool operator ==(Integer left, object right) => right is Integer i && left.Value == i.Value;
 
-        public static bool operator !=(Integer left, object right) {
-            return right is Integer integer && left.Value != integer.Value;
-        }
+        public static bool operator !=(Integer left, object right) => right is Integer i && left.Value != i.Value;
 
-        public override bool Equals(object other) {
-            return other is Integer integer && Value == integer.Value;
-        }
+        public override bool Equals(object other) => other is Integer i && Value == i.Value;
 
-        public override int GetHashCode() {
-            return Value.GetHashCode();
-        }
+        public override int GetHashCode() => Value.GetHashCode();
 
         public override string ToString() => Value.ToString();
     }
@@ -44,29 +36,17 @@ namespace Broccoli {
             Value = f;
         }
 
-        public static implicit operator Float(double f) {
-            return new Float(f);
-        }
+        public static implicit operator Float(double f) => new Float(f);
 
-        public static implicit operator Float(Integer f) {
-            return new Float(f.Value);
-        }
+        public static implicit operator Float(Integer f) => new Float(f.Value);
 
-        public static bool operator ==(Float left, object right) {
-            return right is Float f && left.Value == f.Value;
-        }
+        public static bool operator ==(Float left, object right) => right is Float f && left.Value == f.Value;
 
-        public static bool operator !=(Float left, object right) {
-            return right is Float f && left.Value != f.Value;
-        }
+        public static bool operator !=(Float left, object right) => right is Float f && left.Value != f.Value;
 
-        public override bool Equals(object other) {
-            return other is Float f && Value == f.Value;
-        }
+        public override bool Equals(object other) => other is Float f && Value == f.Value;
 
-        public override int GetHashCode() {
-            return Value.GetHashCode();
-        }
+        public override int GetHashCode() => Value.GetHashCode();
 
         public override string ToString() => Value.ToString();
     }
@@ -78,25 +58,15 @@ namespace Broccoli {
             Value = s;
         }
 
-        public static implicit operator String(string s) {
-            return new String(s);
-        }
+        public static implicit operator String(string s) => new String(s);
 
-        public static bool operator ==(String left, object right) {
-            return right is String s && left.Value == s.Value;
-        }
+        public static bool operator ==(String left, object right) => right is String s && left.Value == s.Value;
 
-        public static bool operator !=(String left, object right) {
-            return right is String s && left.Value != s.Value;
-        }
+        public static bool operator !=(String left, object right) => right is String s && left.Value != s.Value;
 
-        public override bool Equals(object other) {
-            return (other is String s) && Value == s.Value;
-        }
+        public override bool Equals(object other) => (other is String s) && Value == s.Value;
 
-        public override int GetHashCode() {
-            return Value.GetHashCode();
-        }
+        public override int GetHashCode() => Value.GetHashCode();
 
         public override string ToString() => Value;
     }
@@ -115,21 +85,13 @@ namespace Broccoli {
             return new Atom(a);
         }
 
-        public static bool operator ==(Atom left, object right) {
-            return right is Atom atom && left.Value == atom.Value;
-        }
+        public static bool operator ==(Atom left, object right) => right is Atom a && left.Value == a.Value;
 
-        public static bool operator !=(Atom left, object right) {
-            return right is Atom atom && left.Value != atom.Value;
-        }
+        public static bool operator !=(Atom left, object right) => right is Atom a && left.Value != a.Value;
 
-        public override bool Equals(object other) {
-            return (other is Atom atom) && Value == atom.Value;
-        }
+        public override bool Equals(object other) => (other is Atom a) && Value == a.Value;
 
-        public override int GetHashCode() {
-            return Value.GetHashCode();
-        }
+        public override int GetHashCode() => Value.GetHashCode();
 
         public override string ToString() => Value;
     }
@@ -165,31 +127,22 @@ namespace Broccoli {
             Value = this;
         }
 
-        public static implicit operator ValueList(IValue[] values) {
-            return new ValueList(values);
-        }
+        public static implicit operator ValueList(IValue[] values) => new ValueList(values);
 
-        public static bool operator ==(ValueList left, object right) {
-            return right is ValueList list && left.Equals(list);
-        }
+        public static bool operator ==(ValueList left, object right) => right is ValueList list && left.Equals(list);
 
-        public static bool operator !=(ValueList left, object right) {
-            return right is ValueList list && !left.Equals(list);
-        }
+        public static bool operator !=(ValueList left, object right) => right is ValueList list && !left.Equals(list);
 
         public override bool Equals(object other) {
-            if (!(other is ValueList) || ((ValueList) other).Count != Count)
+            if (!(other is ValueList otherList) || otherList.Count != Count)
                 return false;
-            var otherList = (ValueList) other;
             for (int i = 0; i < Count; i++)
                 if (!this[i].Equals(otherList[i]))
                     return false;
             return true;
         }
 
-        public override int GetHashCode() {
-            return Value.GetHashCode();
-        }
+        public override int GetHashCode() => Value.GetHashCode();
 
         public override string ToString() => '(' + string.Join(' ', Value) + ')';
     }

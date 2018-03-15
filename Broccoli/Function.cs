@@ -31,7 +31,7 @@ namespace Broccoli {
             bool isVariadic = argc < 0;
             int requiredArgc = isVariadic ? -argc - 1 : argc;
 
-            if (args.Length < requiredArgc) {
+            if (isVariadic ? args.Length < requiredArgc : args.Length != requiredArgc) {
                 throw new Exception($"Function {name} requires {(isVariadic ? "at least" : "exactly")} {requiredArgc} arguments, {args.Length} provided");
             }
         }
