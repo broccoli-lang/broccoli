@@ -15,7 +15,7 @@ namespace Broccoli {
                 if (!(broccoli.EvaluateExpression(args[0]) is Atom name))
                     throw new Exception($"Received {TypeName(args[0])} instead of atom in argument 1 for 'fn'");
                 if (!(args[1] is ValueExpression argExpressions))
-                    throw new Exception($"Received {TypeName(args[1])} instead of valueexpressible in argument 2 for 'fn'");
+                    throw new Exception($"Received {TypeName(args[1])} instead of expression in argument 2 for 'fn'");
                 var argNames = argExpressions.Values.ToArray();
                 var statements = args.Skip(2);
                 IValue result = null;
@@ -550,17 +550,52 @@ namespace Broccoli {
         public static readonly Dictionary<string, Dictionary<string, IFunction>> AlternativeEnvironments = new Dictionary<string, Dictionary<string, IFunction>> {
             {"cauliflower",  new Dictionary<string, IFunction> {
                 {"and", new ShortCircuitFunction("and", -1, (broccoli, args) => {
-                    foreach (var arg in args)
-                        if (broccoli.EvaluateExpression(arg).Equals(Atom.Nil))
-                            return Atom.Nil;
+                    if (args.Any(arg => broccoli.EvaluateExpression(arg).Equals(Atom.Nil))) {
+                        return Atom.Nil;
+                    }
+
                     return Atom.True;
                 })},
                 {"or", new ShortCircuitFunction("or", -1, (broccoli, args) => {
-                    foreach (var arg in args)
-                        if (!broccoli.EvaluateExpression(arg).Equals(Atom.Nil))
-                            return Atom.True;
+                    if (args.Any(arg => !broccoli.EvaluateExpression(arg).Equals(Atom.Nil))) {
+                        return Atom.True;
+                    }
+
                     return Atom.Nil;
                 })},
+                {"lam", new ShortCircuitFunction("lam", -2, (broccoli, args) => {
+                    if (!(args[1] is ValueExpression argExpressions))
+                        throw new Exception($"Received {TypeName(args[1])} instead of expression in argument 1 for 'lam'");
+                    var argNames = argExpressions.Values.ToArray();
+                    var statements = args.Skip(2);
+                    IValue result = null;
+                    return new AnonymousFunction(argNames.Length, innerArgs => {
+                        broccoli.Scope = new BroccoliScope(broccoli.Scope);
+                        for (int i = 0; i < innerArgs.Length; i++) {
+                            var toAssign = innerArgs[i];
+                            switch (argNames[i]) {
+                                case ScalarVar s:
+                                    if (toAssign is ValueList)
+                                        throw new Exception("Lists cannot be assigned to scalar ($) variables");
+                                    broccoli.Scope[s] = toAssign;
+                                    break;
+                                case ListVar l:
+                                    if (!(toAssign is ValueList valueList))
+                                        throw new Exception("Scalars cannot be assigned to list (@) variables");
+                                    broccoli.Scope[l] = valueList;
+                                    break;
+                                default:
+                                    throw new Exception("Values can only be assigned to scalar ($) or list (@) variables");
+                            }
+                        }
+                        foreach (var statement in statements.Take(statements.Count() - 1))
+                            broccoli.EvaluateExpression(statement);
+                        if (statements.Count() != 0)
+                            result = broccoli.EvaluateExpression(statements.Last());
+                        broccoli.Scope = broccoli.Scope.Parent;
+                        return result;
+                    });
+                })}
             }.Extend(DefaultBuiltins)}
         };
     }

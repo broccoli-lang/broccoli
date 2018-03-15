@@ -57,4 +57,24 @@ namespace Broccoli {
             return _call(broccoli, args);
         }
     }
+
+    public struct AnonymousFunction : IFunction, IValue {
+        public delegate IValue Call(IValue[] args);
+
+        private readonly int _argc;
+        private readonly Call _call;
+
+        public AnonymousFunction(int argc, Call call) {
+            _argc = argc;
+            _call = call;
+        }
+
+        public IValue Invoke(Broccoli broccoli, IValueExpressible[] args) {
+            var runArgs = args.ToList().Select(broccoli.EvaluateExpression).ToArray();
+            Function.ValidateArgs(_argc, runArgs, "(anonymous)");
+            return _call(runArgs);
+        }
+
+        public override string ToString() => $"(anonymous function with {_argc} arguments)";
+    }
 }
