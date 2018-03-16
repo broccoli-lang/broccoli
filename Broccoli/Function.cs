@@ -3,7 +3,7 @@ using System.Linq;
 
 namespace Broccoli {
     public interface IFunction {
-        IValue Invoke(Broccoli broccoli, IValueExpressible[] args);
+        IValue Invoke(Broccoli broccoli, params IValueExpressible[] args);
     }
 
     public struct Function : IFunction {
@@ -21,7 +21,7 @@ namespace Broccoli {
         }
 
         // ReSharper disable once UnusedMethodReturnValue.Global
-        public IValue Invoke(Broccoli broccoli, IValueExpressible[] args) {
+        public IValue Invoke(Broccoli broccoli, params IValueExpressible[] args) {
             var runArgs = args.ToList().Select(broccoli.Run).ToArray();
             ValidateArgs(_argc, runArgs, _name);
             return _call(broccoli, runArgs);
@@ -51,7 +51,7 @@ namespace Broccoli {
         }
 
         // ReSharper disable once UnusedMethodReturnValue.Global
-        public IValue Invoke(Broccoli broccoli, IValueExpressible[] args) {
+        public IValue Invoke(Broccoli broccoli, params IValueExpressible[] args) {
             Function.ValidateArgs(_argc, args, _name);
             return _call(broccoli, args);
         }
@@ -68,7 +68,7 @@ namespace Broccoli {
             _call = call;
         }
 
-        public IValue Invoke(Broccoli broccoli, IValueExpressible[] args) {
+        public IValue Invoke(Broccoli broccoli, params IValueExpressible[] args) {
             var runArgs = args.ToList().Select(broccoli.Run).ToArray();
             Function.ValidateArgs(_argc, runArgs, "(anonymous)");
             return _call(runArgs);

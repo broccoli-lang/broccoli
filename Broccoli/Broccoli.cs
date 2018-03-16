@@ -142,7 +142,7 @@ namespace Broccoli {
                 case ValueList l:
                     return new ValueList(l.Value.Select(Run).ToList());
                 case ValueExpression e:
-                    return Builtins[""].Invoke(this, new[] { e });
+                    return Builtins[""].Invoke(this, e);
                 case IValue i:
                     return i;
                 default:
