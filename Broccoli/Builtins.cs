@@ -11,6 +11,22 @@ namespace Broccoli {
 
         public static readonly Dictionary<string, IFunction> DefaultBuiltins = new Dictionary<string, IFunction> {
             // Core Language Features
+            {"", new ShortCircuitFunction("", 1, (broccoli, args) => {
+                var e = (ValueExpression) args[0];
+                if (e.IsValue)
+                    return broccoli.EvaluateExpression(e.Values.First());
+                var first = e.Values.First();
+                IFunction fn = null;
+                if (!(first is Atom a))
+                    throw new Exception($"Function name {first} must be an identifier");
+
+                var fnName = a.Value;
+                fn = broccoli.Scope[fnName] ?? broccoli.Builtins.GetValueOrDefault(fnName, null);
+                if (fn == null)
+                    throw new Exception($"Function {fnName} does not exist");
+
+                return fn.Invoke(broccoli, e.Values.Skip(1).ToArray());
+            })},
             {"fn", new ShortCircuitFunction("fn", -3, (broccoli, args) => {
                 if (!(broccoli.EvaluateExpression(args[0]) is Atom name))
                     throw new Exception($"Received {TypeName(args[0])} instead of atom in argument 1 for 'fn'");
@@ -91,9 +107,17 @@ namespace Broccoli {
                 return broccoli.Run(s.Value);
             })},
             {"call", new ShortCircuitFunction("call", -2, (broccoli, args) => {
-                if (!(broccoli.EvaluateExpression(args[0]) is Atom a))
+                IFunction fn = null;
+                var value = broccoli.EvaluateExpression(args[0]);
+                if (!(broccoli.EvaluateExpression(value) is Atom a))
                     throw new Exception($"Received {TypeName(args[0])} instead of atom in argument 0 for 'call'");
-                return (broccoli.Scope[a.Value] ?? broccoli.Builtins[a.Value]).Invoke(broccoli, args.Skip(1).ToArray());
+
+                var fnName = a.Value;
+                fn = broccoli.Scope[fnName] ?? broccoli.Builtins.GetValueOrDefault(fnName, null);
+                if (fn == null)
+                    throw new Exception($"Function {fnName} does not exist");
+
+                return fn.Invoke(broccoli, args.Skip(1).ToArray());
             })},
             {"run", new ShortCircuitFunction("run", 1, (broccoli, args) => {
                 if (!(broccoli.EvaluateExpression(args[0]) is String s))
@@ -226,20 +250,24 @@ namespace Broccoli {
                 return toAssign;
             })},
             {"int", new Function("int", 1, args => {
-                if (args[0] is Integer)
-                    return args[0];
-                if (args[0] is Float f)
-                    return new Integer((int) f.Value);
-
-                throw new Exception($"Received {TypeName(args[0])} instead of integer or float in argument 1 for 'int'");
+                switch (args[0]) {
+                    case Integer i:
+                        return i;
+                    case Float f:
+                        return new Integer((int) f.Value);
+                    default:
+                        throw new Exception($"Received {TypeName(args[0])} instead of integer or float in argument 1 for 'int'");
+                }
             })},
             {"float", new Function("float", 1, args => {
-                if (args[0] is Float)
-                    return args[0];
-                if (args[0] is Integer integer)
-                    return (Float) integer;
-
-                throw new Exception($"Received {TypeName(args[0])} instead of integer or float in argument 1 for 'float'");
+                switch (args[0]) {
+                    case Integer i:
+                        return new Float(i.Value);
+                    case Float f:
+                        return f;
+                    default:
+                        throw new Exception($"Received {TypeName(args[0])} instead of integer or float in argument 1 for 'float'");
+                }
             })},
 
             // Comparison
@@ -442,19 +470,17 @@ namespace Broccoli {
                 if (!condition.Equals(Atom.True) && !condition.Equals(Atom.Nil))
                     throw new Exception($"Received {TypeName(args[0])} '{args[0].ToString()}' instead of boolean in argument 1 for 'if'");
                 var elseIndex = Array.IndexOf(args.ToArray(), new Atom("else"), 1);
-                if (elseIndex != -1) {
-                    var expression = new ValueExpression(
-                        condition.Equals(Atom.True) ?
+                IEnumerable<IValueExpressible> statements = elseIndex != -1 ?
+                    condition.Equals(Atom.True) ?
                         args.Skip(1).Take(elseIndex - 1) :
-                        args.Skip(elseIndex + 1)
-                    );
-                    return broccoli.EvaluateExpression(expression.Values.Length == 1 ? expression.Values[0] : expression);
-                } else if (condition.Equals(Atom.True)) {
-                    if (args.Length == 2)
-                        return broccoli.EvaluateExpression(args[1]);
-                    return broccoli.EvaluateExpression(new ValueExpression(args.Skip(1)));
-                }
-                return null;
+                        args.Skip(elseIndex + 1) :
+                    condition.Equals(Atom.True) ?
+                        args.Skip(1) :
+                        args.Skip(args.Length);
+                foreach (var statement in statements.Take(statements.Count() - 1))
+                    broccoli.EvaluateExpression(statement);
+                if (statements.Count() != 0)
+                    return broccoli.EvaluateExpression(statements.Last());
             })},
             {"for", new ShortCircuitFunction("for", -3, (broccoli, args) => {
                 var inValue = broccoli.EvaluateExpression(args[1]);
@@ -549,25 +575,83 @@ namespace Broccoli {
 
         public static readonly Dictionary<string, Dictionary<string, IFunction>> AlternativeEnvironments = new Dictionary<string, Dictionary<string, IFunction>> {
             {"cauliflower",  new Dictionary<string, IFunction> {
-                {"and", new ShortCircuitFunction("and", -1, (broccoli, args) => {
-                    if (args.Any(arg => broccoli.EvaluateExpression(arg).Equals(Atom.Nil))) {
-                        return Atom.Nil;
-                    }
+                {"", new ShortCircuitFunction("", 1, (broccoli, args) => {
+                    var e = (ValueExpression) args[0];
+                    if (e.IsValue)
+                        return broccoli.EvaluateExpression(e.Values.First());
+                    var first = e.Values.First();
+                    IFunction fn = null;
+                    if (first is Atom fnAtom) {
+                        var fnName = fnAtom.Value;
+                        fn = broccoli.Scope[fnName] ?? broccoli.Builtins.GetValueOrDefault(fnName, null);
 
-                    return Atom.True;
-                })},
-                {"or", new ShortCircuitFunction("or", -1, (broccoli, args) => {
-                    if (args.Any(arg => !broccoli.EvaluateExpression(arg).Equals(Atom.Nil))) {
-                        return Atom.True;
-                    }
+                        if (fn == null)
+                            throw new Exception($"Function {fnName} does not exist");
+                    } else if (broccoli.EvaluateExpression(first) is IFunction lambda)
+                        fn = lambda;
+                    else
+                        throw new Exception($"Function name {first} must be an identifier");
 
-                    return Atom.Nil;
+                    return fn.Invoke(broccoli, e.Values.Skip(1).ToArray());
                 })},
-                {"lam", new ShortCircuitFunction("lam", -2, (broccoli, args) => {
-                    if (!(args[1] is ValueExpression argExpressions))
-                        throw new Exception($"Received {TypeName(args[1])} instead of expression in argument 1 for 'lam'");
+
+                {"input", new Function("input", 0, args => new String(Console.ReadLine()))},
+
+                {"string", new Function("string", 1, args => new String(args[0].ToString()))},
+                {"bool", new Function("bool", 1, args => {
+                    switch (args[0]) {
+                        case Integer i:
+                            return Boolean(i.Value != 0);
+                        case Float f:
+                            return Boolean(f.Value != 0);
+                        case String s:
+                            return Boolean(s.Value.Length != 0);
+                        case Atom a:
+                            return Boolean(!a.Equals(Atom.Nil));
+                        case ValueList v:
+                            return Boolean(v.Value.Count != 0);
+                        case IFunction f:
+                            return Boolean(true);
+                    }
+                    return Boolean(false);
+                })},
+                {"int", new Function("int", 1, args => {
+                    switch (args[0]) {
+                        case Integer i:
+                            return i;
+                        case Float f:
+                            return new Integer((int) f.Value);
+                        case String s:
+                            return new Integer(int.Parse(s.Value));
+                        default:
+                            throw new Exception($"Received {TypeName(args[0])} instead of integer, float or string in argument 1 for 'int'");
+                    }
+                })},
+                {"float", new Function("float", 1, args => {
+                    switch (args[0]) {
+                        case Integer i:
+                            return new Float(i.Value);
+                        case Float f:
+                            return f;
+                        case String s:
+                            return new Float(float.Parse(s.Value));
+                        default:
+                            throw new Exception($"Received {TypeName(args[0])} instead of integer, float or string in argument 1 for 'float'");
+                    }
+                })},
+
+                {"not", new ShortCircuitFunction("not", 1, (broccoli, args) => Boolean(broccoli.Builtins["bool"].Invoke(broccoli, new[] { args[0] }).Equals(Atom.Nil)))},
+                {"and", new ShortCircuitFunction("and", -1, (broccoli, args) =>
+                    Boolean(!args.Any(arg => broccoli.Builtins["bool"].Invoke(broccoli, new[] { arg }).Equals(Atom.Nil)))
+                )},
+                {"or", new ShortCircuitFunction("or", -1, (broccoli, args) =>
+                    Boolean(args.Any(arg => !broccoli.Builtins["bool"].Invoke(broccoli, new[] { arg }).Equals(Atom.Nil)))
+                )},
+                {"=>", new ShortCircuitFunction("=>", -2, (broccoli, args) => {
+                    if (!(args[0] is ValueExpression argExpressions))
+                        throw new Exception($"Received {TypeName(args[0])} instead of expression in argument 1 for '=>'");
                     var argNames = argExpressions.Values.ToArray();
-                    var statements = args.Skip(2);
+                    var statements = args.Skip(1);
                     IValue result = null;
                     return new AnonymousFunction(argNames.Length, innerArgs => {
                         broccoli.Scope = new BroccoliScope(broccoli.Scope);
@@ -595,8 +679,25 @@ namespace Broccoli {
                         broccoli.Scope = broccoli.Scope.Parent;
                         return result;
                     });
-                })}
-            }.Extend(DefaultBuiltins)}
+                })},
+
+                {"if", new ShortCircuitFunction("if", -3, (broccoli, args) => {
+                    var condition = broccoli.Builtins["bool"].Invoke(broccoli, new[] {broccoli.EvaluateExpression(args[0]) });
+                    var elseIndex = Array.IndexOf(args.ToArray(), new Atom("else"), 1);
+                    IEnumerable<IValueExpressible> statements = elseIndex != -1 ?
+                        condition.Equals(Atom.True) ?
+                            args.Skip(1).Take(elseIndex - 1) :
+                            args.Skip(elseIndex + 1) :
+                        condition.Equals(Atom.True) ?
+                            args.Skip(1) :
+                            args.Skip(args.Length);
+                    foreach (var statement in statements.Take(statements.Count() - 1))
+                        broccoli.EvaluateExpression(statement);
+                    if (statements.Count() != 0)
+                        return broccoli.EvaluateExpression(statements.Last());
+                    return null;
+                })},
+            }.Extend(DefaultBuiltins).FluentRemove("call")}
         };
     }
 
@@ -605,6 +706,11 @@ namespace Broccoli {
             foreach (var (key, value) in other)
                 if (!self.ContainsKey(key))
                     self[key] = value;
+            return self;
+        }
+        public static Dictionary<K, V> FluentRemove<K, V>(this Dictionary<K, V> self, params K[] keys) {
+            foreach (var key in keys)
+                self.Remove(key);
             return self;
         }
     }

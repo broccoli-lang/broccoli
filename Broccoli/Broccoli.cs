@@ -137,28 +137,12 @@ namespace Broccoli {
                 case ListVar l:
                     result = Scope[l];
                     if (result == null)
-                        throw new Exception($"Scalar {l.Value} not found");
+                        throw new Exception($"List {l.Value} not found");
                     return result;
                 case ValueList l:
                     return new ValueList(l.Value.Select(EvaluateExpression).ToList());
                 case ValueExpression e:
-                    if (e.IsValue)
-                        return EvaluateExpression(e.Values.First());
-                    var first = e.Values.First();
-                    if (!(first is Atom fnAtom))
-                        throw new Exception($"Function name {first} must be an identifier");
-
-                    var args = e.Values.Skip(1).ToArray();
-                    var fnName = fnAtom.Value;
-                    IFunction fn = Scope[fnName];
-
-                    if (fn == null) {
-                        if (Builtins.ContainsKey(fnName))
-                            fn = Builtins[fnName];
-                        else
-                            throw new Exception($"Function {fnName} does not exist");
-                    }
-                    return fn.Invoke(this, args);
+                    return Builtins[""].Invoke(this, new[] { e });
                 case IValue i:
                     return i;
                 default:
