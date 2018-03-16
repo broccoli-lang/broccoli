@@ -794,6 +794,27 @@ namespace Broccoli {
                         return broccoli.EvaluateExpression(statements.Last());
                     return null;
                 })},
+                {"map", new ShortCircuitFunction("map", -2, (broccoli, args) => {
+                    var func = broccoli.EvaluateExpression(args[0]);
+
+                    IFunction fn = null;
+                    switch (broccoli.EvaluateExpression(func)) {
+                        case Atom a:
+                            fn = broccoli.Scope[a.Value] ?? broccoli.Builtins.GetValueOrDefault(a.Value, null);
+                            if (fn == null)
+                                throw new Exception($"Function {a.Value} does not exist");
+                            break;
+
+                        case AnonymousFunction f:
+                            fn = f;
+                            break;
+                            
+                        default:
+                            throw new Exception($"Received {TypeName(args[0])} instead of atom or lambda in argument 0 for 'map'");
+                    }
+
+                    return new ValueList(args.Skip(1).ToArray().Select(x => fn.Invoke(broccoli, new IValueExpressible[] {x})));
+                })},
             }.Extend(DefaultBuiltins).FluentRemove("call")}
         };
     }
