@@ -1,8 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
-using System;
-
-// TODO: should ==, != etc have expression body?
 
 namespace Broccoli {
     public interface IValue : IValueExpressible { }
@@ -14,9 +10,9 @@ namespace Broccoli {
             Value = i;
         }
 
-        public static implicit operator Integer(long i) {
-            return new Integer(i);
-        }
+        public static implicit operator Integer(int i) => new Integer(i);
+
+        public static implicit operator Integer(long i) => new Integer(i);
 
         public static bool operator ==(Integer left, object right) => right is Integer i && left.Value == i.Value;
 
@@ -35,6 +31,8 @@ namespace Broccoli {
         public Float(double f) {
             Value = f;
         }
+
+        public static implicit operator Float(float f) => new Float(f);
 
         public static implicit operator Float(double f) => new Float(f);
 
@@ -81,9 +79,7 @@ namespace Broccoli {
             Value = a;
         }
 
-        public static implicit operator Atom(string a) {
-            return new Atom(a);
-        }
+        public static implicit operator Atom(string a) => new Atom(a);
 
         public static bool operator ==(Atom left, object right) => right is Atom a && left.Value == a.Value;
 

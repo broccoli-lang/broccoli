@@ -16,12 +16,7 @@ namespace Broccoli {
             Parent = parent;
         }
 
-        public IValue Get(ScalarVar s) {
-            if (Scalars.ContainsKey(s.Value))
-                return Scalars[s.Value];
-
-            return Parent?.Get(s);
-        }
+        public IValue Get(ScalarVar s) => Scalars.ContainsKey(s.Value) ? Scalars[s.Value] : Parent?.Get(s);
 
         public bool Set(ScalarVar s, IValue value, bool self = false, bool initial = true) {
             if (self || Scalars.ContainsKey(s.Value)) {
@@ -30,7 +25,8 @@ namespace Broccoli {
             }
             if (Parent != null && Parent.Set(s, value))
                 return true;
-            if (!initial) return false;
+            if (!initial)
+                return false;
 
             Scalars[s.Value] = value;
             return true;
@@ -42,12 +38,7 @@ namespace Broccoli {
             set => Set(s, value);
         }
 
-        public ValueList Get(ListVar l) {
-            if (Lists.ContainsKey(l.Value))
-                return Lists[l.Value];
-
-            return Parent?.Get(l);
-        }
+        public ValueList Get(ListVar l) => Lists.ContainsKey(l.Value) ? Lists[l.Value] : Parent?.Get(l);
 
         public bool Set(ListVar l, ValueList value, bool self = false, bool initial = true) {
             if (self || Lists.ContainsKey(l.Value)) {
@@ -56,7 +47,8 @@ namespace Broccoli {
             }
             if (Parent != null && Parent.Set(l, value, false))
                 return true;
-            if (!initial) return false;
+            if (!initial)
+                return false;
 
             Lists[l.Value] = value;
             return true;
@@ -68,20 +60,17 @@ namespace Broccoli {
             set => Set(l, value);
         }
 
-        public IFunction Get(string l) {
-            if (Functions.ContainsKey(l))
-                return Functions[l];
-
-            return Parent?.Get(l);
-        }
+        public IFunction Get(string l) => Functions.ContainsKey(l) ? Functions[l] : Parent?.Get(l);
 
         public bool Set(string l, IFunction value, bool self = false, bool initial = true) {
             if (self || Functions.ContainsKey(l)) {
                 Functions[l] = value;
                 return true;
             }
-            if (Parent != null && Parent.Set(l, value, false)) return true;
-            if (!initial) return false;
+            if (Parent != null && Parent.Set(l, value, false))
+                return true;
+            if (!initial)
+                return false;
 
             Functions[l] = value;
             return true;
@@ -100,12 +89,7 @@ namespace Broccoli {
 
         public Broccoli() { }
 
-        public IValue Run(string code) {
-            IValue result = null;
-            foreach (var e in Parser.Parse(code).Children.Select(s => (ValueExpression) s))
-                result = Run(e);
-            return result;
-        }
+        public IValue Run(string code) => Run(Parser.Parse(code));
 
         public IValue Run(ParseNode node) {
             IValue result = null;
