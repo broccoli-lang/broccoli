@@ -127,6 +127,10 @@ namespace Broccoli {
             Value = this;
         }
 
+        public ValueList(params IValue[] values) : base(values) {
+            Value = this;
+        }
+
         public static implicit operator ValueList(IValue[] values) => new ValueList(values);
 
         public static bool operator ==(ValueList left, object right) => right is ValueList list && left.Equals(list);

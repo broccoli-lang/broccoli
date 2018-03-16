@@ -95,7 +95,7 @@ namespace Broccoli {
                 return null;
             })},
             {"bench", new ShortCircuitFunction("bench", -2, (broccoli, args) => {
-                var start = new DateTime();
+                var start = DateTime.Now;
                 foreach (var expression in args)
                     broccoli.Run(expression);
                 return new Float((DateTime.Now - start).TotalSeconds);
@@ -598,9 +598,9 @@ namespace Broccoli {
                         throw new Exception($"Received {TypeName(args[0])} instead of atom in argument 1 for 'fn'");
                     if (!(args[1] is ValueExpression argExpressions)) {
                         if (args[1] is ScalarVar s)
-                            argExpressions = new ValueExpression(new IValueExpressible[] { s });
+                            argExpressions = new ValueExpression(s);
                         if (args[1] is ListVar l)
-                            argExpressions = new ValueExpression(new IValueExpressible[] { l });
+                            argExpressions = new ValueExpression(l);
                         throw new Exception($"Received {TypeName(args[1])} instead of expression in argument 1 for 'fn'");
                     }
                     var argNames = argExpressions.Values.ToList();
@@ -700,9 +700,9 @@ namespace Broccoli {
                 {"\\", new ShortCircuitFunction("\\", -2, (broccoli, args) => {
                     if (!(args[0] is ValueExpression argExpressions)) {
                         if (args[0] is ScalarVar s)
-                            argExpressions = new ValueExpression(new IValueExpressible[] { s });
+                            argExpressions = new ValueExpression(s);
                         if (args[0] is ListVar l)
-                            argExpressions = new ValueExpression(new IValueExpressible[] { l });
+                            argExpressions = new ValueExpression(l);
                         throw new Exception($"Received {TypeName(args[0])} instead of expression in argument 1 for '\\'");
                     }
                     var argNames = argExpressions.Values.ToList();
@@ -789,10 +789,7 @@ namespace Broccoli {
                         case 2:
                             return new ValueList(list.Skip(ints[0]).Take(ints[1] - Math.Max(0, ints[0])));
                         case 3:
-                            var result = new ValueList();
-                            for (int i = ints[0]; i < ints[1]; i += ints[2])
-                                result.Add(list[i]);
-                            return result;
+                            return new ValueList(Enumerable.Range(ints[0], ints[1] == ints[0] ? 0 : (ints[1] - ints[0] - 1) / ints[2] + 1).Select(i => list[ints[0] + i * ints[2]]));
                         default:
                             throw new Exception($"Function slice requires 1 to 4 arguments, {args.Length} provided");
                     }
@@ -809,10 +806,7 @@ namespace Broccoli {
                         case 2:
                             return new ValueList(Enumerable.Range(ints[0], ints[1] - ints[0] + 1).Select(i => (IValue) new Integer(i)));
                         case 3:
-                            var result = new ValueList();
-                            for (int i = ints[0]; i <= ints[1]; i += ints[2])
-                                result.Add(new Integer(i));
-                            return result;
+                            return new ValueList(Enumerable.Range(ints[0], ints[1] == ints[0] ? 0 : (ints[1] - ints[0] - 1) / ints[2] + 1).Select(i => (IValue) new Integer(ints[0] + i * ints[2])));
                         default:
                             throw new Exception($"Function range requires 1 to 3 arguments, {args.Length} provided");
                     }
@@ -820,20 +814,15 @@ namespace Broccoli {
                 {"map", new Function("map", 2, (broccoli, args) => {
                     var func = CauliflowerInline.FindFunction("map", broccoli, args[0]);
 
-                    switch (args[1]) {
-                        case ValueList l:
-                            return new ValueList(l.Select(x => func.Invoke(broccoli, x)));
-                        default:
-                            throw new Exception($"Received {TypeName(args[1])} instead of list in argument 1 for 'map'");
-                    }
+                    if (args[1] is ValueList l)
+                        return new ValueList(l.Select(x => func.Invoke(broccoli, x)));
+                    throw new Exception($"Received {TypeName(args[1])} instead of list in argument 1 for 'map'");
                 })},
                 {"filter", new Function("filter", 2, (broccoli, args) => {
                     var func = CauliflowerInline.FindFunction("filter", broccoli, args[0]);
 
                     if (args[1] is ValueList l)
-                        return new ValueList(l.Where(x =>
-                            CauliflowerInline.Truthy(func.Invoke(broccoli, x))));
-
+                        return new ValueList(l.Where(x => CauliflowerInline.Truthy(func.Invoke(broccoli, x))));
                     throw new Exception($"Received {TypeName(args[1])} instead of list in argument 1 for 'map'");
                 })},
                 {"reduce", new Function("reduce", 2, (broccoli, args) => {
@@ -841,28 +830,21 @@ namespace Broccoli {
 
                     if (args[1] is ValueList l)
                         return l.Aggregate((res, elem) => func.Invoke(broccoli, res, elem));
-
                     throw new Exception($"Received {TypeName(args[1])} instead of list in argument 1 for 'map'");
                 })},
                 {"all", new Function("all", 2, (broccoli, args) => {
                     var func = CauliflowerInline.FindFunction("all", broccoli, args[0]);
 
-                    switch (args[1]) {
-                        case ValueList l:
-                            return Boolean(l.All(CauliflowerInline.Truthy));
-                        default:
-                            throw new Exception($"Received {TypeName(args[1])} instead of list in argument 1 for 'all'");
-                    }
+                    if (args[1] is ValueList l)
+                        return Boolean(l.All(CauliflowerInline.Truthy));
+                    throw new Exception($"Received {TypeName(args[1])} instead of list in argument 1 for 'all'");
                 })},
                 {"any", new Function("any", 2, (broccoli, args) => {
                     var func = CauliflowerInline.FindFunction("any", broccoli, args[0]);
 
-                    switch (args[1]) {
-                        case ValueList l:
-                            return Boolean(l.Any(CauliflowerInline.Truthy));
-                        default:
-                            throw new Exception($"Received {TypeName(args[1])} instead of list in argument 1 for 'any'");
-                    }
+                    if (args[1] is ValueList l)
+                        return Boolean(l.Any(CauliflowerInline.Truthy));
+                    throw new Exception($"Received {TypeName(args[1])} instead of list in argument 1 for 'any'");
                 })},
             }.Extend(DefaultBuiltins).FluentRemove("call")}
         };

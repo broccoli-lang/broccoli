@@ -9,7 +9,7 @@ namespace Broccoli {
         public readonly IValueExpressible[] Values;
         public bool IsValue { get; }
 
-        public ValueExpression(IValueExpressible[] values) {
+        public ValueExpression(params IValueExpressible[] values) {
             Values = values;
             IsValue = false;
         }
