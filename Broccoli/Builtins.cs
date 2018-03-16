@@ -81,8 +81,7 @@ namespace Broccoli {
                 return null;
             })},
             {"help", new ShortCircuitFunction("help", 0, (broccoli, args) => {
-                Console.WriteLine('(' + string.Join(' ', broccoli.Builtins.Keys) + ')');
-                return null;
+                return new ValueList(broccoli.Builtins.Keys.Where(key => !new []{ "", "fn", "env" }.Contains(key)).Select(key => (IValue) new String(key)));
             })},
             {"clear", new ShortCircuitFunction("clear", 0, (broccoli, args) => {
                 broccoli.Scope.Scalars.Clear();
@@ -481,6 +480,7 @@ namespace Broccoli {
                     broccoli.EvaluateExpression(statement);
                 if (statements.Count() != 0)
                     return broccoli.EvaluateExpression(statements.Last());
+                return null;
             })},
             {"for", new ShortCircuitFunction("for", -3, (broccoli, args) => {
                 var inValue = broccoli.EvaluateExpression(args[1]);
@@ -594,6 +594,74 @@ namespace Broccoli {
 
                     return fn.Invoke(broccoli, e.Values.Skip(1).ToArray());
                 })},
+                {"fn", new ShortCircuitFunction("fn", -3, (broccoli, args) => {
+                    if (!(broccoli.EvaluateExpression(args[0]) is Atom name))
+                        throw new Exception($"Received {TypeName(args[0])} instead of atom in argument 1 for 'fn'");
+                    if (!(args[1] is ValueExpression argExpressions)) {
+                        if (args[1] is ScalarVar s)
+                            argExpressions = new ValueExpression(new IValueExpressible[] { s });
+                        if (args[1] is ListVar l)
+                            argExpressions = new ValueExpression(new IValueExpressible[] { l });
+                        throw new Exception($"Received {TypeName(args[1])} instead of expression in argument 1 for 'fn'");
+                    }
+                    var argNames = argExpressions.Values.ToList();
+                    foreach (var argExpression in argNames.Take(argNames.Count - 1))
+                        if (argExpression is ValueExpression)
+                            throw new Exception($"Received expression instead of variable name in argument list for 'fn'");
+                    int length = argNames.Count;
+                    IValue varargs = null;
+                    if (argNames.Count != 0) {
+                        switch (argNames.Last()) {
+                            case ListVar list:
+                                break;
+                            case ScalarVar scalar:
+                                break;
+                            case ValueExpression expr when expr.Values.Length == 1 && expr.Values[0] is ListVar l:
+                                length = -length - 1;
+                                varargs = l;
+                                break;
+                            default:
+                                throw new Exception($"Received expression instead of variable name in argument list for 'fn'");
+                        }
+                    }
+                    if (varargs != null)
+                        argNames.RemoveAt(argNames.Count - 1);
+                    var statements = args.Skip(2);
+                    IValue result = null;
+                    broccoli.Scope.Functions[name.Value] = new Function(name.Value, length, innerArgs => {
+                        broccoli.Scope = new BroccoliScope(broccoli.Scope);
+                        for (int i = 0; i < argNames.Count; i++) {
+                            var toAssign = innerArgs[i];
+                            switch (argNames[i]) {
+                                case ScalarVar s:
+                                    if (toAssign is ValueList)
+                                        throw new Exception("Lists cannot be assigned to scalar ($) variables");
+                                    broccoli.Scope[s] = toAssign;
+                                    break;
+                                case ListVar l:
+                                    if (!(toAssign is ValueList valueList))
+                                        throw new Exception("Scalars cannot be assigned to list (@) variables");
+                                    broccoli.Scope[l] = valueList;
+                                    break;
+                                default:
+                                    throw new Exception("Values can only be assigned to scalar ($) or list (@) variables");
+                            }
+                        }
+                        if (varargs != null)
+                            broccoli.Scope[(ListVar) varargs] = new ValueList(innerArgs.Skip(argNames.Count));
+                        foreach (var statement in statements.Take(statements.Count() - 1))
+                            broccoli.EvaluateExpression(statement);
+                        if (statements.Count() != 0)
+                            result = broccoli.EvaluateExpression(statements.Last());
+                        broccoli.Scope = broccoli.Scope.Parent;
+                        return result;
+                    });
+                    return null;
+                })},
+
+                {"help", new ShortCircuitFunction("help", 0, (broccoli, args) => {
+                    return new ValueList(broccoli.Builtins.Keys.Skip(1).Select(key => (IValue) new String(key)));
+                })},
 
                 {"input", new Function("input", 0, args => new String(Console.ReadLine()))},
 
@@ -647,15 +715,42 @@ namespace Broccoli {
                 {"or", new ShortCircuitFunction("or", -1, (broccoli, args) =>
                     Boolean(args.Any(arg => !broccoli.Builtins["bool"].Invoke(broccoli, new[] { arg }).Equals(Atom.Nil)))
                 )},
-                {"=>", new ShortCircuitFunction("=>", -2, (broccoli, args) => {
-                    if (!(args[0] is ValueExpression argExpressions))
-                        throw new Exception($"Received {TypeName(args[0])} instead of expression in argument 1 for '=>'");
-                    var argNames = argExpressions.Values.ToArray();
+
+                {"\\", new ShortCircuitFunction("\\", -2, (broccoli, args) => {
+                    if (!(args[0] is ValueExpression argExpressions)) {
+                        if (args[0] is ScalarVar s)
+                            argExpressions = new ValueExpression(new IValueExpressible[] { s });
+                        if (args[0] is ListVar l)
+                            argExpressions = new ValueExpression(new IValueExpressible[] { l });
+                        throw new Exception($"Received {TypeName(args[0])} instead of expression in argument 1 for '\\'");
+                    }
+                    var argNames = argExpressions.Values.ToList();
+                    foreach (var argExpression in argNames.Take(argNames.Count - 1))
+                        if (argExpression is ValueExpression)
+                            throw new Exception($"Received expression instead of variable name in argument list for '\\'");
+                    int length = argNames.Count;
+                    IValue varargs = null;
+                    if (argNames.Count != 0) {
+                        switch (argNames.Last()) {
+                            case ListVar list:
+                                break;
+                            case ScalarVar scalar:
+                                break;
+                            case ValueExpression expr when expr.Values.Length == 1 && expr.Values[0] is ListVar l:
+                                length = -length - 1;
+                                varargs = l;
+                                break;
+                            default:
+                                throw new Exception($"Received expression instead of variable name in argument list for '\\'");
+                        }
+                    }
+                    if (varargs != null)
+                        argNames.RemoveAt(argNames.Count - 1);
                     var statements = args.Skip(1);
                     IValue result = null;
-                    return new AnonymousFunction(argNames.Length, innerArgs => {
+                    return new AnonymousFunction(length, innerArgs => {
                         broccoli.Scope = new BroccoliScope(broccoli.Scope);
-                        for (int i = 0; i < innerArgs.Length; i++) {
+                        for (int i = 0; i < argNames.Count; i++) {
                             var toAssign = innerArgs[i];
                             switch (argNames[i]) {
                                 case ScalarVar s:
@@ -672,6 +767,8 @@ namespace Broccoli {
                                     throw new Exception("Values can only be assigned to scalar ($) or list (@) variables");
                             }
                         }
+                        if (varargs != null)
+                            broccoli.Scope[(ListVar) varargs] = new ValueList(innerArgs.Skip(argNames.Count));
                         foreach (var statement in statements.Take(statements.Count() - 1))
                             broccoli.EvaluateExpression(statement);
                         if (statements.Count() != 0)
