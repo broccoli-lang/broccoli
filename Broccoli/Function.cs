@@ -7,13 +7,13 @@ namespace Broccoli {
     }
 
     public struct Function : IFunction {
-        public delegate IValue Call(IValue[] args);
+        public delegate IValue Call(Broccoli broccoli, IValue[] args);
 
         private readonly string _name;
         private readonly int _argc;
         private readonly Call _call;
 
-        // If the function has variadic arguments, argc is -n-1, where n is the number of required args
+        // If the function has variadic arguments, argc is -n - 1, where n is the number of required args
         public Function(string name, int argc, Call call) {
             _name = name;
             _argc = argc;
@@ -22,18 +22,17 @@ namespace Broccoli {
 
         // ReSharper disable once UnusedMethodReturnValue.Global
         public IValue Invoke(Broccoli broccoli, IValueExpressible[] args) {
-            var runArgs = args.ToList().Select(broccoli.EvaluateExpression).ToArray();
+            var runArgs = args.ToList().Select(broccoli.Run).ToArray();
             ValidateArgs(_argc, runArgs, _name);
-            return _call(runArgs);
+            return _call(broccoli, runArgs);
         }
 
         public static void ValidateArgs<T>(int argc, T[] args, string name) {
             bool isVariadic = argc < 0;
             int requiredArgc = isVariadic ? -argc - 1 : argc;
 
-            if (isVariadic ? args.Length < requiredArgc : args.Length != requiredArgc) {
+            if (isVariadic ? args.Length < requiredArgc : args.Length != requiredArgc)
                 throw new Exception($"Function {name} requires {(isVariadic ? "at least" : "exactly")} {requiredArgc} arguments, {args.Length} provided");
-            }
         }
     }
 
@@ -70,7 +69,7 @@ namespace Broccoli {
         }
 
         public IValue Invoke(Broccoli broccoli, IValueExpressible[] args) {
-            var runArgs = args.ToList().Select(broccoli.EvaluateExpression).ToArray();
+            var runArgs = args.ToList().Select(broccoli.Run).ToArray();
             Function.ValidateArgs(_argc, runArgs, "(anonymous)");
             return _call(runArgs);
         }

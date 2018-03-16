@@ -115,18 +115,18 @@ namespace Broccoli {
         public IValue Run(string code) {
             IValue result = null;
             foreach (var e in Parser.Parse(code).Children.Select(s => (ValueExpression) s))
-                result = EvaluateExpression(e);
+                result = Run(e);
             return result;
         }
 
         public IValue Run(ParseNode node) {
             IValue result = null;
             foreach (var e in node.Children.Select(s => (ValueExpression) s))
-                result = EvaluateExpression(e);
+                result = Run(e);
             return result;
         }
 
-        public IValue EvaluateExpression(IValueExpressible expr) {
+        public IValue Run(IValueExpressible expr) {
             IValue result;
             switch (expr) {
                 case ScalarVar s:
@@ -140,7 +140,7 @@ namespace Broccoli {
                         throw new Exception($"List {l.Value} not found");
                     return result;
                 case ValueList l:
-                    return new ValueList(l.Value.Select(EvaluateExpression).ToList());
+                    return new ValueList(l.Value.Select(Run).ToList());
                 case ValueExpression e:
                     return Builtins[""].Invoke(this, new[] { e });
                 case IValue i:
