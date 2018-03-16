@@ -37,13 +37,9 @@ namespace Broccoli {
         }
 
         public IValue this[ScalarVar s] {
-            get {
-                return Get(s);
-            }
+            get => Get(s);
 
-            set {
-                Set(s, value);
-            }
+            set => Set(s, value);
         }
 
         public ValueList Get(ListVar l) {
@@ -67,13 +63,9 @@ namespace Broccoli {
         }
 
         public ValueList this[ListVar l] {
-            get {
-                return Get(l);
-            }
+            get => Get(l);
 
-            set {
-                Set(l, value);
-            }
+            set => Set(l, value);
         }
 
         public IFunction Get(string l) {
@@ -96,13 +88,9 @@ namespace Broccoli {
         }
 
         public IFunction this[string l] {
-            get {
-                return Get(l);
-            }
+            get => Get(l);
 
-            set {
-                Set(l, value);
-            }
+            set => Set(l, value);
         }
     }
 
