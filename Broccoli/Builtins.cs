@@ -827,6 +827,17 @@ namespace Broccoli {
                             throw new Exception($"Received {TypeName(args[1])} instead of list in argument 1 for 'map'");
                     }
                 })},
+                {"filter", new Function("filter", 2, (broccoli, args) => {
+                    var func = CauliflowerInline.FindFunction("filter", broccoli, args[0]);
+
+                    switch (args[1]) {
+                        case ValueList l:
+                            return new ValueList(l.Where(x => CauliflowerInline.Truthy(func.Invoke(broccoli, new IValueExpressible[] {x}))));
+
+                        default:
+                            throw new Exception($"Received {TypeName(args[1])} instead of list in argument 1 for 'map'");
+                    }
+                })},
                 {"all", new Function("all", 2, (broccoli, args) => {
                     var func = CauliflowerInline.FindFunction("all", broccoli, args[0]);
 
