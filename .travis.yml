@@ -6,4 +6,4 @@ dotnet: 2.1.4
 
 script:
   - dotnet restore
-  - dotnet run -p BroccoliTest/
+  - dotnet test BroccoliTest
