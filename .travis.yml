@@ -1,0 +1,9 @@
+language: csharp
+solution: broccoli.sln
+
+mono: none
+dotnet: 2.1.101
+
+script:
+  - dotnet restore
+  - dotnet run -p BroccoliTest/
