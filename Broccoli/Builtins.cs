@@ -76,10 +76,15 @@ namespace Broccoli {
                     throw new Exception($"Received {TypeName(args[1])} instead of atom in argument 1 for 'env'");
                 if (a.Value == "broccoli") {
                     broccoli.Builtins = DefaultBuiltins;
-                    Program.IsCauliflower = true;
+                    Program.IsCauliflower = false;
                 }
-                else if (AlternativeEnvironments.ContainsKey(a.Value))
+                else if (AlternativeEnvironments.ContainsKey(a.Value)) {
                         broccoli.Builtins = AlternativeEnvironments[a.Value];
+                        if (a.Value == "cauliflower")
+                        {
+                            Program.IsCauliflower = true;
+                        }
+                }
                 else
                     throw new Exception($"Environment {a.Value} not found");
                 return null;
