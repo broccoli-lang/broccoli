@@ -83,11 +83,11 @@ namespace Broccoli {
         }
     }
 
-    public partial class Broccoli {
+    public partial class Interpreter {
         public BroccoliScope Scope = new BroccoliScope();
         public Dictionary<string, IFunction> Builtins = DefaultBuiltins;
 
-        public Broccoli() { }
+        public Interpreter() { }
 
         public IValue Run(string code) => Run(Parser.Parse(code));
 

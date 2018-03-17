@@ -3,11 +3,11 @@ using System.Linq;
 
 namespace Broccoli {
     public interface IFunction {
-        IValue Invoke(Broccoli broccoli, params IValueExpressible[] args);
+        IValue Invoke(Interpreter broccoli, params IValueExpressible[] args);
     }
 
     public struct Function : IFunction {
-        public delegate IValue Call(Broccoli broccoli, IValue[] args);
+        public delegate IValue Call(Interpreter broccoli, IValue[] args);
 
         private readonly string _name;
         private readonly int _argc;
@@ -21,7 +21,7 @@ namespace Broccoli {
         }
 
         // ReSharper disable once UnusedMethodReturnValue.Global
-        public IValue Invoke(Broccoli broccoli, params IValueExpressible[] args) {
+        public IValue Invoke(Interpreter broccoli, params IValueExpressible[] args) {
             var runArgs = args.ToList().Select(broccoli.Run).ToArray();
             ValidateArgs(_argc, runArgs, _name);
             return _call(broccoli, runArgs);
@@ -37,7 +37,7 @@ namespace Broccoli {
     }
 
     public struct ShortCircuitFunction : IFunction {
-        public delegate IValue Call(Broccoli broccoli, IValueExpressible[] args);
+        public delegate IValue Call(Interpreter broccoli, IValueExpressible[] args);
 
         private readonly string _name;
         private readonly int _argc;
@@ -51,7 +51,7 @@ namespace Broccoli {
         }
 
         // ReSharper disable once UnusedMethodReturnValue.Global
-        public IValue Invoke(Broccoli broccoli, params IValueExpressible[] args) {
+        public IValue Invoke(Interpreter broccoli, params IValueExpressible[] args) {
             Function.ValidateArgs(_argc, args, _name);
             return _call(broccoli, args);
         }
@@ -68,7 +68,7 @@ namespace Broccoli {
             _call = call;
         }
 
-        public IValue Invoke(Broccoli broccoli, params IValueExpressible[] args) {
+        public IValue Invoke(Interpreter broccoli, params IValueExpressible[] args) {
             var runArgs = args.ToList().Select(broccoli.Run).ToArray();
             Function.ValidateArgs(_argc, runArgs, "(anonymous)");
             return _call(runArgs);

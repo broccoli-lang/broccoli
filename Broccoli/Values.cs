@@ -3,7 +3,7 @@
 namespace Broccoli {
     public interface IValue : IValueExpressible { }
 
-    public struct Integer : IValue {
+    public class Integer : IValue {
         public long Value { get; }
 
         public Integer(long i) {
@@ -25,7 +25,7 @@ namespace Broccoli {
         public override string ToString() => Value.ToString();
     }
 
-    public struct Float : IValue {
+    public class Float : IValue {
         public double Value { get; }
 
         public Float(double f) {
@@ -49,7 +49,7 @@ namespace Broccoli {
         public override string ToString() => Value.ToString();
     }
 
-    public struct String : IValue {
+    public class String : IValue {
         public string Value { get; }
 
         public String(string s) {
@@ -69,7 +69,7 @@ namespace Broccoli {
         public override string ToString() => Value;
     }
 
-    public struct Atom : IValue {
+    public class Atom : IValue {
         public static readonly Atom True = new Atom("t");
         public static readonly Atom Nil = new Atom("nil");
 
@@ -92,7 +92,7 @@ namespace Broccoli {
         public override string ToString() => Value;
     }
 
-    public struct ScalarVar : IValue {
+    public class ScalarVar : IValue {
         public string Value { get; }
 
         public ScalarVar(string s) {
@@ -102,7 +102,7 @@ namespace Broccoli {
         public override string ToString() => Value;
     }
 
-    public struct ListVar : IValue {
+    public class ListVar : IValue {
         public string Value { get; }
 
         public ListVar(string l) {
@@ -136,7 +136,7 @@ namespace Broccoli {
         public override bool Equals(object other) {
             if (!(other is ValueList otherList) || otherList.Count != Count)
                 return false;
-            for (int i = 0; i < Count; i++)
+            for (var i = 0; i < Count; i++)
                 if (!this[i].Equals(otherList[i]))
                     return false;
             return true;

@@ -5,7 +5,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 
 namespace Broccoli {
-    public partial class Broccoli {
+    public partial class Interpreter {
         private static string TypeName(object o) => o.GetType().ToString().Split('.').Last().ToLower();
 
         private static Atom Boolean(bool b) => b ? Atom.True : Atom.Nil;
@@ -126,7 +126,7 @@ namespace Broccoli {
             {"import", new Function("import", 1, (broccoli, args) => {
                 if (!(args[0] is String s))
                     throw new Exception($"Received {TypeName(args[0])} instead of string in argument 0 for 'import'");
-                var tempBroccoli = new Broccoli();
+                var tempBroccoli = new Interpreter();
                 tempBroccoli.Run(File.ReadAllText(s.Value));
                 foreach (var (key, value) in tempBroccoli.Scope.Functions)
                     broccoli.Scope[key] = value;
@@ -851,7 +851,7 @@ namespace Broccoli {
 
         static class CauliflowerInline {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static IFunction FindFunction(string callerName, Broccoli broccoli, IValue func) {
+            public static IFunction FindFunction(string callerName, Interpreter broccoli, IValue func) {
                 switch (func) {
                     case Atom a:
                         var fn = broccoli.Scope[a.Value] ?? broccoli.Builtins.GetValueOrDefault(a.Value, null);

@@ -7,7 +7,7 @@ using String = Broccoli.String;
 namespace BroccoliTest {
     [TestClass]
     public class Test {
-        private Broccoli.Broccoli _broccoli;
+        private Interpreter _broccoli;
         private Func<string, IValue> _run;
 
         public static ValueList ValueListFrom() {
@@ -20,7 +20,7 @@ namespace BroccoliTest {
 
         [TestInitialize]
         public void Initialize() {
-            _broccoli = new Broccoli.Broccoli();
+            _broccoli = new Interpreter();
             _run = _broccoli.Run;
         }
 
