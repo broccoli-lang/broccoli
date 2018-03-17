@@ -8,7 +8,7 @@ namespace Broccoli {
     public partial class Interpreter {
         private static string TypeName(object o) => o.GetType().ToString().Split('.').Last().ToLower();
 
-        private static Atom Boolean(bool b) => b ? Atom.True : Atom.Nil;
+        private static BAtom Boolean(bool b) => b ? BAtom.True : BAtom.Nil;
 
         public static readonly Dictionary<string, IFunction> DefaultBuiltins = new Dictionary<string, IFunction> {
             // Core Language Features
@@ -18,7 +18,7 @@ namespace Broccoli {
                     return broccoli.Run(e.Values.First());
                 var first = e.Values.First();
                 IFunction fn = null;
-                if (!(first is Atom a))
+                if (!(first is BAtom a))
                     throw new Exception($"Function name {first} must be an identifier");
 
                 var fnName = a.Value;
@@ -29,7 +29,7 @@ namespace Broccoli {
                 return fn.Invoke(broccoli, e.Values.Skip(1).ToArray());
             })},
             {"fn", new ShortCircuitFunction("fn", -3, (broccoli, args) => {
-                if (!(broccoli.Run(args[0]) is Atom name))
+                if (!(broccoli.Run(args[0]) is BAtom name))
                     throw new Exception($"Received {TypeName(args[0])} instead of atom in argument 1 for 'fn'");
                 if (!(args[1] is ValueExpression argExpressions))
                     throw new Exception($"Received {TypeName(args[1])} instead of expression in argument 2 for 'fn'");
@@ -63,7 +63,7 @@ namespace Broccoli {
                 return null;
             })},
             {"env", new Function("env", 1, (broccoli, args) => {
-                if (!(args[0] is Atom a))
+                if (!(args[0] is BAtom a))
                     throw new Exception($"Received {TypeName(args[1])} instead of atom in argument 1 for 'env'");
                 if (a.Value == "broccoli")
                     broccoli.Builtins = DefaultBuiltins;
@@ -81,7 +81,7 @@ namespace Broccoli {
                 return null;
             })},
             {"help", new ShortCircuitFunction("help", 0, (broccoli, args) => {
-                return new ValueList(broccoli.Builtins.Keys.Where(key => !new []{ "", "fn", "env" }.Contains(key)).Select(key => (IValue) new String(key)));
+                return new ValueList(broccoli.Builtins.Keys.Where(key => !new []{ "", "fn", "env" }.Contains(key)).Select(key => (IValue) new BString(key)));
             })},
             {"clear", new ShortCircuitFunction("clear", 0, (broccoli, args) => {
                 broccoli.Scope.Scalars.Clear();
@@ -98,17 +98,17 @@ namespace Broccoli {
                 var start = DateTime.Now;
                 foreach (var expression in args)
                     broccoli.Run(expression);
-                return new Float((DateTime.Now - start).TotalSeconds);
+                return new BFloat((DateTime.Now - start).TotalSeconds);
             })},
             {"eval", new Function("eval", 1, (broccoli, args) => {
-                if (!(args[0] is String s))
+                if (!(args[0] is BString s))
                     throw new Exception($"Received {TypeName(args[0])} instead of string in argument 0 for 'eval'");
                 return broccoli.Run(s.Value);
             })},
             {"call", new ShortCircuitFunction("call", -2, (broccoli, args) => {
                 IFunction fn = null;
                 var value = broccoli.Run(args[0]);
-                if (!(broccoli.Run(value) is Atom a))
+                if (!(broccoli.Run(value) is BAtom a))
                     throw new Exception($"Received {TypeName(args[0])} instead of atom in argument 0 for 'call'");
 
                 var fnName = a.Value;
@@ -119,12 +119,12 @@ namespace Broccoli {
                 return fn.Invoke(broccoli, args.Skip(1).ToArray());
             })},
             {"run", new Function("run", 1, (broccoli, args) => {
-                if (!(args[0] is String s))
+                if (!(args[0] is BString s))
                     throw new Exception($"Received {TypeName(args[0])} instead of string in argument 0 for 'run'");
                 return broccoli.Run(File.ReadAllText(s.Value));
             })},
             {"import", new Function("import", 1, (broccoli, args) => {
-                if (!(args[0] is String s))
+                if (!(args[0] is BString s))
                     throw new Exception($"Received {TypeName(args[0])} instead of string in argument 0 for 'import'");
                 var tempBroccoli = new Interpreter();
                 tempBroccoli.Run(File.ReadAllText(s.Value));
@@ -137,7 +137,7 @@ namespace Broccoli {
             {"print", new Function("print", -2, (broccoli, args) => {
                 foreach (var value in args) {
                     string print = null;
-                    if (value is Atom atom)
+                    if (value is BAtom atom)
                         switch (atom.Value) {
                             case "tab":
                                 print = "\t";
@@ -154,80 +154,80 @@ namespace Broccoli {
             // Basic Math
             {"+", new Function("+", -1, (broccoli, args) => {
                 foreach (var (value, index) in args.WithIndex())
-                    if (!(value is Integer || value is Float))
+                    if (!(value is BInteger || value is BFloat))
                         throw new Exception($"Received {TypeName(value)} instead of integer or float in argument {index + 1} for '+'");
 
-                return args.Aggregate((IValue) new Integer(0), (m, v) => {
-                    if (m is Integer im && v is Integer iv)
-                        return new Integer(im.Value + iv.Value);
+                return args.Aggregate((IValue) new BInteger(0), (m, v) => {
+                    if (m is BInteger im && v is BInteger iv)
+                        return new BInteger(im.Value + iv.Value);
                     double fm, fv;
-                    if (m is Integer mValue)
+                    if (m is BInteger mValue)
                         fm = mValue.Value;
                     else
-                        fm = ((Float) m).Value;
-                    if (v is Integer vValue)
+                        fm = ((BFloat) m).Value;
+                    if (v is BInteger vValue)
                         fv = vValue.Value;
                     else
-                        fv = ((Float) v).Value;
-                    return new Float(fm + fv);
+                        fv = ((BFloat) v).Value;
+                    return new BFloat(fm + fv);
                 });
             })},
             {"*", new Function("*", -1, (broccoli, args) => {
                 foreach (var (value, index) in args.WithIndex())
-                    if (!(value is Integer || value is Float))
+                    if (!(value is BInteger || value is BFloat))
                         throw new Exception($"Received {TypeName(value)} instead of integer or float in argument {index + 1} for '*'");
 
-                return args.Aggregate((IValue) new Integer(1), (m, v) => {
-                    if (m is Integer im && v is Integer iv)
-                        return new Integer(im.Value * iv.Value);
+                return args.Aggregate((IValue) new BInteger(1), (m, v) => {
+                    if (m is BInteger im && v is BInteger iv)
+                        return new BInteger(im.Value * iv.Value);
                     double fm, fv;
-                    if (m is Integer mValue)
+                    if (m is BInteger mValue)
                         fm = mValue.Value;
                     else
-                        fm = ((Float) m).Value;
-                    if (v is Integer vValue)
+                        fm = ((BFloat) m).Value;
+                    if (v is BInteger vValue)
                         fv = vValue.Value;
                     else
-                        fv = ((Float) v).Value;
-                    return new Float(fm * fv);
+                        fv = ((BFloat) v).Value;
+                    return new BFloat(fm * fv);
                 });
             })},
             {"-", new Function("-", -2, (broccoli, args) => {
                 foreach (var (value, index) in args.WithIndex())
-                    if (!(value is Integer || value is Float))
+                    if (!(value is BInteger || value is BFloat))
                         throw new Exception($"Received {TypeName(value)} instead of integer or float in argument {index + 1} for '-'");
 
                 return args.Skip(1).Aggregate(args[0], (m, v) => {
-                    if (m is Integer im && v is Integer iv)
-                        return new Integer(im.Value - iv.Value);
+                    if (m is BInteger im && v is BInteger iv)
+                        return new BInteger(im.Value - iv.Value);
                     double fm, fv;
-                    if (m is Integer mValue)
+                    if (m is BInteger mValue)
                         fm = mValue.Value;
                     else
-                        fm = ((Float) m).Value;
-                    if (v is Integer vValue)
+                        fm = ((BFloat) m).Value;
+                    if (v is BInteger vValue)
                         fv = vValue.Value;
                     else
-                        fv = ((Float) v).Value;
-                    return new Float(fm - fv);
+                        fv = ((BFloat) v).Value;
+                    return new BFloat(fm - fv);
                 });
             })},
             {"/", new Function("/", -2, (broccoli, args) => {
                 foreach (var (value, index) in args.WithIndex())
-                    if (!(value is Integer || value is Float))
+                    if (!(value is BInteger || value is BFloat))
                         throw new Exception($"Received {TypeName(value)} instead of integer or float in argument {index + 1} for '/'");
 
                 return args.Skip(1).Aggregate(args[0], (m, v) => {
                     double fm, fv;
-                    if (m is Integer mValue)
+                    if (m is BInteger mValue)
                         fm = mValue.Value;
                     else
-                        fm = ((Float) m).Value;
-                    if (v is Integer vValue)
+                        fm = ((BFloat) m).Value;
+                    if (v is BInteger vValue)
                         fv = vValue.Value;
                     else
-                        fv = ((Float) v).Value;
-                    return new Float(fm / fv);
+                        fv = ((BFloat) v).Value;
+                    return new BFloat(fm / fv);
                 });
             })},
             {":=", new ShortCircuitFunction(":=", 2, (broccoli, args) => {
@@ -250,19 +250,19 @@ namespace Broccoli {
             })},
             {"int", new Function("int", 1, (broccoli, args) => {
                 switch (args[0]) {
-                    case Integer i:
+                    case BInteger i:
                         return i;
-                    case Float f:
-                        return new Integer((int) f.Value);
+                    case BFloat f:
+                        return new BInteger((int) f.Value);
                     default:
                         throw new Exception($"Received {TypeName(args[0])} instead of integer or float in argument 1 for 'int'");
                 }
             })},
             {"float", new Function("float", 1, (broccoli, args) => {
                 switch (args[0]) {
-                    case Integer i:
-                        return new Float(i.Value);
-                    case Float f:
+                    case BInteger i:
+                        return new BFloat(i.Value);
+                    case BFloat f:
                         return f;
                     default:
                         throw new Exception($"Received {TypeName(args[0])} instead of integer or float in argument 1 for 'float'");
@@ -275,205 +275,205 @@ namespace Broccoli {
             })},
             {"/=", new Function("/=", -2, (broccoli, args) => {
                 if (args.Length == 1)
-                    return Atom.Nil;
+                    return BAtom.Nil;
                 return Boolean(args.Skip(1).All(element => !args[0].Equals(element)));
             })},
             // TODO: make this shorter
             {"<", new Function("<", -3, (broccoli, args) => {
                 foreach (var (value, index) in args.WithIndex())
-                    if (!(value is Integer || value is Float))
+                    if (!(value is BInteger || value is BFloat))
                         throw new Exception($"Received {TypeName(value)} instead of integer or float in argument {index + 1} for '<'");
                 var current = args[0];
                 var rest = args.Skip(1);
                 foreach (var next in rest) {
                     switch (current) {
-                        case Integer i:
+                        case BInteger i:
                             switch (next) {
-                                case Integer i2:
+                                case BInteger i2:
                                     if (i.Value < i2.Value)
                                         current = next;
                                     else
-                                        return Atom.Nil;
+                                        return BAtom.Nil;
                                     break;
-                                case Float f:
+                                case BFloat f:
                                     if (i.Value < f.Value)
                                         current = next;
                                     else
-                                        return Atom.Nil;
+                                        return BAtom.Nil;
                                     break;
                             }
                             break;
-                        case Float f:
+                        case BFloat f:
                             switch (next) {
-                                case Integer i:
+                                case BInteger i:
                                     if (f.Value < i.Value)
                                         current = next;
                                     else
-                                        return Atom.Nil;
+                                        return BAtom.Nil;
                                     break;
-                                case Float f2:
+                                case BFloat f2:
                                     if (f.Value < f2.Value)
                                         current = next;
                                     else
-                                        return Atom.Nil;
+                                        return BAtom.Nil;
                                     break;
                             }
                             break;
                     }
                 }
-                return Atom.True;
+                return BAtom.True;
             })},
             {">", new Function(">", -3, (broccoli, args) => {
                 foreach (var (value, index) in args.WithIndex())
-                    if (!(value is Integer || value is Float))
+                    if (!(value is BInteger || value is BFloat))
                         throw new Exception($"Received {TypeName(value)} instead of integer or float in argument {index + 1} for '>'");
                 var current = args[0];
                 var rest = args.Skip(1);
                 foreach (var next in rest) {
                     switch (current) {
-                        case Integer i:
+                        case BInteger i:
                             switch (next) {
-                                case Integer i2:
+                                case BInteger i2:
                                     if (i.Value > i2.Value)
                                         current = next;
                                     else
-                                        return Atom.Nil;
+                                        return BAtom.Nil;
                                     break;
-                                case Float f:
+                                case BFloat f:
                                     if (i.Value > f.Value)
                                         current = next;
                                     else
-                                        return Atom.Nil;
+                                        return BAtom.Nil;
                                     break;
                             }
                             break;
-                        case Float f:
+                        case BFloat f:
                             switch (next) {
-                                case Integer i:
+                                case BInteger i:
                                     if (f.Value > i.Value)
                                         current = next;
                                     else
-                                        return Atom.Nil;
+                                        return BAtom.Nil;
                                     break;
-                                case Float f2:
+                                case BFloat f2:
                                     if (f.Value > f2.Value)
                                         current = next;
                                     else
-                                        return Atom.Nil;
+                                        return BAtom.Nil;
                                     break;
                             }
                             break;
                     }
                 }
-                return Atom.True;
+                return BAtom.True;
             })},
             {"<=", new Function("<=", -3, (broccoli, args) => {
                 foreach (var (value, index) in args.WithIndex())
-                    if (!(value is Integer || value is Float))
+                    if (!(value is BInteger || value is BFloat))
                         throw new Exception($"Received {TypeName(value)} instead of integer or float in argument {index + 1} for '<='");
                 var current = args[0];
                 var rest = args.Skip(1);
                 foreach (var next in rest) {
                     switch (current) {
-                        case Integer i:
+                        case BInteger i:
                             switch (next) {
-                                case Integer i2:
+                                case BInteger i2:
                                     if (i.Value <= i2.Value)
                                         current = next;
                                     else
-                                        return Atom.Nil;
+                                        return BAtom.Nil;
                                     break;
-                                case Float f:
+                                case BFloat f:
                                     if (i.Value <= f.Value)
                                         current = next;
                                     else
-                                        return Atom.Nil;
+                                        return BAtom.Nil;
                                     break;
                             }
                             break;
-                        case Float f:
+                        case BFloat f:
                             switch (next) {
-                                case Integer i:
+                                case BInteger i:
                                     if (f.Value <= i.Value)
                                         current = next;
                                     else
-                                        return Atom.Nil;
+                                        return BAtom.Nil;
                                     break;
-                                case Float f2:
+                                case BFloat f2:
                                     if (f.Value <= f2.Value)
                                         current = next;
                                     else
-                                        return Atom.Nil;
+                                        return BAtom.Nil;
                                     break;
                             }
                             break;
                     }
                 }
-                return Atom.True;
+                return BAtom.True;
             })},
             {">=", new Function(">=", -3, (broccoli, args) => {
                 foreach (var (value, index) in args.WithIndex())
-                    if (!(value is Integer || value is Float))
+                    if (!(value is BInteger || value is BFloat))
                         throw new Exception($"Received {TypeName(value)} instead of integer or float in argument {index + 1} for '>='");
                 if (args.Length == 1)
-                    return Atom.Nil;
+                    return BAtom.Nil;
                 var current = args[0];
                 var rest = args.Skip(1);
                 foreach (var next in rest) {
                     switch (current) {
-                        case Integer i:
+                        case BInteger i:
                             switch (next) {
-                                case Integer i2:
+                                case BInteger i2:
                                     if (i.Value >= i2.Value)
                                         current = next;
                                     else
-                                        return Atom.Nil;
+                                        return BAtom.Nil;
                                     break;
-                                case Float f:
+                                case BFloat f:
                                     if (i.Value >= f.Value)
                                         current = next;
                                     else
-                                        return Atom.Nil;
+                                        return BAtom.Nil;
                                     break;
                             }
                             break;
-                        case Float f:
+                        case BFloat f:
                             switch (next) {
-                                case Integer i:
+                                case BInteger i:
                                     if (f.Value >= i.Value)
                                         current = next;
                                     else
-                                        return Atom.Nil;
+                                        return BAtom.Nil;
                                     break;
-                                case Float f2:
+                                case BFloat f2:
                                     if (f.Value >= f2.Value)
                                         current = next;
                                     else
-                                        return Atom.Nil;
+                                        return BAtom.Nil;
                                     break;
                             }
                             break;
                     }
                 }
-                return Atom.True;
+                return BAtom.True;
             })},
 
             // Logic
-            {"not", new Function("not", 1, (broccoli, args) => Boolean(args[0].Equals(Atom.Nil)))},
-            {"and", new Function("and", -1, (broccoli, args) => Boolean(args.All(arg => !arg.Equals(Atom.Nil))))},
-            {"or", new Function("or", -1, (broccoli, args) => Boolean(args.Any(arg => !arg.Equals(Atom.Nil))))},
+            {"not", new Function("not", 1, (broccoli, args) => Boolean(args[0].Equals(BAtom.Nil)))},
+            {"and", new Function("and", -1, (broccoli, args) => Boolean(args.All(arg => !arg.Equals(BAtom.Nil))))},
+            {"or", new Function("or", -1, (broccoli, args) => Boolean(args.Any(arg => !arg.Equals(BAtom.Nil))))},
 
             // Flow control
             {"if", new ShortCircuitFunction("if", -3, (broccoli, args) => {
                 var condition = broccoli.Run(args[0]);
-                if (!condition.Equals(Atom.True) && !condition.Equals(Atom.Nil))
+                if (!condition.Equals(BAtom.True) && !condition.Equals(BAtom.Nil))
                     throw new Exception($"Received {TypeName(args[0])} '{args[0].ToString()}' instead of boolean in argument 1 for 'if'");
-                var elseIndex = Array.IndexOf(args.ToArray(), new Atom("else"), 1);
+                var elseIndex = Array.IndexOf(args.ToArray(), new BAtom("else"), 1);
                 IEnumerable<IValueExpressible> statements = elseIndex != -1 ?
-                    condition.Equals(Atom.True) ?
+                    condition.Equals(BAtom.True) ?
                         args.Skip(1).Take(elseIndex - 1) :
                         args.Skip(elseIndex + 1) :
-                    condition.Equals(Atom.True) ?
+                    condition.Equals(BAtom.True) ?
                         args.Skip(1) :
                         args.Skip(args.Length);
                 IValue result = null;
@@ -483,7 +483,7 @@ namespace Broccoli {
             })},
             {"for", new ShortCircuitFunction("for", -3, (broccoli, args) => {
                 var inValue = broccoli.Run(args[1]);
-                if (!(inValue is Atom inAtom))
+                if (!(inValue is BAtom inAtom))
                     throw new Exception($"Received {TypeName(inValue)} instead of atom 'in' in argument 2 for 'for'");
                 if (inAtom.Value != "in")
                     throw new Exception($"Received atom '{inAtom.Value}' instead of atom 'in' in argument 2 for 'for'");
@@ -521,9 +521,9 @@ namespace Broccoli {
             {"list", new Function("list", -1, (broccoli, args) => new ValueList(args.ToList()))},
             {"len", new Function("len", 1, (broccoli, args) => {
                 if (args[0] is ValueList l)
-                    return new Integer(l.Count);
-                if (args[0] is String s)
-                    return new Integer(s.Value.Length);
+                    return new BInteger(l.Count);
+                if (args[0] is BString s)
+                    return new BInteger(s.Value.Length);
 
                 throw new Exception($"Received {TypeName(args[0])} instead of list or string in argument 1 for 'len'");
             })},
@@ -531,7 +531,7 @@ namespace Broccoli {
                 if (!(args[0] is ValueList list))
                     throw new Exception($"Received {TypeName(args[0])} instead of list in argument 1 for 'first'");
 
-                return list.Count == 0 ? Atom.Nil : list[0];
+                return list.Count == 0 ? BAtom.Nil : list[0];
             })},
             {"rest", new Function("rest", 1, (broccoli, args) => {
                 if (!(args[0] is ValueList list))
@@ -542,9 +542,9 @@ namespace Broccoli {
             {"slice", new Function("slice", 3, (broccoli, args) => {
                 if (!(args[0] is ValueList list))
                     throw new Exception($"Received {TypeName(args[0])} instead of list in argument 1 for 'slice'");
-                if (!(args[1] is Integer i1))
+                if (!(args[1] is BInteger i1))
                     throw new Exception($"Received {TypeName(args[0])} instead of integer in argument 2 for 'slice'");
-                if (!(args[2] is Integer i2))
+                if (!(args[2] is BInteger i2))
                     throw new Exception($"Received {TypeName(args[0])} instead of integer in argument 3 for 'slice'");
 
                 var start = (int) i1.Value;
@@ -552,14 +552,14 @@ namespace Broccoli {
                 return new ValueList(list.Skip(start).Take(end - Math.Max(0, start)));
             })},
             {"range", new Function("range", 2, (broccoli, args) => {
-                if (!(args[0] is Integer i1))
+                if (!(args[0] is BInteger i1))
                     throw new Exception($"Received {TypeName(args[0])} instead of integer in argument 1 for 'range'");
-                if (!(args[1] is Integer i2))
+                if (!(args[1] is BInteger i2))
                     throw new Exception($"Received {TypeName(args[0])} instead of integer in argument 2 for 'range'");
 
                 var start = (int) i1.Value;
                 var end = (int) i2.Value;
-                return new ValueList(Enumerable.Range(start, end - start + 1).Select(value => (IValue) new Integer(value)));
+                return new ValueList(Enumerable.Range(start, end - start + 1).Select(value => (IValue) new BInteger(value)));
             })},
             {"cat", new Function("cat", -3, (broccoli, args) => {
                 foreach (var (value, index) in args.WithIndex())
@@ -580,7 +580,7 @@ namespace Broccoli {
                         return broccoli.Run(e.Values.First());
                     var first = e.Values.First();
                     IFunction fn = null;
-                    if (first is Atom fnAtom) {
+                    if (first is BAtom fnAtom) {
                         var fnName = fnAtom.Value;
                         fn = broccoli.Scope[fnName] ?? broccoli.Builtins.GetValueOrDefault(fnName, null);
 
@@ -594,7 +594,7 @@ namespace Broccoli {
                     return fn.Invoke(broccoli, e.Values.Skip(1).ToArray());
                 })},
                 {"fn", new ShortCircuitFunction("fn", -3, (broccoli, args) => {
-                    if (!(broccoli.Run(args[0]) is Atom name))
+                    if (!(broccoli.Run(args[0]) is BAtom name))
                         throw new Exception($"Received {TypeName(args[0])} instead of atom in argument 1 for 'fn'");
                     if (!(args[1] is ValueExpression argExpressions)) {
                         if (args[1] is ScalarVar s)
@@ -657,39 +657,39 @@ namespace Broccoli {
                 })},
 
                 {"help", new ShortCircuitFunction("help", 0, (broccoli, args) => {
-                    return new ValueList(broccoli.Builtins.Keys.Skip(1).Select(key => (IValue) new String(key)));
+                    return new ValueList(broccoli.Builtins.Keys.Skip(1).Select(key => (IValue) new BString(key)));
                 })},
 
-                {"input", new Function("input", 0, (broccoli, args) => new String(Console.ReadLine()))},
+                {"input", new Function("input", 0, (broccoli, args) => new BString(Console.ReadLine()))},
 
-                {"string", new Function("string", 1, (broccoli, args) => new String(args[0].ToString()))},
+                {"string", new Function("string", 1, (broccoli, args) => new BString(args[0].ToString()))},
                 {"bool", new Function("bool", 1, (broccoli, args) => Boolean(CauliflowerInline.Truthy(args[0])))},
                 {"int", new Function("int", 1, (broccoli, args) => {
                     switch (args[0]) {
-                        case Integer i:
+                        case BInteger i:
                             return i;
-                        case Float f:
-                            return new Integer((int) f.Value);
-                        case String s:
-                            return new Integer(int.Parse(s.Value));
+                        case BFloat f:
+                            return new BInteger((int) f.Value);
+                        case BString s:
+                            return new BInteger(int.Parse(s.Value));
                         default:
                             throw new Exception($"Received {TypeName(args[0])} instead of integer, float or string in argument 1 for 'int'");
                     }
                 })},
                 {"float", new Function("float", 1, (broccoli, args) => {
                     switch (args[0]) {
-                        case Integer i:
-                            return new Float(i.Value);
-                        case Float f:
+                        case BInteger i:
+                            return new BFloat(i.Value);
+                        case BFloat f:
                             return f;
-                        case String s:
-                            return new Float(float.Parse(s.Value));
+                        case BString s:
+                            return new BFloat(float.Parse(s.Value));
                         default:
                             throw new Exception($"Received {TypeName(args[0])} instead of integer, float or string in argument 1 for 'float'");
                     }
                 })},
 
-                {"not", new Function("not", 1, (broccoli, args) => Boolean(CauliflowerInline.Truthy(args[0]).Equals(Atom.Nil)))},
+                {"not", new Function("not", 1, (broccoli, args) => Boolean(CauliflowerInline.Truthy(args[0]).Equals(BAtom.Nil)))},
                 {"and", new ShortCircuitFunction("and", -1, (broccoli, args) =>
                     Boolean(!args.Any(arg => CauliflowerInline.Truthy(broccoli.Run(arg))))
                 )},
@@ -759,12 +759,12 @@ namespace Broccoli {
 
                 {"if", new ShortCircuitFunction("if", -3, (broccoli, args) => {
                     var condition = broccoli.Builtins["bool"].Invoke(broccoli, broccoli.Run(args[0]));
-                    var elseIndex = Array.IndexOf(args.ToArray(), new Atom("else"), 1);
+                    var elseIndex = Array.IndexOf(args.ToArray(), new BAtom("else"), 1);
                     IEnumerable<IValueExpressible> statements = elseIndex != -1 ?
-                        condition.Equals(Atom.True) ?
+                        condition.Equals(BAtom.True) ?
                             args.Skip(1).Take(elseIndex - 1) :
                             args.Skip(elseIndex + 1) :
-                        condition.Equals(Atom.True) ?
+                        condition.Equals(BAtom.True) ?
                             args.Skip(1) :
                             args.Skip(args.Length);
                     IValue result = null;
@@ -777,9 +777,9 @@ namespace Broccoli {
                     if (!(args[0] is ValueList list))
                         throw new Exception($"Received {TypeName(args[0])} instead of list in argument 1 for 'slice'");
                     foreach (var (arg, index) in args.Skip(1).WithIndex())
-                        if (!(arg is Integer i))
+                        if (!(arg is BInteger i))
                             throw new Exception($"Received {TypeName(arg)} instead of integer in argument {index + 2} for 'slice'");
-                    var ints = args.Skip(1).Select(arg => (int) ((Integer) arg).Value).ToArray();
+                    var ints = args.Skip(1).Select(arg => (int) ((BInteger) arg).Value).ToArray();
 
                     switch (ints.Length) {
                         case 0:
@@ -796,17 +796,17 @@ namespace Broccoli {
                 })},
                 {"range", new Function("range", -2, (broccoli, args) => {
                     foreach (var (arg, index) in args.WithIndex())
-                        if (!(arg is Integer i))
+                        if (!(arg is BInteger i))
                             throw new Exception($"Received {TypeName(arg)} instead of integer in argument {index + 1} for 'range'");
-                    var ints = args.Select(arg => (int) ((Integer) arg).Value).ToArray();
+                    var ints = args.Select(arg => (int) ((BInteger) arg).Value).ToArray();
 
                     switch (ints.Length) {
                         case 1:
-                            return new ValueList(Enumerable.Range(0, ints[0] + 1).Select(i => (IValue) new Integer(i)));
+                            return new ValueList(Enumerable.Range(0, ints[0] + 1).Select(i => (IValue) new BInteger(i)));
                         case 2:
-                            return new ValueList(Enumerable.Range(ints[0], ints[1] - ints[0] + 1).Select(i => (IValue) new Integer(i)));
+                            return new ValueList(Enumerable.Range(ints[0], ints[1] - ints[0] + 1).Select(i => (IValue) new BInteger(i)));
                         case 3:
-                            return new ValueList(Enumerable.Range(ints[0], ints[1] == ints[0] ? 0 : (ints[1] - ints[0] - 1) / ints[2] + 1).Select(i => (IValue) new Integer(ints[0] + i * ints[2])));
+                            return new ValueList(Enumerable.Range(ints[0], ints[1] == ints[0] ? 0 : (ints[1] - ints[0] - 1) / ints[2] + 1).Select(i => (IValue) new BInteger(ints[0] + i * ints[2])));
                         default:
                             throw new Exception($"Function range requires 1 to 3 arguments, {args.Length} provided");
                     }
@@ -853,7 +853,7 @@ namespace Broccoli {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static IFunction FindFunction(string callerName, Interpreter broccoli, IValue func) {
                 switch (func) {
-                    case Atom a:
+                    case BAtom a:
                         var fn = broccoli.Scope[a.Value] ?? broccoli.Builtins.GetValueOrDefault(a.Value, null);
                         if (fn == null)
                             throw new Exception($"Function {a.Value} does not exist");
@@ -868,14 +868,14 @@ namespace Broccoli {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static bool Truthy(IValue value) {
                 switch (value) {
-                    case Integer i:
+                    case BInteger i:
                         return i.Value != 0;
-                    case Float f:
+                    case BFloat f:
                         return f.Value != 0;
-                    case String s:
+                    case BString s:
                         return s.Value.Length != 0;
-                    case Atom a:
-                        return !a.Equals(Atom.Nil);
+                    case BAtom a:
+                        return !a.Equals(BAtom.Nil);
                     case ValueList v:
                         return v.Value.Count != 0;
                     case IFunction f:

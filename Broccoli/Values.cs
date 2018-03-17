@@ -3,89 +3,89 @@
 namespace Broccoli {
     public interface IValue : IValueExpressible { }
 
-    public class Integer : IValue {
+    public class BInteger : IValue {
         public long Value { get; }
 
-        public Integer(long i) {
+        public BInteger(long i) {
             Value = i;
         }
 
-        public static implicit operator Integer(int i) => new Integer(i);
+        public static implicit operator BInteger(int i) => new BInteger(i);
 
-        public static implicit operator Integer(long i) => new Integer(i);
+        public static implicit operator BInteger(long i) => new BInteger(i);
 
-        public static bool operator ==(Integer left, object right) => right is Integer i && left.Value == i.Value;
+        public static bool operator ==(BInteger left, object right) => right is BInteger i && left.Value == i.Value;
 
-        public static bool operator !=(Integer left, object right) => right is Integer i && left.Value != i.Value;
+        public static bool operator !=(BInteger left, object right) => right is BInteger i && left.Value != i.Value;
 
-        public override bool Equals(object other) => other is Integer i && Value == i.Value;
+        public override bool Equals(object other) => other is BInteger i && Value == i.Value;
 
         public override int GetHashCode() => Value.GetHashCode();
 
         public override string ToString() => Value.ToString();
     }
 
-    public class Float : IValue {
+    public class BFloat : IValue {
         public double Value { get; }
 
-        public Float(double f) {
+        public BFloat(double f) {
             Value = f;
         }
 
-        public static implicit operator Float(float f) => new Float(f);
+        public static implicit operator BFloat(float f) => new BFloat(f);
 
-        public static implicit operator Float(double f) => new Float(f);
+        public static implicit operator BFloat(double f) => new BFloat(f);
 
-        public static implicit operator Float(Integer f) => new Float(f.Value);
+        public static implicit operator BFloat(BInteger f) => new BFloat(f.Value);
 
-        public static bool operator ==(Float left, object right) => right is Float f && left.Value == f.Value;
+        public static bool operator ==(BFloat left, object right) => right is BFloat f && left.Value == f.Value;
 
-        public static bool operator !=(Float left, object right) => right is Float f && left.Value != f.Value;
+        public static bool operator !=(BFloat left, object right) => right is BFloat f && left.Value != f.Value;
 
-        public override bool Equals(object other) => other is Float f && Value == f.Value;
+        public override bool Equals(object other) => other is BFloat f && Value == f.Value;
 
         public override int GetHashCode() => Value.GetHashCode();
 
         public override string ToString() => Value.ToString();
     }
 
-    public class String : IValue {
+    public class BString : IValue {
         public string Value { get; }
 
-        public String(string s) {
+        public BString(string s) {
             Value = s;
         }
 
-        public static implicit operator String(string s) => new String(s);
+        public static implicit operator BString(string s) => new BString(s);
 
-        public static bool operator ==(String left, object right) => right is String s && left.Value == s.Value;
+        public static bool operator ==(BString left, object right) => right is BString s && left.Value == s.Value;
 
-        public static bool operator !=(String left, object right) => right is String s && left.Value != s.Value;
+        public static bool operator !=(BString left, object right) => right is BString s && left.Value != s.Value;
 
-        public override bool Equals(object other) => (other is String s) && Value == s.Value;
+        public override bool Equals(object other) => (other is BString s) && Value == s.Value;
 
         public override int GetHashCode() => Value.GetHashCode();
 
         public override string ToString() => Value;
     }
 
-    public class Atom : IValue {
-        public static readonly Atom True = new Atom("t");
-        public static readonly Atom Nil = new Atom("nil");
+    public class BAtom : IValue {
+        public static readonly BAtom True = new BAtom("t");
+        public static readonly BAtom Nil = new BAtom("nil");
 
         public string Value { get; }
 
-        public Atom(string a) {
+        public BAtom(string a) {
             Value = a;
         }
 
-        public static implicit operator Atom(string a) => new Atom(a);
+        public static implicit operator BAtom(string a) => new BAtom(a);
 
-        public static bool operator ==(Atom left, object right) => right is Atom a && left.Value == a.Value;
+        public static bool operator ==(BAtom left, object right) => right is BAtom a && left.Value == a.Value;
 
-        public static bool operator !=(Atom left, object right) => right is Atom a && left.Value != a.Value;
+        public static bool operator !=(BAtom left, object right) => right is BAtom a && left.Value != a.Value;
 
-        public override bool Equals(object other) => (other is Atom a) && Value == a.Value;
+        public override bool Equals(object other) => (other is BAtom a) && Value == a.Value;
 
         public override int GetHashCode() => Value.GetHashCode();
 

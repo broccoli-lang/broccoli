@@ -17,13 +17,13 @@ namespace Broccoli.Parsing {
         public IValue ToIValue() {
             switch (Type) {
                 case TokenType.String:
-                    return new String(Literal);
+                    return new BString(Literal);
                 case TokenType.Integer:
-                    return new Integer(int.Parse(Literal));
+                    return new BInteger(int.Parse(Literal));
                 case TokenType.Float:
-                    return new Float(double.Parse(Literal));
+                    return new BFloat(double.Parse(Literal));
                 case TokenType.Atom:
-                    return new Atom(Literal);
+                    return new BAtom(Literal);
                 case TokenType.Scalar:
                     return new ScalarVar(Literal);
                 case TokenType.List:

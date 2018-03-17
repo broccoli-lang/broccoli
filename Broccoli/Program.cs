@@ -33,7 +33,7 @@ namespace Broccoli {
 
             if (useCauliflower) {
                 broccoli.Builtins = Interpreter.AlternativeEnvironments["cauliflower"];
-                broccoli.Scope.Lists["ARGV"] = new ValueList(argv.Select(i => new String(i)));
+                broccoli.Scope.Lists["ARGV"] = new ValueList(argv.Select(i => new BString(i)));
             }
 
             if (useREPL)
