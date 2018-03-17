@@ -115,62 +115,67 @@ namespace BroccoliTest {
 
         [TestMethod]
         public void TestCast() {
-            Assert.AreEqual(_run("(float 2)"), new BFloat(2), "Float does not work correctly");
-            Assert.AreEqual(_run("(float 2.2)"), new BFloat(2.2), "Float does not work correctly");
-            Assert.AreEqual(_run("(int 2)"), new BInteger(2), "Int does not work correctly");
-            Assert.AreEqual(_run("(int 2.2)"), new BInteger(2), "Int does not work correctly");
+            Assert.AreEqual(_run("(float 2)"), new BFloat(2), "Float does not work correctly with integer value");
+            Assert.AreEqual(_run("(float 2.2)"), new BFloat(2.2), "Float does not work correctly with float value");
+            Assert.AreEqual(_run("(int 2)"), new BInteger(2), "Int does not work correctly with integer value");
+            Assert.AreEqual(_run("(int 2.2)"), new BInteger(2), "Int does not work correctly with float value");
         }
 
         // Comparison
 
         [TestMethod]
         public void TestEqual() {
-            Assert.AreEqual(_run("(= 1 1 1)"), BAtom.True, "= does not work correctly");
-            Assert.AreEqual(_run("(= 1.1 1.1 1.1)"), BAtom.True, "= does not work correctly");
-            Assert.AreEqual(_run("(= 1 1 0)"), BAtom.Nil, "= does not work correctly");
-            Assert.AreEqual(_run("(= a b a)"), BAtom.Nil, "= does not work correctly");
-            Assert.AreEqual(_run("(= \"a\" \"b\" \"b\")"), BAtom.Nil, "= does not work correctly");
+            Assert.AreEqual(_run("(= 1 1 1)"), BAtom.True, "= does not succeed correctly with integers");
+            Assert.AreEqual(_run("(= 1.1 1.1 1.1)"), BAtom.True, "= does not succeed correctly with floats");
+            Assert.AreEqual(_run("(= aa aa aa)"), BAtom.True, "= does not succeed correctly with atoms");
+            Assert.AreEqual(_run("(= \"aa\" \"aa\" \"aa\")"), BAtom.True, "= does not succeed correctly with strings");
+            Assert.AreEqual(_run("(= (list 1 2) (list 1 2) (list 1 2))"), BAtom.True, "= does not succeed correctly with lists");
+            Assert.AreEqual(_run("(= 1.1 1.1 0.1)"), BAtom.Nil, "= does not fail correctly with floats");
+            Assert.AreEqual(_run("(= 1 1 0)"), BAtom.Nil, "= does not fail correctly with integers");
+            Assert.AreEqual(_run("(= aa ab aa)"), BAtom.Nil, "= does not fail correctly with atoms");
+            Assert.AreEqual(_run("(= \"aa\" \"ab\" \"ab\")"), BAtom.Nil, "= does not fail correctly with strings");
+            Assert.AreEqual(_run("(= (list 1 1) (list 1 2) (list 1 2))"), BAtom.Nil, "= does not fail correctly with lists");
             Assert.AreEqual(_run("(= 1)"), BAtom.True, "= does not work correctly with one argument");
             Assert.ThrowsException<Exception>(() => _run("(=)"), "= does not fail with no arguments");
         }
 
         [TestMethod]
         public void TestNotEqual() {
-            Assert.AreEqual(_run("(/= 1 1 1)"), BAtom.Nil, "/= does not work correctly");
-            Assert.AreEqual(_run("(/= 1.1 1.1 1.1)"), BAtom.Nil, "/= does not work correctly");
-            Assert.AreEqual(_run("(/= 1 1 0)"), BAtom.Nil, "/= does not work correctly");
-            Assert.AreEqual(_run("(/= 1 0 0)"), BAtom.True, "/= does not work correctly");
-            Assert.AreEqual(_run("(/= a b a)"), BAtom.Nil, "/= does not work correctly");
-            Assert.AreEqual(_run("(/= a b b)"), BAtom.True, "/= does not work correctly");
-            Assert.AreEqual(_run("(/= \"a\" \"b\" \"b\")"), BAtom.True, "/= does not work correctly");
+            Assert.AreEqual(_run("(/= 1 1 1)"), BAtom.Nil, "/= does not fail correctly with integers");
+            Assert.AreEqual(_run("(/= 1.1 1.1 1.1)"), BAtom.Nil, "/= does fail work correctly with floats");
+            Assert.AreEqual(_run("(/= 1 1 0)"), BAtom.Nil, "/= does not fail correctly when some integers match");
+            Assert.AreEqual(_run("(/= 1 0 0)"), BAtom.True, "/= does not succeed correctly with integers");
+            Assert.AreEqual(_run("(/= a b a)"), BAtom.Nil, "/= does not fail correctly with atoms");
+            Assert.AreEqual(_run("(/= a b b)"), BAtom.True, "/= does not succeed correctly with atoms");
+            Assert.AreEqual(_run("(/= \"a\" \"b\" \"b\")"), BAtom.True, "/= does not succeed correctly with strings");
             Assert.AreEqual(_run("(/= 1)"), BAtom.Nil, "= does not work correctly with one argument");
             Assert.ThrowsException<Exception>(() => _run("(/=)"), "/= does not fail with no arguments");
         }
 
         [TestMethod]
         public void TestComparison() {
-            Assert.AreEqual(_run("(< 0 1 2)"), BAtom.True, "< does not work correctly");
-            Assert.AreEqual(_run("(< 0 1 1)"), BAtom.Nil, "< does not work correctly");
-            Assert.AreEqual(_run("(< 1.1 2 3.1)"), BAtom.True, "< does not work correctly");
-            Assert.AreEqual(_run("(< 1 2.1 2.1)"), BAtom.Nil, "< does not work correctly");
+            Assert.AreEqual(_run("(< 0 1 2)"), BAtom.True, "< does not succeed correctly with integers");
+            Assert.AreEqual(_run("(< 0 1 1)"), BAtom.Nil, "< does not fail correctly with integers");
+            Assert.AreEqual(_run("(< 1.1 2 3.1)"), BAtom.True, "< does not succeed correctly with numbers");
+            Assert.AreEqual(_run("(< 1 2.1 2.1)"), BAtom.Nil, "< does not fail correctly with numbers");
             Assert.ThrowsException<Exception>(() => _run("(< a b)"), "< does not fail with non-numeric argument");
             Assert.ThrowsException<Exception>(() => _run("(< 1)"), "< does not fail with one argument");
-            Assert.AreEqual(_run("(> 2 1 0)"), BAtom.True, "> does not work correctly");
-            Assert.AreEqual(_run("(> 1 0 0)"), BAtom.Nil, "> does not work correctly");
-            Assert.AreEqual(_run("(> 3.1 2 1.1)"), BAtom.True, "> does not work correctly");
-            Assert.AreEqual(_run("(> 2.1 2.1 1)"), BAtom.Nil, "> does not work correctly");
+            Assert.AreEqual(_run("(> 2 1 0)"), BAtom.True, "> does not succeed correctly with integers");
+            Assert.AreEqual(_run("(> 1 0 0)"), BAtom.Nil, "> does not fail correctly with integers");
+            Assert.AreEqual(_run("(> 3.1 2 1.1)"), BAtom.True, "> does not succeed correctly with numbers");
+            Assert.AreEqual(_run("(> 2.1 2.1 1)"), BAtom.Nil, "> does not fail correctly with numbers");
             Assert.ThrowsException<Exception>(() => _run("(> a b)"), "> does not fail with non-numeric argument");
             Assert.ThrowsException<Exception>(() => _run("(> 1)"), "> does not fail with one argument");
-            Assert.AreEqual(_run("(<= 0 1 1)"), BAtom.True, "<= does not work correctly");
-            Assert.AreEqual(_run("(<= 0 0 -1)"), BAtom.Nil, "<= does not work correctly");
-            Assert.AreEqual(_run("(<= 1.1 1.1 3.1)"), BAtom.True, "<= does not work correctly");
-            Assert.AreEqual(_run("(<= 1 2.1 2)"), BAtom.Nil, "<= does not work correctly");
+            Assert.AreEqual(_run("(<= 0 1 1)"), BAtom.True, "<= does not succeed correctly with integers");
+            Assert.AreEqual(_run("(<= 0 0 -1)"), BAtom.Nil, "<= does not fail correctly with integers");
+            Assert.AreEqual(_run("(<= 1.1 1.1 3)"), BAtom.True, "<= does not succeed correctly with numbers");
+            Assert.AreEqual(_run("(<= 1 2.1 2)"), BAtom.Nil, "<= does not fail correctly with numbers");
             Assert.ThrowsException<Exception>(() => _run("(<= a b)"), "<= does not fail with non-numeric argument");
             Assert.ThrowsException<Exception>(() => _run("(<= 1)"), "<= does not fail with one argument");
-            Assert.AreEqual(_run("(>= 2 1 0)"), BAtom.True, ">= does not work correctly");
-            Assert.AreEqual(_run("(>= 0 0 1)"), BAtom.Nil, ">= does not work correctly");
-            Assert.AreEqual(_run("(>= 3.1 1.1 1.1)"), BAtom.True, ">= does not work correctly");
-            Assert.AreEqual(_run("(>= 2 2.1 1)"), BAtom.Nil, ">= does not work correctly");
+            Assert.AreEqual(_run("(>= 2 1 0)"), BAtom.True, ">= does not succeed correctly with integers");
+            Assert.AreEqual(_run("(>= 0 0 1)"), BAtom.Nil, ">= does not fail correctly with integers");
+            Assert.AreEqual(_run("(>= 3 1.1 1.1)"), BAtom.True, ">= does not succeed correctly with numbers");
+            Assert.AreEqual(_run("(>= 2 2.1 1)"), BAtom.Nil, ">= does not fail correctly with numbers");
             Assert.ThrowsException<Exception>(() => _run("(>= a b)"), ">= does not fail with non-numeric argument");
             Assert.ThrowsException<Exception>(() => _run("(>= 1)"), ">= does not fail with one argument");
         }
@@ -179,29 +184,29 @@ namespace BroccoliTest {
 
         [TestMethod]
         public void TestNot() {
-            Assert.AreEqual(_run("(not t)"), BAtom.Nil, "Not does not work correctly");
-            Assert.AreEqual(_run("(not nil)"), BAtom.True, "Not does not work correctly");
-            Assert.AreEqual(_run("(not 0)"), BAtom.Nil, "Not does not work correctly");
-            Assert.AreEqual(_run("(not a)"), BAtom.Nil, "Not does not work correctly");
+            Assert.AreEqual(_run("(not t)"), BAtom.Nil, "Not does not work correctly with true");
+            Assert.AreEqual(_run("(not nil)"), BAtom.True, "Not does not work correctly with nil");
+            Assert.AreEqual(_run("(not 0)"), BAtom.Nil, "Not does not work correctly with non-boolean");
+            Assert.AreEqual(_run("(not a)"), BAtom.Nil, "Not does not work correctly with non-boolean");
             Assert.ThrowsException<Exception>(() => _run("(not t t)"), "Not does not fail with two arguments");
             Assert.ThrowsException<Exception>(() => _run("(not)"), "Not does not fail with no arguments");
         }
 
         [TestMethod]
         public void TestAnd() {
-            Assert.AreEqual(_run("(and 1 2 3)"), BAtom.True, "And does not work correctly");
-            Assert.AreEqual(_run("(and nil)"), BAtom.Nil, "And does not work correctly");
+            Assert.AreEqual(_run("(and 1 2 3)"), BAtom.True, "And does not work correctly with integers");
+            Assert.AreEqual(_run("(and nil)"), BAtom.Nil, "And does not work correctly with nil");
             Assert.AreEqual(_run("(and nil 1 2)"), BAtom.Nil, "And does not work correctly");
-            Assert.AreEqual(_run("(and)"), BAtom.True, "And does not work correctly");
+            Assert.AreEqual(_run("(and)"), BAtom.True, "And does not work correctly with no arguments");
         }
 
         [TestMethod]
         public void TestOr() {
-            Assert.AreEqual(_run("(or 1 2 3)"), BAtom.True, "Or does not work correctly");
-            Assert.AreEqual(_run("(or nil)"), BAtom.Nil, "Or does not work correctly");
-            Assert.AreEqual(_run("(or nil 0)"), BAtom.True, "Or does not work correctly");
+            Assert.AreEqual(_run("(or 1 2 3)"), BAtom.True, "Or does not work correctly with integers");
+            Assert.AreEqual(_run("(or nil)"), BAtom.Nil, "Or does not work correctly with nil");
+            Assert.AreEqual(_run("(or nil 0)"), BAtom.True, "Or does not work correctly with zero");
             Assert.AreEqual(_run("(or 0 1 2)"), BAtom.True, "Or does not work correctly");
-            Assert.AreEqual(_run("(or)"), BAtom.Nil, "Or does not work correctly");
+            Assert.AreEqual(_run("(or)"), BAtom.Nil, "Or does not work correctly with no arguments");
         }
 
         // Control flow
@@ -209,8 +214,8 @@ namespace BroccoliTest {
         [TestMethod]
         public void TestIf() {
             Assert.AreEqual(_run("(if t 2)"), new BInteger(2), "If does not work correctly");
-            Assert.AreEqual(_run("(if t 2 else 0)"), new BInteger(2), "If else does not work correctly");
-            Assert.AreEqual(_run("(if nil 2 else 0)"), new BInteger(0), "If else does not work correctly");
+            Assert.AreEqual(_run("(if t 2 else 0)"), new BInteger(2), "If else does not work correctly with true");
+            Assert.AreEqual(_run("(if nil 2 else 0)"), new BInteger(0), "If else does not work correctly with zero");
         }
 
         // List Functions
