@@ -22,7 +22,7 @@ namespace BroccoliTest {
         public void Initialize() {
             _broccoli = new Interpreter();
             _run = _broccoli.Run;
-            Program.IsCauliflower = false;
+            _run("(env broccoli)");
         }
 
         // TODO: more imformative messages

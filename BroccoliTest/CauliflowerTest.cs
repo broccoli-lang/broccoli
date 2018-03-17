@@ -46,6 +46,7 @@ namespace BroccoliTest {
         public void Cleanup() {
             _broccoli = null;
             _run = null;
+            Program.IsCauliflower = false;
         }
     }
 }
