@@ -8,6 +8,7 @@ namespace Broccoli {
         public readonly Dictionary<string, IValue> Scalars = new Dictionary<string, IValue>();
         public readonly Dictionary<string, ValueList> Lists = new Dictionary<string, ValueList>();
         public readonly Dictionary<string, IFunction> Functions = new Dictionary<string, IFunction>();
+        public readonly Dictionary<string, ValueDict> Dicts = new Dictionary<string, ValueDict>();
         public readonly BroccoliScope Parent;
 
         public BroccoliScope() { }
@@ -60,6 +61,25 @@ namespace Broccoli {
             set => Set(l, value);
         }
 
+        public ValueDict Get(DictVar d) => Dicts.ContainsKey(d.Value) ? Dicts[d.Value] : Parent?.Get(d);
+        public bool Set(DictVar d, ValueDict value, bool self = false, bool initial = true) {
+            if (self || Dicts.ContainsKey(d.Value)) {
+                Dicts[d.Value] = value;
+                return true;
+            }
+            if (Parent != null && Parent.Set(d, value, false))
+                return true;
+            if (!initial)
+                return false;
+            Dicts[d.Value] = value;
+            return true;
+        }
+
+        public ValueDict this[DictVar d] {
+            get => Get(d);
+            set => Set(d, value);
+        }
+
         public IFunction Get(string l) => Functions.ContainsKey(l) ? Functions[l] : Parent?.Get(l);
 
         public bool Set(string l, IFunction value, bool self = false, bool initial = true) {
@@ -103,14 +123,13 @@ namespace Broccoli {
             switch (expr) {
                 case ScalarVar s:
                     result = Scope[s];
-                    if (result == null)
-                        throw new Exception($"Scalar {s.Value} not found");
-                    return result;
+                    return result ?? throw new Exception($"Scalar {s.Value} not found");
                 case ListVar l:
                     result = Scope[l];
-                    if (result == null)
-                        throw new Exception($"List {l.Value} not found");
-                    return result;
+                    return result ?? throw new Exception($"List {l.Value} not found");
+                case DictVar d:
+                    result = Scope[d];
+                    return result ?? throw new Exception($"Dict {d.Value} not found");
                 case ValueList l:
                     return new ValueList(l.Value.Select(Run).ToList());
                 case ValueExpression e:

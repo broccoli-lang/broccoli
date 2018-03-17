@@ -41,17 +41,26 @@ namespace Broccoli {
                         var toAssign = innerArgs[i];
                         switch (argNames[i]) {
                             case ScalarVar s:
-                                if (toAssign is ValueList)
-                                    throw new Exception("Lists cannot be assigned to scalar ($) variables");
+                                if (toAssign.GetType().In(typeof(ValueList), typeof(ValueDict)))
+                                    throw new Exception("Only Scalars can be assigned to scalar ($) variables");
                                 broccoli.Scope[s] = toAssign;
                                 break;
                             case ListVar l:
                                 if (!(toAssign is ValueList valueList))
-                                    throw new Exception("Scalars cannot be assigned to list (@) variables");
+                                    throw new Exception("Only Lists can be assigned to list (@) variables");
                                 broccoli.Scope[l] = valueList;
                                 break;
+                            case DictVar d when Program.IsCauliflower:
+                                if (!(toAssign is ValueDict valueDict))
+                                    throw new Exception("Only Dicts can be assigned to dict (%) variables");
+                                broccoli.Scope[d] = valueDict;
+                                break;
+
                             default:
-                                throw new Exception("Values can only be assigned to scalar ($) or list (@) variables");
+                                throw new Exception(
+                                    "Values can only be assigned to scalar ($)," +
+                                    $"list (@){(Program.IsCauliflower ? ", or dict (%)" : "")} variables"
+                                );
                         }
                     }
                     IValue result = null;
@@ -234,17 +243,25 @@ namespace Broccoli {
                 var toAssign = broccoli.Run(args[1]);
                 switch (args[0]) {
                     case ScalarVar s:
-                        if (toAssign is ValueList)
-                            throw new Exception("Lists cannot be assigned to scalar ($) variables");
+                        if (toAssign.GetType().In(typeof(ValueList), typeof(ValueDict)))
+                            throw new Exception("Only Scalars can be assigned to scalar ($) variables");
                         broccoli.Scope[s] = toAssign;
                         break;
                     case ListVar l:
                         if (!(toAssign is ValueList valueList))
-                            throw new Exception("Scalars cannot be assigned to list (@) variables");
+                            throw new Exception("Only Lists can be assigned to list (@) variables");
                         broccoli.Scope[l] = valueList;
                         break;
+                    case DictVar d when Program.IsCauliflower:
+                            if (!(toAssign is ValueDict valueDict))
+                                throw new Exception("Only Dicts can be assigned to dict (%) variables");
+                            broccoli.Scope[d] = valueDict;
+                            break;
                     default:
-                        throw new Exception("Values can only be assigned to scalar ($) or list (@) variables");
+                        throw new Exception(
+                                    "Values can only be assigned to scalar ($)," +
+                                    $"list (@){(Program.IsCauliflower ? ", or dict (%)" : "")} variables"
+                                );
                 }
                 return toAssign;
             })},
@@ -497,16 +514,19 @@ namespace Broccoli {
                 foreach (var value in valueList) {
                     switch (args[0]) {
                         case ScalarVar s:
-                            if (value is ValueList)
-                                throw new Exception("Lists cannot be assigned to scalar ($) variables");
-
-                            broccoli.Scope[s] = value;
-                            break;
+                                if (value.GetType().In(typeof(ValueList), typeof(ValueDict)))
+                                    throw new Exception("Only Scalars can be assigned to scalar ($) variables");
+                                broccoli.Scope[s] = value;
+                                break;
                         case ListVar l:
-                            if (!(value is ValueList list))
-                                throw new Exception("Scalars cannot be assigned to list (@) variables");
-
-                            broccoli.Scope[l] = list;
+                            if (!(value is ValueList vList))
+                                throw new Exception("Only Lists can be assigned to list (@) variables");
+                            broccoli.Scope[l] = vList;
+                            break;
+                        case DictVar d when Program.IsCauliflower:
+                            if (!(value is ValueDict vDict))
+                                throw new Exception("Only Dicts can be assigned to dict (%) variables");
+                            broccoli.Scope[d] = vDict;
                             break;
                     }
                     foreach (var statement in statements)
@@ -520,12 +540,18 @@ namespace Broccoli {
             // List Functions
             {"list", new Function("list", -1, (broccoli, args) => new ValueList(args.ToList()))},
             {"len", new Function("len", 1, (broccoli, args) => {
-                if (args[0] is ValueList l)
-                    return new BInteger(l.Count);
-                if (args[0] is BString s)
-                    return new BInteger(s.Value.Length);
-
-                throw new Exception($"Received {TypeName(args[0])} instead of list or string in argument 1 for 'len'");
+                switch (args[0])
+                {
+                    case ValueList l:
+                        return new BInteger(l.Count);
+                    case BString s:
+                        return new BInteger(s.Value.Length);
+                    case ValueDict d:
+                        return new BInteger(d.Count);
+                    default:
+                        throw new Exception($"Received {TypeName(args[0])} instead of list or string in argument 1 for 'len'");
+                }
+                
             })},
             {"first", new Function("first", 1, (broccoli, args) => {
                 if (!(args[0] is ValueList list))
@@ -615,6 +641,8 @@ namespace Broccoli {
                                 break;
                             case ScalarVar scalar:
                                 break;
+                            case DictVar dict when Program.IsCauliflower:
+                                break;
                             case ValueExpression expr when expr.Values.Length == 1 && expr.Values[0] is ListVar l:
                                 length = -length - 1;
                                 varargs = l;
@@ -632,7 +660,7 @@ namespace Broccoli {
                             var toAssign = innerArgs[i];
                             switch (argNames[i]) {
                                 case ScalarVar s:
-                                    if (toAssign is ValueList)
+                                    if (toAssign.GetType().In(typeof(ValueList), typeof(ValueDict)))
                                         throw new Exception("Lists cannot be assigned to scalar ($) variables");
                                     broccoli.Scope[s] = toAssign;
                                     break;
@@ -641,8 +669,17 @@ namespace Broccoli {
                                         throw new Exception("Scalars cannot be assigned to list (@) variables");
                                     broccoli.Scope[l] = valueList;
                                     break;
+                                case DictVar d when Program.IsCauliflower:
+                                        if (!(toAssign is ValueDict valueDict))
+                                            throw new Exception("Only Dicts can be assigned to dict (%) variables");
+                                        broccoli.Scope[d] = valueDict;
+                                        break;
                                 default:
-                                    throw new Exception("Values can only be assigned to scalar ($) or list (@) variables");
+                                    throw new Exception(
+                                                "Values can only be assigned to scalar ($)," +
+                                                $"list (@){(Program.IsCauliflower ? ", or dict (%)" : "")} variables"
+                                            );                
+                                
                             }
                         }
                         if (varargs != null)
@@ -717,6 +754,8 @@ namespace Broccoli {
                                 break;
                             case ScalarVar scalar:
                                 break;
+                            case DictVar dict when Program.IsCauliflower:
+                                break;
                             case ValueExpression expr when expr.Values.Length == 1 && expr.Values[0] is ListVar l:
                                 length = -length - 1;
                                 varargs = l;
@@ -743,8 +782,16 @@ namespace Broccoli {
                                         throw new Exception("Scalars cannot be assigned to list (@) variables");
                                     broccoli.Scope[l] = valueList;
                                     break;
+                                case DictVar d when Program.IsCauliflower:
+                                    if (!(toAssign is ValueDict valueDict))
+                                        throw new Exception("Only Dicts can be assigned to dict (%) variables");
+                                    broccoli.Scope[d] = valueDict;
+                                    break;
                                 default:
-                                    throw new Exception("Values can only be assigned to scalar ($) or list (@) variables");
+                                    throw new Exception(
+                                                "Values can only be assigned to scalar ($)," +
+                                                $"list (@){(Program.IsCauliflower ? ", or dict (%)" : "")} variables"
+                                            );
                             }
                         }
                         if (varargs != null)
@@ -845,6 +892,37 @@ namespace Broccoli {
                     if (args[1] is ValueList l)
                         return Boolean(l.Any(CauliflowerInline.Truthy));
                     throw new Exception($"Received {TypeName(args[1])} instead of list in argument 1 for 'any'");
+                })},
+                {"mkdict", new Function("mkdict", 0, (broccoli, args) => {
+                    return new ValueDict();
+                })},
+                {"setkey", new Function("setkey", 3, (broccoli, args) => {
+                    if (args[0] is ValueDict dict) {
+                        var d = new Dictionary<IValue, IValue>(dict);
+                        d[args[1]] = args[2];
+                        return new ValueDict(d);
+                    }
+                    throw new Exception("First argument to rmkey must be a Dict.");
+                })},
+                {"getkey", new Function("getkey", 2, (broccoli, args) => {
+                    if (args[0] is ValueDict dict) {
+                        return dict[args[1]];
+                    }
+                    throw new Exception("First argument to rmkey must be a Dict.");
+                })},
+                {"rmkey", new Function("rmkey", 2, (broccoli, args) => {
+                    if (args[0] is ValueDict dict) {
+                        var d = new Dictionary<IValue, IValue>(dict);
+                        d.Remove(args[1]);
+                        return new ValueDict(d);
+                    }
+                    throw new Exception("First argument to rmkey must be a Dict.");
+                })},
+                {"haskey", new Function("haskey", 2, (broccoli, args) => {
+                    if (args[0] is ValueDict dict) {
+                        return Boolean(dict.ContainsKey(args[1]));
+                    }
+                    throw new Exception("First argument to rmkey must be a Dict.");
                 })},
             }.Extend(DefaultBuiltins).FluentRemove("call")}
         };

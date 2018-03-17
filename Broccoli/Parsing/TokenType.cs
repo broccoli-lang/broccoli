@@ -9,6 +9,7 @@ namespace Broccoli.Parsing {
         Atom,
         Scalar,
         List,
+        Dict,
 
         // Miscellaneous
         None

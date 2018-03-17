@@ -1,5 +1,6 @@
-﻿using System.Collections.Generic;
-
+﻿using System.Text;
+using System.Collections.Generic;
+using System.Linq;
 namespace Broccoli {
     public interface IValue : IValueExpressible { }
 
@@ -112,26 +113,28 @@ namespace Broccoli {
         public override string ToString() => Value;
     }
 
+    public class DictVar : IValue {
+        public string Value { get; }
+        public DictVar(string d) {
+            Value = d;
+        }
+        public override string ToString() => Value;
+    }
+
     public class ValueList : List<IValue>, IValue {
         public ValueList Value { get; }
 
-        public ValueList() : base() {
-            Value = this;
-        }
+        public ValueList() : base() => Value = this;
 
-        public ValueList(IEnumerable<IValue> values) : base(values) {
-            Value = this;
-        }
+        public ValueList(IEnumerable<IValue> values) : base(values) => Value = this;
 
-        public ValueList(params IValue[] values) : base(values) {
-            Value = this;
-        }
+        public ValueList(params IValue[] values) : base(values) => Value = this;
 
         public static implicit operator ValueList(IValue[] values) => new ValueList(values);
 
         public static bool operator ==(ValueList left, object right) => right is ValueList list && left.Equals(list);
 
-        public static bool operator !=(ValueList left, object right) => right is ValueList list && !left.Equals(list);
+        public static bool operator !=(ValueList left, object right) => !(left == right);
 
         public override bool Equals(object other) {
             if (!(other is ValueList otherList) || otherList.Count != Count)
@@ -142,8 +145,38 @@ namespace Broccoli {
             return true;
         }
 
-        public override int GetHashCode() => Value.GetHashCode();
+        public override int GetHashCode() => base.GetHashCode();
 
         public override string ToString() => '(' + string.Join(' ', Value) + ')';
+    }
+
+    public class ValueDict : Dictionary<IValue, IValue>, IValue
+    {
+        public ValueDict Value { get; }
+        public ValueDict() : base() => Value = this;
+        public ValueDict(IReadOnlyDictionary<IValue, IValue> values) : base(values) => Value = this;
+
+        public static bool operator ==(ValueDict left, object right) => right is IReadOnlyDictionary<IValue, IValue> rdict
+            && rdict.Count == left.Count && !left.Except(rdict).Any();
+        public static bool operator !=(ValueDict left, object right) => !(left == right);
+
+        public override bool Equals(object obj) => this == obj;
+
+        public override int GetHashCode() => base.GetHashCode();
+
+        public override string ToString() {
+            var sb = new StringBuilder("{");
+            foreach (KeyValuePair<IValue, IValue> i in this)
+            {
+                sb.Append($"{i.Key}: {i.Value},");
+            }
+            if (sb.Length > 1)
+            {
+                sb.Length--;
+            }
+            sb.Append("}");
+            return sb.ToString();
+        }
+
     }
 }

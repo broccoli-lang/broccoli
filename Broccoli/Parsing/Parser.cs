@@ -37,14 +37,15 @@ namespace Broccoli.Parsing {
     }
 
     public static class Parser {
-        private static Regex _rNewline = new Regex(@"[\r\n][\s\r\n]*[\r\n]|[\r\n]");
-        private static Regex _rWhitespace = new Regex(@"\G\s+");
-        private static Regex _rString = new Regex(@"\G""(?:\\.|[^""])*""");
-        private static Regex _rNumber = new Regex(@"\G-?(?:\d*\.\d+|\d+\.?\d*|\d*)");
-        private static Regex _rScalar = new Regex(@"\G\$[^\s()$@]+");
-        private static Regex _rList = new Regex(@"\G@[^\s()$@]+");
-        private static Regex _rName = new Regex(@"\G[^\s\d()$@][^\s()$@]*");
-        private static Regex _rEscapes = new Regex(@"\\(.)");
+        private static Regex _rNewline = new Regex(@"[\r\n][\s\r\n]*[\r\n]|[\r\n]", RegexOptions.Compiled);
+        private static Regex _rWhitespace = new Regex(@"\G\s+", RegexOptions.Compiled);
+        private static Regex _rString = new Regex(@"\G""(?:\\.|[^""])*""", RegexOptions.Compiled);
+        private static Regex _rNumber = new Regex(@"\G-?(?:\d*\.\d+|\d+\.?\d*|\d*)", RegexOptions.Compiled);
+        private static Regex _rScalar = new Regex(@"\G\$[^\s()$@%]+", RegexOptions.Compiled);
+        private static Regex _rList = new Regex(@"\G@[^\s()$@%]+", RegexOptions.Compiled);
+        private static Regex _rDict = new Regex(@"\G%[^\s()$@%]+", RegexOptions.Compiled);
+        private static Regex _rName = new Regex(@"\G[^\s\d()$@%][^\s()$@%]*", RegexOptions.Compiled);
+        private static Regex _rEscapes = new Regex(@"\\(.)", RegexOptions.Compiled);
 
         public static ParseNode Parse(string s, ParseNode p = null) {
             var source = _rNewline.Split(s).ToList();
@@ -102,6 +103,11 @@ namespace Broccoli.Parsing {
                             match = _rList.Match(line, column).ToString();
                             value = match.Substring(1);
                             type = TokenType.List;
+                            break;
+                        case '%':
+                            match = _rDict.Match(line, column).ToString();
+                            value = match.Substring(1);
+                            type = TokenType.Dict;
                             break;
                         // Strings
                         case '"':

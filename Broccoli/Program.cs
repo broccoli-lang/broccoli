@@ -7,13 +7,14 @@ using System.Collections.Generic;
 using System.Linq; 
 
 namespace Broccoli {
-    class Program {
+    public static class Program {
+        public static bool IsCauliflower { get; private set; }
         public static void Main(string[] args) {
             // TODO: remove as many try/catches as possible, this isn't Python, nor is it Java
             // TODO: do we even need row/col in ParseNode
             var broccoli = new Interpreter();
             string file;
-            bool getHelp = false, useREPL = args.Length == 0, useCauliflower = false;
+            bool getHelp = false, useREPL = args.Length == 0;
 
             var options = new OptionSet {
                 {
@@ -21,7 +22,7 @@ namespace Broccoli {
                 }, {
                     "r|repl", "Use REPL", n => useREPL = n != null
                 }, {
-                    "c|cauliflower", "Use Cauliflower", n => useCauliflower = n != null
+                    "c|cauliflower", "Use Cauliflower", n => IsCauliflower = n != null
                 }
             };
             
@@ -31,7 +32,7 @@ namespace Broccoli {
                 useREPL = true;
             argv = argv.Skip(1);
 
-            if (useCauliflower) {
+            if (IsCauliflower) {
                 broccoli.Builtins = Interpreter.AlternativeEnvironments["cauliflower"];
                 broccoli.Scope.Lists["ARGV"] = new ValueList(argv.Select(i => new BString(i)));
             }
