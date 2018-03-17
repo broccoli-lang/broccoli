@@ -44,13 +44,20 @@ namespace Broccoli {
                     ForegroundColor = ConsoleColor.Green;
                     Write("broccoli> ");
                     ForegroundColor = ConsoleColor.White;
+                    
+                    string ReadOrDie() {
+                        var line = ReadLine();
+                        if (line is null)
+                            Environment.Exit(0);
+                        return line;
+                    }
 
-                    var parsed = Parser.Parse(ReadLine());
+                    var parsed = Parser.Parse(ReadOrDie());
                     while (!parsed.Finished) {
                         ForegroundColor = ConsoleColor.Green;
                         Write("        > ");
                         ForegroundColor = ConsoleColor.White;
-                        parsed = Parser.Parse(ReadLine(), parsed);
+                        parsed = Parser.Parse(ReadOrDie(), parsed);
                     }
 
                     try {
