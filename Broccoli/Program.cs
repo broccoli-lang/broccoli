@@ -8,7 +8,7 @@ using System.Linq;
 
 namespace Broccoli {
     public static class Program {
-        public static bool IsCauliflower { get; private set; }
+        public static bool IsCauliflower { get; set; }
         public static void Main(string[] args) {
             // TODO: remove as many try/catches as possible, this isn't Python, nor is it Java
             // TODO: do we even need row/col in ParseNode
