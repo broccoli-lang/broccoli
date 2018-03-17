@@ -74,8 +74,10 @@ namespace Broccoli {
             {"env", new Function("env", 1, (broccoli, args) => {
                 if (!(args[0] is BAtom a))
                     throw new Exception($"Received {TypeName(args[1])} instead of atom in argument 1 for 'env'");
-                if (a.Value == "broccoli")
+                if (a.Value == "broccoli") {
                     broccoli.Builtins = DefaultBuiltins;
+                    Program.IsCauliflower = true;
+                }
                 else if (AlternativeEnvironments.ContainsKey(a.Value))
                         broccoli.Builtins = AlternativeEnvironments[a.Value];
                 else
