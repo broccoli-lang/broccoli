@@ -1,18 +1,19 @@
-namespace Broccoli.Parsing {
+namespace Broccoli {
     /// <summary>
     /// Represents the different types of raw token before parsing.
     /// </summary>
     public enum TokenType {
         // Literals
+        List, 
         String,
         Integer,
         Float,
 
         // Identifiers
         Atom,
-        Scalar,
-        List,
-        Dict,
+        ScalarName,
+        ListName,
+        DictionaryName,
 
         // Miscellaneous
         None

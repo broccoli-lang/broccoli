@@ -8,10 +8,12 @@ namespace Broccoli {
     /// </summary>
     public interface IValue : IValueExpressible { }
 
+    public interface IScalar : IValue { }
+
     /// <summary>
     /// Represents a 64-bit signed integer.
     /// </summary>
-    public class BInteger : IValue {
+    public class BInteger : IScalar {
         public long Value { get; }
 
         public BInteger(long i) {
@@ -36,7 +38,7 @@ namespace Broccoli {
     /// <summary>
     /// Represents a double-precision float.
     /// </summary>
-    public class BFloat : IValue {
+    public class BFloat : IScalar {
         public double Value { get; }
 
         public BFloat(double f) {
@@ -63,7 +65,7 @@ namespace Broccoli {
     /// <summary>
     /// Represents a string of characters.
     /// </summary>
-    public class BString : IValue {
+    public class BString : IScalar {
         public string Value { get; }
 
         public BString(string s) {
@@ -86,7 +88,7 @@ namespace Broccoli {
     /// <summary>
     /// Represents a bare atomic value.
     /// </summary>
-    public class BAtom : IValue {
+    public class BAtom : IScalar {
         public static readonly BAtom True = new BAtom("t");
         public static readonly BAtom Nil = new BAtom("nil");
 
@@ -112,7 +114,7 @@ namespace Broccoli {
     /// <summary>
     /// Represents a scalar variable.
     /// </summary>
-    public class ScalarVar : IValue {
+    public class ScalarVar : IScalar {
         public string Value { get; }
 
         public ScalarVar(string s) {
@@ -125,7 +127,7 @@ namespace Broccoli {
     /// <summary>
     /// Represents a list variable.
     /// </summary>
-    public class ListVar : IValue {
+    public class ListVar : IScalar {
         public string Value { get; }
 
         public ListVar(string l) {
@@ -138,7 +140,7 @@ namespace Broccoli {
     /// <summary>
     /// Represents a dictionary variable.
     /// </summary>
-    public class DictVar : IValue {
+    public class DictVar : IScalar {
         public string Value { get; }
         public DictVar(string d) {
             Value = d;

@@ -3,51 +3,18 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 
-namespace Broccoli.Parsing {
-    /// <summary>
-    /// Represents a node in the overall parse tree that represents a Broccoli program.
-    /// </summary>
-    public class ParseNode {
-        public bool Finished;
-        public Token Token { get; }
-        public List<ParseNode> Children { get; }
-
-        public ParseNode() {
-            Token = null;
-            Children = new List<ParseNode>();
-            Finished = false;
-        }
-
-        public ParseNode(IEnumerable<ParseNode> nodes) {
-            Token = null;
-            Children = nodes.ToList();
-            Finished = false;
-        }
-
-        public ParseNode(Token token) {
-            Token = token;
-            Children = null;
-            Finished = true;
-        }
-
-        public override string ToString() {
-            return Token != null ? Token.Literal : '(' + string.Join<ParseNode>(' ', Children) + ')';
-        }
-
-        public void Finish() {
-            Finished = true;
-        }
-    }
-
-    public static class Parser {
-        private static Regex _rNewline = new Regex(@"[\r\n][\s\r\n]*[\r\n]|[\r\n]", RegexOptions.Compiled);
+namespace Broccoli {
+    public partial class Interpreter {
+        private static Regex _rNewline = new Regex(@"(?<=[\r\n][\s\r\n]*[\r\n]|[\r\n])", RegexOptions.Compiled);
+        private static Regex _rComment = new Regex(@"\G;.*$", RegexOptions.Compiled);
         private static Regex _rWhitespace = new Regex(@"\G\s+", RegexOptions.Compiled);
         private static Regex _rString = new Regex(@"\G""(?:\\.|[^""])*""", RegexOptions.Compiled);
+        private static Regex _rStringStart = new Regex(@"\G""(?:\\.|[^""])*$", RegexOptions.Compiled);
+        private static Regex _rStringEnd = new Regex(@"^(?:\\.|[^""])*""", RegexOptions.Compiled);
         private static Regex _rNumber = new Regex(@"\G-?(?:\d*\.\d+|\d+\.?\d*|\d*)", RegexOptions.Compiled);
-        private static Regex _rScalar = new Regex(@"\G\$[^\s()$@%]+", RegexOptions.Compiled);
-        private static Regex _rList = new Regex(@"\G@[^\s()$@%]+", RegexOptions.Compiled);
-        private static Regex _rDict = new Regex(@"\G%[^\s()$@%]+", RegexOptions.Compiled);
-        private static Regex _rName = new Regex(@"\G[^\s\d()$@%][^\s()$@%]*", RegexOptions.Compiled);
+        private static Regex _rScalar = new Regex(@"\G\$[^\s()$@%&|~][^\s()&|~]*", RegexOptions.Compiled);
+        private static Regex _rList = new Regex(@"\G@[^\s()$@%&|~][^\s()&|~]*", RegexOptions.Compiled);
+        private static Regex _rName = new Regex(@"\G[^\s\d()$@%&|~][^\s()&|~]*", RegexOptions.Compiled);
         private static Regex _rEscapes = new Regex(@"\\(.)", RegexOptions.Compiled);
 
         /// <summary>
@@ -57,8 +24,8 @@ namespace Broccoli.Parsing {
         /// <param name="p">A partially-parsed node coming from multiline inputs in the REPL.</param>
         /// <returns>Returns the root ParseNode that represents the string.</returns>
         /// <exception cref="Exception">Thrown when the parser fails to parse an token.</exception>
-        public static ParseNode Parse(string s, ParseNode p = null) {
-            var source = _rNewline.Split(s).ToList();
+        public virtual ParseNode Parse(string s, ParseNode p = null) {
+            var source = _rNewline.Split(_rComment.Replace(s, "")).ToList();
             var result = new ParseNode();
             var stack = new List<ParseNode> { result };
             var current = result;
@@ -84,6 +51,7 @@ namespace Broccoli.Parsing {
                 while (column < line.Length) {
                     var c = line[column];
                     TokenType type = TokenType.None;
+                    Match rawMatch = null;
                     string value = null;
                     string match = null;
                     switch (c) {
@@ -107,21 +75,21 @@ namespace Broccoli.Parsing {
                         case '$':
                             match = _rScalar.Match(line, column).ToString();
                             value = match.Substring(1);
-                            type = TokenType.Scalar;
+                            type = TokenType.ScalarName;
                             break;
                         case '@':
                             match = _rList.Match(line, column).ToString();
                             value = match.Substring(1);
-                            type = TokenType.List;
-                            break;
-                        case '%':
-                            match = _rDict.Match(line, column).ToString();
-                            value = match.Substring(1);
-                            type = TokenType.Dict;
+                            type = TokenType.ListName;
                             break;
                         // Strings
                         case '"':
-                            match = _rString.Match(line, column).ToString();
+                            rawMatch = _rString.Match(line, column);
+                            if (!rawMatch.Success) {
+                                current.UnfinishedString = _rEscapes.Replace(_rStringStart.Match(line, column).ToString(), "$1");
+                                continue;
+                            }
+                            match = rawMatch.ToString();
                             value = _rEscapes.Replace(match.Substring(1, match.Length - 2), "$1");
                             type = TokenType.String;
                             break;
@@ -140,7 +108,13 @@ namespace Broccoli.Parsing {
                         case '\t':
                         case '\f':
                         case '\v':
+                        case '\r':
+                        case '\n':
                             match = _rWhitespace.Match(line, column).ToString();
+                            break;
+                        // Comments
+                        case ';':
+                            match = _rComment.Match(line, column).ToString();
                             break;
                         // Identifiers (default)
                         default:

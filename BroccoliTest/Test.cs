@@ -20,16 +20,23 @@ namespace BroccoliTest {
 
         [TestInitialize]
         public void Initialize() {
-            _broccoli = new Interpreter();
-            _run = _broccoli.Run;
-            _run("(env broccoli)");
+            _run = (_broccoli = new Interpreter()).Run;
         }
-
-        // TODO: more imformative messages
 
         [TestMethod]
         public void TestLiterals() {
             Assert.AreEqual(_run("(first (list 42))"), new BInteger(42), "Integer does not work correctly");
+            Assert.AreEqual(_run("(first (list -42))"), new BInteger(-42), "Negative integer does not work correctly");
+            Assert.AreEqual(_run("(first (list 4.2))"), new BFloat(4.2), "Float does not work correctly");
+            Assert.AreEqual(_run("(first (list -4.2))"), new BFloat(-4.2), "Negative float does not work correctly");
+            Assert.AreEqual(_run("(first (list \"foo\"))"), new BString("foo"), "String does not work correctly");
+            Assert.AreEqual(_run("(first (list \"\\f\\o\\o\"))"), new BString("foo"), "String escaping does not work correctly");
+            Assert.AreEqual(_run("(first (list foo))"), new BAtom("foo"), "Atom does not work correctly");
+        }
+
+        [TestMethod]
+        public void TestComments() {
+            Assert.AreEqual(_run(";this is a comment. !@#$%^&*()\n\"yey\""), new BString("yey"), "Integer does not work correctly");
             Assert.AreEqual(_run("(first (list -42))"), new BInteger(-42), "Negative integer does not work correctly");
             Assert.AreEqual(_run("(first (list 4.2))"), new BFloat(4.2), "Float does not work correctly");
             Assert.AreEqual(_run("(first (list -4.2))"), new BFloat(-4.2), "Negative float does not work correctly");
@@ -159,25 +166,25 @@ namespace BroccoliTest {
             Assert.AreEqual(_run("(< 0 1 1)"), BAtom.Nil, "< does not fail correctly with integers");
             Assert.AreEqual(_run("(< 1.1 2 3.1)"), BAtom.True, "< does not succeed correctly with numbers");
             Assert.AreEqual(_run("(< 1 2.1 2.1)"), BAtom.Nil, "< does not fail correctly with numbers");
-            Assert.ThrowsException<Exception>(() => _run("(< a b)"), "< does not fail with non-numeric argument");
+            Assert.ThrowsException<ArgumentTypeException>(() => _run("(< a b)"), "< does not fail with non-numeric argument");
             Assert.ThrowsException<Exception>(() => _run("(< 1)"), "< does not fail with one argument");
             Assert.AreEqual(_run("(> 2 1 0)"), BAtom.True, "> does not succeed correctly with integers");
             Assert.AreEqual(_run("(> 1 0 0)"), BAtom.Nil, "> does not fail correctly with integers");
             Assert.AreEqual(_run("(> 3.1 2 1.1)"), BAtom.True, "> does not succeed correctly with numbers");
             Assert.AreEqual(_run("(> 2.1 2.1 1)"), BAtom.Nil, "> does not fail correctly with numbers");
-            Assert.ThrowsException<Exception>(() => _run("(> a b)"), "> does not fail with non-numeric argument");
+            Assert.ThrowsException<ArgumentTypeException>(() => _run("(> a b)"), "> does not fail with non-numeric argument");
             Assert.ThrowsException<Exception>(() => _run("(> 1)"), "> does not fail with one argument");
             Assert.AreEqual(_run("(<= 0 1 1)"), BAtom.True, "<= does not succeed correctly with integers");
             Assert.AreEqual(_run("(<= 0 0 -1)"), BAtom.Nil, "<= does not fail correctly with integers");
             Assert.AreEqual(_run("(<= 1.1 1.1 3)"), BAtom.True, "<= does not succeed correctly with numbers");
             Assert.AreEqual(_run("(<= 1 2.1 2)"), BAtom.Nil, "<= does not fail correctly with numbers");
-            Assert.ThrowsException<Exception>(() => _run("(<= a b)"), "<= does not fail with non-numeric argument");
+            Assert.ThrowsException<ArgumentTypeException>(() => _run("(<= a b)"), "<= does not fail with non-numeric argument");
             Assert.ThrowsException<Exception>(() => _run("(<= 1)"), "<= does not fail with one argument");
             Assert.AreEqual(_run("(>= 2 1 0)"), BAtom.True, ">= does not succeed correctly with integers");
             Assert.AreEqual(_run("(>= 0 0 1)"), BAtom.Nil, ">= does not fail correctly with integers");
             Assert.AreEqual(_run("(>= 3 1.1 1.1)"), BAtom.True, ">= does not succeed correctly with numbers");
             Assert.AreEqual(_run("(>= 2 2.1 1)"), BAtom.Nil, ">= does not fail correctly with numbers");
-            Assert.ThrowsException<Exception>(() => _run("(>= a b)"), ">= does not fail with non-numeric argument");
+            Assert.ThrowsException<ArgumentTypeException>(() => _run("(>= a b)"), ">= does not fail with non-numeric argument");
             Assert.ThrowsException<Exception>(() => _run("(>= 1)"), ">= does not fail with one argument");
         }
 
@@ -234,7 +241,7 @@ namespace BroccoliTest {
             Assert.AreEqual(_run("(len \"\\\\\")"), new BInteger(1), "String len does not work correctly");
             Assert.AreEqual(_run("(len (list 0 1 2))"), new BInteger(3), "List len does not work correctly");
             Assert.AreEqual(_run("(len (list))"), new BInteger(0), "Zero-length list len does not work correctly");
-            Assert.ThrowsException<Exception>(() => _run("(len 1)"), "Len does not fail with non-list");
+            Assert.ThrowsException<ArgumentTypeException>(() => _run("(len 1)"), "Len does not fail with non-list");
             Assert.ThrowsException<Exception>(() => _run("(len (list) (list))"), "Len does not fail with two arguments");
             Assert.ThrowsException<Exception>(() => _run("(len)"), "Len does not fail with no arguments");
         }
@@ -259,7 +266,7 @@ namespace BroccoliTest {
             Assert.AreEqual(_run("(slice (list 0 1 2 3 4 5) -5 -3)"), ValueListFrom(), "Slice does not work correctly with negative end");
             Assert.AreEqual(_run("(slice (list 0 1 2 3 4 5) 3 -5)"), ValueListFrom(), "Slice does not work correctly with end less than start");
             Assert.ThrowsException<Exception>(() => _run("(slice (list) 1)"), "Range does not fail with two arguments");
-            Assert.ThrowsException<Exception>(() => _run("(slice (list) 1.1 2.1)"), "Range does not fail with non-integers");
+            Assert.ThrowsException<ArgumentTypeException>(() => _run("(slice (list) 1.1 2.1)"), "Range does not fail with non-integers");
         }
 
         [TestMethod]
@@ -268,7 +275,7 @@ namespace BroccoliTest {
             Assert.AreEqual(_run("(range -5 5)"), ValueListFrom(-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5), "Negative range does not work correctly");
             Assert.AreEqual(_run("(range -5 -1)"), ValueListFrom(-5, -4, -3, -2, -1), "Negative to negative range does not work correctly");
             Assert.ThrowsException<Exception>(() => _run("(range 1)"), "Range does not fail with one argument");
-            Assert.ThrowsException<Exception>(() => _run("(range 1.1)"), "Range does not fail with non-integers");
+            Assert.ThrowsException<ArgumentTypeException>(() => _run("(range 1.1 2.1)"), "Range does not fail with non-integers");
         }
 
         [TestMethod]
@@ -276,7 +283,7 @@ namespace BroccoliTest {
             Assert.AreEqual(_run("(cat (list 0 1 2) (list 3 4 5))"), ValueListFrom(0, 1, 2, 3, 4, 5), "Cat does not work correctly");
             Assert.AreEqual(_run("(cat (list 0 1) (list 2 3) (list 4 5))"), ValueListFrom(0, 1, 2, 3, 4, 5), "Cat does not work correctly with multiple arguments");
             Assert.ThrowsException<Exception>(() => _run("(cat (list 0 1 2))"), "Cat does not fail with one argument");
-            Assert.ThrowsException<Exception>(() => _run("(cat 0 1 2)"), "Cat does not fail with non-lists");
+            Assert.ThrowsException<ArgumentTypeException>(() => _run("(cat 0 1 2)"), "Cat does not fail with non-lists");
         }
 
         [TestCleanup]
@@ -286,4 +293,3 @@ namespace BroccoliTest {
         }
     }
 }
-

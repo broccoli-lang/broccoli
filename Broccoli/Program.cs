@@ -2,9 +2,8 @@
 using static System.Console;
 using NDesk.Options;
 using System.IO;
-using Broccoli.Parsing;
 using System.Collections.Generic;
-using System.Linq; 
+using System.Linq;
 
 namespace Broccoli {
     /// <summary>
@@ -18,7 +17,9 @@ namespace Broccoli {
         public static void Main(string[] args) {
             // TODO: remove as many try/catches as possible, this isn't Python, nor is it Java
             // TODO: do we even need row/col in ParseNode
-            var broccoli = new Interpreter();
+            var interpreter = IsCauliflower ? new CauliflowerInterpreter() : new Interpreter();
+            var prompt = IsCauliflower ? "cauliflower> " : "broccoli> ";
+            var continuationPrompt = IsCauliflower ? "           > " : "        > ";
             string file;
             bool getHelp = false, useREPL = args.Length == 0;
 
@@ -38,17 +39,12 @@ namespace Broccoli {
                 useREPL = true;
             argv = argv.Skip(1);
 
-            if (IsCauliflower) {
-                broccoli.Builtins = Interpreter.AlternativeEnvironments["cauliflower"];
-                broccoli.Scope.Lists["ARGV"] = new ValueList(argv.Select(i => new BString(i)));
-            }
-
             if (useREPL)
                 while (true) {
                     if (CursorLeft != 0)
                         WriteLine();
                     ForegroundColor = ConsoleColor.Green;
-                    Write("broccoli> ");
+                    Write(prompt);
                     ForegroundColor = ConsoleColor.White;
                     
                     string ReadOrDie() {
@@ -58,27 +54,27 @@ namespace Broccoli {
                         return line;
                     }
 
-                    var parsed = Parser.Parse(ReadOrDie());
+                    var parsed = interpreter.Parse(ReadOrDie());
                     while (!parsed.Finished) {
                         ForegroundColor = ConsoleColor.Green;
-                        Write("        > ");
+                        Write(continuationPrompt);
                         ForegroundColor = ConsoleColor.White;
-                        parsed = Parser.Parse(ReadOrDie(), parsed);
+                        parsed = interpreter.Parse(ReadOrDie(), parsed);
                     }
 
                     try {
-                        var result = broccoli.Run(parsed);
+                        var result = interpreter.Run(parsed);
                         if (result != null)
                             WriteLine(result);
                     } catch (Exception e) {
-                        WriteLine($"Error: {e.Message}");
+                        WriteLine(e);
                     }
                 }
 
             if (file == null || getHelp)
                 GetHelp(options);
 
-            broccoli.Run(file == "-" ? In.ReadToEnd() : File.ReadAllText(file));
+            interpreter.Run(file == "-" ? In.ReadToEnd() : File.ReadAllText(file));
         }
 
         /// <summary>

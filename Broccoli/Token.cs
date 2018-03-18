@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Globalization;
-namespace Broccoli.Parsing {
+namespace Broccoli {
     /// <summary>
     /// Represents a token with associated string representation before parsing to values.
     /// </summary>
@@ -30,11 +30,11 @@ namespace Broccoli.Parsing {
                     return new BFloat(double.Parse(Literal, CultureInfo.InvariantCulture));
                 case TokenType.Atom:
                     return new BAtom(Literal);
-                case TokenType.Scalar:
+                case TokenType.ScalarName:
                     return new ScalarVar(Literal);
-                case TokenType.List:
+                case TokenType.ListName:
                     return new ListVar(Literal);
-                case TokenType.Dict:
+                case TokenType.DictionaryName:
                     return new DictVar(Literal);
                 default:
                     throw new Exception($"{Type} cannot be converted to a value");
