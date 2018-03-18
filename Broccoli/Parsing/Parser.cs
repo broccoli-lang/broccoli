@@ -4,6 +4,9 @@ using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace Broccoli.Parsing {
+    /// <summary>
+    /// Represents a node in the overall parse tree that represents a Broccoli program.
+    /// </summary>
     public class ParseNode {
         public bool Finished;
         public Token Token { get; }
@@ -47,6 +50,13 @@ namespace Broccoli.Parsing {
         private static Regex _rName = new Regex(@"\G[^\s\d()$@%][^\s()$@%]*", RegexOptions.Compiled);
         private static Regex _rEscapes = new Regex(@"\\(.)", RegexOptions.Compiled);
 
+        /// <summary>
+        /// Takes a string and traverses it to create a ParseNode with associated values.
+        /// </summary>
+        /// <param name="s">The string to parse.</param>
+        /// <param name="p">A partially-parsed node coming from multiline inputs in the REPL.</param>
+        /// <returns>Returns the root ParseNode that represents the string.</returns>
+        /// <exception cref="Exception">Thrown when the parser fails to parse an token.</exception>
         public static ParseNode Parse(string s, ParseNode p = null) {
             var source = _rNewline.Split(s).ToList();
             var result = new ParseNode();

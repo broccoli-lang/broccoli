@@ -2,8 +2,15 @@
 using System.Collections.Generic;
 using System.Linq;
 namespace Broccoli {
+    /// <inheritdoc />
+    /// <summary>
+    /// Represents a class that can be used as a value within a Broccoli program.
+    /// </summary>
     public interface IValue : IValueExpressible { }
 
+    /// <summary>
+    /// Represents a 64-bit signed integer.
+    /// </summary>
     public class BInteger : IValue {
         public long Value { get; }
 
@@ -26,6 +33,9 @@ namespace Broccoli {
         public override string ToString() => Value.ToString();
     }
 
+    /// <summary>
+    /// Represents a double-precision float.
+    /// </summary>
     public class BFloat : IValue {
         public double Value { get; }
 
@@ -50,6 +60,9 @@ namespace Broccoli {
         public override string ToString() => Value.ToString();
     }
 
+    /// <summary>
+    /// Represents a string of characters.
+    /// </summary>
     public class BString : IValue {
         public string Value { get; }
 
@@ -70,6 +83,9 @@ namespace Broccoli {
         public override string ToString() => Value;
     }
 
+    /// <summary>
+    /// Represents a bare atomic value.
+    /// </summary>
     public class BAtom : IValue {
         public static readonly BAtom True = new BAtom("t");
         public static readonly BAtom Nil = new BAtom("nil");
@@ -93,6 +109,9 @@ namespace Broccoli {
         public override string ToString() => Value;
     }
 
+    /// <summary>
+    /// Represents a scalar variable.
+    /// </summary>
     public class ScalarVar : IValue {
         public string Value { get; }
 
@@ -103,6 +122,9 @@ namespace Broccoli {
         public override string ToString() => Value;
     }
 
+    /// <summary>
+    /// Represents a list variable.
+    /// </summary>
     public class ListVar : IValue {
         public string Value { get; }
 
@@ -113,6 +135,9 @@ namespace Broccoli {
         public override string ToString() => Value;
     }
 
+    /// <summary>
+    /// Represents a dictionary variable.
+    /// </summary>
     public class DictVar : IValue {
         public string Value { get; }
         public DictVar(string d) {
@@ -121,6 +146,9 @@ namespace Broccoli {
         public override string ToString() => Value;
     }
 
+    /// <summary>
+    /// Represents a list of values.
+    /// </summary>
     public class ValueList : List<IValue>, IValue {
         public ValueList Value { get; }
 
@@ -150,6 +178,9 @@ namespace Broccoli {
         public override string ToString() => '(' + string.Join(' ', Value) + ')';
     }
 
+    /// <summary>
+    /// Represents a dictionary of values paired with other values.
+    /// </summary>
     public class ValueDict : Dictionary<IValue, IValue>, IValue
     {
         public ValueDict Value { get; }

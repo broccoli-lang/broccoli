@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Globalization;
 namespace Broccoli.Parsing {
+    /// <summary>
+    /// Represents a token with associated string representation before parsing to values.
+    /// </summary>
     public class Token {
         public TokenType Type { get; }
         public string Literal { get; }

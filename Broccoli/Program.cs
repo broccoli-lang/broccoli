@@ -7,7 +7,13 @@ using System.Collections.Generic;
 using System.Linq; 
 
 namespace Broccoli {
+    /// <summary>
+    /// The main class of the Broccoli .NET interpreter.
+    /// </summary>
     public static class Program {
+        /// <summary>
+        /// Represents whether the current Broccoli program uses the Cauliflower environment.
+        /// </summary>
         public static bool IsCauliflower { get; set; }
         public static void Main(string[] args) {
             // TODO: remove as many try/catches as possible, this isn't Python, nor is it Java
@@ -75,6 +81,10 @@ namespace Broccoli {
             broccoli.Run(file == "-" ? In.ReadToEnd() : File.ReadAllText(file));
         }
 
+        /// <summary>
+        /// Prints all the available options to stdout.
+        /// </summary>
+        /// <param name="o">The OptionSet to use.</param>
         private static void GetHelp(OptionSet o) {
             Error.WriteLine("Broccoli .NET: C# based Broccoli interpreter.\n");
             Error.WriteLine("Usage: broccoli [options] <filename>");

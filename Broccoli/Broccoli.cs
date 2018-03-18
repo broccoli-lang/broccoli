@@ -4,6 +4,9 @@ using System.Linq;
 using Broccoli.Parsing;
 
 namespace Broccoli {
+    /// <summary>
+    /// Represents a nested scope with various scoped variables.
+    /// </summary>
     public class BroccoliScope {
         public readonly Dictionary<string, IValue> Scalars = new Dictionary<string, IValue>();
         public readonly Dictionary<string, ValueList> Lists = new Dictionary<string, ValueList>();
@@ -17,100 +20,112 @@ namespace Broccoli {
             Parent = parent;
         }
 
-        public IValue Get(ScalarVar s) => Scalars.ContainsKey(s.Value) ? Scalars[s.Value] : Parent?.Get(s);
-
-        public bool Set(ScalarVar s, IValue value, bool self = false, bool initial = true) {
-            if (self || Scalars.ContainsKey(s.Value)) {
-                Scalars[s.Value] = value;
-                return true;
-            }
-            if (Parent != null && Parent.Set(s, value))
-                return true;
-            if (!initial)
-                return false;
-
-            Scalars[s.Value] = value;
-            return true;
-        }
-
+        /// <summary>
+        /// Gets or sets the value of the given scalar variable.
+        /// </summary>
+        /// <param name="s">The scalar variable to access.</param>
         public IValue this[ScalarVar s] {
-            get => Get(s);
+            get => Scalars.ContainsKey(s.Value) ? Scalars[s.Value] : Parent?[s];
 
-            set => Set(s, value);
-        }
+            set {
+                if (Scalars.ContainsKey(s.Value)) {
+                    Scalars[s.Value] = value;
+                    return;
+                }
+                if (Parent != null) {
+                    Parent[s] = value;
+                    return;
+                }
 
-        public ValueList Get(ListVar l) => Lists.ContainsKey(l.Value) ? Lists[l.Value] : Parent?.Get(l);
-
-        public bool Set(ListVar l, ValueList value, bool self = false, bool initial = true) {
-            if (self || Lists.ContainsKey(l.Value)) {
-                Lists[l.Value] = value;
-                return true;
+                Scalars[s.Value] = value;
             }
-            if (Parent != null && Parent.Set(l, value, false))
-                return true;
-            if (!initial)
-                return false;
-
-            Lists[l.Value] = value;
-            return true;
         }
 
+        /// <summary>
+        /// Gets or sets the value of the given list variable.
+        /// </summary>
+        /// <param name="l">The list variable to access.</param>
         public ValueList this[ListVar l] {
-            get => Get(l);
+            get => Lists.ContainsKey(l.Value) ? Lists[l.Value] : Parent?[l];
 
-            set => Set(l, value);
-        }
+            set {
+                if (Lists.ContainsKey(l.Value)) {
+                    Lists[l.Value] = value;
+                    return;
+                }
+                if (Parent != null) {
+                    Parent[l] = value;
+                    return;
+                }
 
-        public ValueDict Get(DictVar d) => Dicts.ContainsKey(d.Value) ? Dicts[d.Value] : Parent?.Get(d);
-        public bool Set(DictVar d, ValueDict value, bool self = false, bool initial = true) {
-            if (self || Dicts.ContainsKey(d.Value)) {
-                Dicts[d.Value] = value;
-                return true;
+                Lists[l.Value] = value;
             }
-            if (Parent != null && Parent.Set(d, value, false))
-                return true;
-            if (!initial)
-                return false;
-            Dicts[d.Value] = value;
-            return true;
         }
 
+        /// <summary>
+        /// Gets or sets the value of the given dictionary variable.
+        /// </summary>
+        /// <param name="d">The dictionary variable to access.</param>
         public ValueDict this[DictVar d] {
-            get => Get(d);
-            set => Set(d, value);
-        }
+            get => Dicts.ContainsKey(d.Value) ? Dicts[d.Value] : Parent?[d];
 
-        public IFunction Get(string l) => Functions.ContainsKey(l) ? Functions[l] : Parent?.Get(l);
+            set {
+                if (Dicts.ContainsKey(d.Value)) {
+                    Dicts[d.Value] = value;
+                    return;
+                }
+                if (Parent != null) {
+                    Parent[d] = value;
+                    return;
+                }
 
-        public bool Set(string l, IFunction value, bool self = false, bool initial = true) {
-            if (self || Functions.ContainsKey(l)) {
-                Functions[l] = value;
-                return true;
+                Dicts[d.Value] = value;
             }
-            if (Parent != null && Parent.Set(l, value, false))
-                return true;
-            if (!initial)
-                return false;
-
-            Functions[l] = value;
-            return true;
         }
 
+        /// <summary>
+        /// Gets or sets the value of the given function.
+        /// </summary>
+        /// <param name="l">The name of the function to access.</param>
         public IFunction this[string l] {
-            get => Get(l);
+            get => Functions.ContainsKey(l) ? Functions[l] : Parent?[l];
 
-            set => Set(l, value);
+            set {
+                if (Functions.ContainsKey(l)) {
+                    Functions[l] = value;
+                    return;
+                }
+                if (Parent != null) {
+                    Parent[l] = value;
+                    return;
+                }
+
+                Functions[l] = value;
+            }
         }
     }
 
+    /// <summary>
+    /// The core interpreter interpreter of a Broccoli program.
+    /// </summary>
     public partial class Interpreter {
         public BroccoliScope Scope = new BroccoliScope();
         public Dictionary<string, IFunction> Builtins = DefaultBuiltins;
 
         public Interpreter() { }
 
+        /// <summary>
+        /// Runs the given string as Broccoli code.
+        /// </summary>
+        /// <param name="code">The code to run.</param>
+        /// <returns>The final value returned by the overall expression.</returns>
         public IValue Run(string code) => Run(Parser.Parse(code));
 
+        /// <summary>
+        /// Evaluates the already-parsed tree as Broccoli code.
+        /// </summary>
+        /// <param name="node">The node to evaluate.</param>
+        /// <returns>The final value returned by the root node.</returns>
         public IValue Run(ParseNode node) {
             IValue result = null;
             foreach (var e in node.Children.Select(s => (ValueExpression) s))
@@ -118,6 +133,12 @@ namespace Broccoli {
             return result;
         }
 
+        /// <summary>
+        /// Takes an expression or value and evaluates it down to a value.
+        /// </summary>
+        /// <param name="expr">The expression or value to evaluate.</param>
+        /// <returns>The value represented by the expression or value.</returns>
+        /// <exception cref="Exception">Throws when a variable is undefined or the expression is unhandled.</exception>
         public IValue Run(IValueExpressible expr) {
             IValue result;
             switch (expr) {

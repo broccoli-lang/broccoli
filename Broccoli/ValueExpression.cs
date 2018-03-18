@@ -3,8 +3,14 @@ using System.Linq;
 using Broccoli.Parsing;
 
 namespace Broccoli {
+    /// <summary>
+    /// Represents a class that can be stored in a <see cref="ValueExpression"/>.
+    /// </summary>
     public interface IValueExpressible { }
 
+    /// <summary>
+    /// Represents an unevaluated Broccoli expression full of values.
+    /// </summary>
     public class ValueExpression : IValueExpressible {
         public readonly IValueExpressible[] Values;
         public bool IsValue { get; }
@@ -24,6 +30,11 @@ namespace Broccoli {
             IsValue = true;
         }
 
+        /// <summary>
+        /// Converts a <see cref="ParseNode"/> to the equivalent <see cref="ValueExpression"/>.
+        /// </summary>
+        /// <param name="n">The <see cref="ParseNode"/> to convert.</param>
+        /// <returns>THe expression represented by the <see cref="ParseNode"/>.</returns>
         public static implicit operator ValueExpression(ParseNode n) {
             IValueExpressible Selector(ParseNode node) {
                 if (node.Token != null)

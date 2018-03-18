@@ -6,10 +6,23 @@ using System.Runtime.CompilerServices;
 
 namespace Broccoli {
     public partial class Interpreter {
+        /// <summary>
+        /// Returns the string representation of an object's type.
+        /// </summary>
+        /// <param name="o">The object.</param>
+        /// <returns>The type name of the object.</returns>
         private static string TypeName(object o) => o.GetType().ToString().Split('.').Last().ToLower();
 
+        /// <summary>
+        /// Converts a .NET boolean into the Broccoli equivalent.
+        /// </summary>
+        /// <param name="b">The boolean to convert.</param>
+        /// <returns>The Broccoli equivalent of the boolean.</returns>
         private static BAtom Boolean(bool b) => b ? BAtom.True : BAtom.Nil;
 
+        /// <summary>
+        /// A dictionary containing all the default builtin functions of Broccoli.
+        /// </summary>
         public static readonly Dictionary<string, IFunction> DefaultBuiltins = new Dictionary<string, IFunction> {
             // Core Language Features
             {"", new ShortCircuitFunction("", 1, (broccoli, args) => {
@@ -605,6 +618,9 @@ namespace Broccoli {
             })},
         };
 
+        /// <summary>
+        /// A dictionary containing the commands for other Broccoli environments.
+        /// </summary>
         public static readonly Dictionary<string, Dictionary<string, IFunction>> AlternativeEnvironments = new Dictionary<string, Dictionary<string, IFunction>> {
             {"cauliflower",  new Dictionary<string, IFunction> {
                 {"", new ShortCircuitFunction("", 1, (broccoli, args) => {
@@ -934,7 +950,18 @@ namespace Broccoli {
             }.Extend(DefaultBuiltins).FluentRemove("call")}
         };
 
+        /// <summary>
+        /// Helper functions for Cauliflower that can be inlined.
+        /// </summary>
         static class CauliflowerInline {
+            /// <summary>
+            /// Finds the function to execute given a value.
+            /// </summary>
+            /// <param name="callerName">The function call name.</param>
+            /// <param name="broccoli">The containing Broccoli interpreter.</param>
+            /// <param name="func">The value to try and find a function for.</param>
+            /// <returns>The function to execute.</returns>
+            /// <exception cref="Exception">Throws when the wrong kind of value is given or when the function cannot be found.</exception>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static IFunction FindFunction(string callerName, Interpreter broccoli, IValue func) {
                 switch (func) {
@@ -950,6 +977,11 @@ namespace Broccoli {
                 }
             }
 
+            /// <summary>
+            /// Returns whether a Broccoli value is truthy.
+            /// </summary>
+            /// <param name="value">The value to check.</param>
+            /// <returns>The truthiness of the value.</returns>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static bool Truthy(IValue value) {
                 switch (value) {
@@ -972,13 +1004,33 @@ namespace Broccoli {
         }
     }
 
+    /// <summary>
+    /// Dictionary extension methods.
+    /// </summary>
     static class DictionaryExtensions {
+        /// <summary>
+        /// Adds all the keys + values of a dictionary to the current dictionary.
+        /// </summary>
+        /// <param name="self">The current dictionary.</param>
+        /// <param name="other">The other dictionary whose values to add.</param>
+        /// <typeparam name="K">The key type.</typeparam>
+        /// <typeparam name="V">The value type.</typeparam>
+        /// <returns>The current dictionary.</returns>
         public static Dictionary<K, V> Extend<K, V>(this Dictionary<K, V> self, Dictionary<K, V> other) {
             foreach (var (key, value) in other)
                 if (!self.ContainsKey(key))
                     self[key] = value;
             return self;
         }
+
+        /// <summary>
+        /// Removes all the keys given from the dictionary.
+        /// </summary>
+        /// <param name="self">The current dictionary.</param>
+        /// <param name="keys">The keys to remove.</param>
+        /// <typeparam name="K">The key type.</typeparam>
+        /// <typeparam name="V">The value type.</typeparam>
+        /// <returns>The current dictionary.</returns>
         public static Dictionary<K, V> FluentRemove<K, V>(this Dictionary<K, V> self, params K[] keys) {
             foreach (var key in keys)
                 self.Remove(key);
