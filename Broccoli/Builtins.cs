@@ -569,7 +569,7 @@ namespace Broccoli {
                     case ValueDict d:
                         return new BInteger(d.Count);
                     default:
-                        throw new Exception($"Received {TypeName(args[0])} instead of list or string in argument 1 for 'len'");
+                        throw new Exception($"Type {TypeName(args[0])} has no len.");
                 }
                 
             })},
@@ -946,6 +946,18 @@ namespace Broccoli {
                         return Boolean(dict.ContainsKey(args[1]));
                     }
                     throw new Exception("First argument to rmkey must be a Dict.");
+                })},
+                {"keys", new Function("keys", 1, (broccoli, args) => {
+                    if (args[0] is ValueDict dict) {
+                        return new ValueList(dict.Keys);
+                    }
+                    throw new Exception("First argument to listkeys must be a Dict.");
+                })},
+                {"values", new Function("values", 1, (broccoli, args) => {
+                    if (args[0] is ValueDict dict) {
+                        return new ValueList(dict.Values);
+                    }
+                    throw new Exception("First argument to listkeys must be a Dict.");
                 })},
             }.Extend(DefaultBuiltins).FluentRemove("call")}
         };

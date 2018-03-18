@@ -27,7 +27,6 @@ namespace BroccoliTest {
 
         [TestMethod]
         public void TestDicts() {
-            Console.WriteLine(Program.IsCauliflower);
             Assert.AreEqual(_run("(mkdict)"), new ValueDict{}, "mkdict fails");
             Assert.AreEqual(_run("(setkey (mkdict) 1 2)"), new ValueDict{{(BInteger)1, (BInteger)2}},
              "setkey fails to add key");
@@ -38,8 +37,11 @@ namespace BroccoliTest {
             Assert.AreEqual(_run("(haskey %dict 1)"), BAtom.True, "haskey fails");
             Assert.AreNotEqual(_run("(haskey %dict 42)"), BAtom.True, "haskey fails");
             Assert.AreEqual(_run("(getkey %dict 1)"), (BInteger)2);
+            _run("(:= %dict (setkey %dict \"foo\" \"bar\"))");
+            CollectionAssert.AreEquivalent((ValueList)_run("(keys %dict)"), new ValueList((BInteger)1, (BString) "foo"));
+            CollectionAssert.AreEquivalent((ValueList)_run("(values %dict)"), new ValueList((BInteger)2, (BString) "bar"));
             Assert.ThrowsException<Exception>(() => _run("(:= $s (mkdict))"), "Can assign dict to scalar var");
-                        Assert.ThrowsException<Exception>(() => _run("(:= %d 4)"), "Can assign scalar to dict var");
+            Assert.ThrowsException<Exception>(() => _run("(:= %d 4)"), "Can assign scalar to dict var");
         }        
 
         [TestCleanup]
