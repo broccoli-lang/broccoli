@@ -250,6 +250,18 @@ namespace Broccoli {
                 return result;
             })},
 
+            {"len", new Function("len", 1, (broccoli, args) => {
+                switch (args[0]) {
+                    case ValueList l:
+                        return new BInteger(l.Count);
+                    case BString s:
+                        return new BInteger(s.Value.Length);
+                    case ValueDict d:
+                        return new BInteger(d.Count);
+                    default:
+                        throw new ArgumentTypeException(args[0], "list, dictionary or string", 1, "len");
+                }
+            })},
             {"slice", new Function("slice", -2, (cauliflower, args) => {
                 if (!(args[0] is ValueList list))
                     throw new ArgumentTypeException(args[0], "list", 1, "slice");
@@ -351,6 +363,18 @@ namespace Broccoli {
                     return Boolean(dict.ContainsKey(args[1]));
                 }
                 throw new Exception("First argument to rmkey must be a Dict.");
+            })},
+            {"keys", new Function("keys", 1, (broccoli, args) => {
+                if (args[0] is ValueDict dict) {
+                    return new ValueList(dict.Keys);
+                }
+                throw new Exception("First argument to listkeys must be a Dict.");
+            })},
+            {"values", new Function("values", 1, (broccoli, args) => {
+                if (args[0] is ValueDict dict) {
+                    return new ValueList(dict.Values);
+                }
+                throw new Exception("First argument to listkeys must be a Dict.");
             })},
         }.Extend(Interpreter.StaticBuiltins).FluentRemove("call");
 

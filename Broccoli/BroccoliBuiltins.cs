@@ -517,18 +517,14 @@ namespace Broccoli {
             // List Functions
             {"list", new Function("list", -1, (broccoli, args) => new ValueList(args.ToList()))},
             {"len", new Function("len", 1, (broccoli, args) => {
-                switch (args[0])
-                {
+                switch (args[0]) {
                     case ValueList l:
                         return new BInteger(l.Count);
                     case BString s:
                         return new BInteger(s.Value.Length);
-                    case ValueDict d:
-                        return new BInteger(d.Count);
                     default:
                         throw new ArgumentTypeException(args[0], "list or string", 1, "len");
                 }
-                
             })},
             {"first", new Function("first", 1, (broccoli, args) => {
                 if (!(args[0] is ValueList list))
