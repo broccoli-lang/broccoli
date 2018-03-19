@@ -30,7 +30,7 @@ namespace Broccoli {
                 }
             };
             IEnumerable<string> argv = options.Parse(args);
-            var interpreter = IsCauliflower ? new CauliflowerInterpreter() : new Interpreter();
+            var interpreter = IsCauliflower ? new CauliflowerInterpreter(argv) : new Interpreter();
             var prompt = IsCauliflower ? "cauliflower> " : "broccoli> ";
             var continuationPrompt = IsCauliflower ? "           > " : "        > ";
             file = argv.FirstOrDefault();
