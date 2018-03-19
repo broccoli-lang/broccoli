@@ -106,5 +106,9 @@ namespace Broccoli {
         public override string ToString() => $"(anonymous function with {_argc} arguments)";
 
         public string Inspect() => $"(anonymous function with {_argc} arguments)";
+
+        public object ToCSharp() => _call;
+
+        public Type Type() => typeof(Call);
     }
 }

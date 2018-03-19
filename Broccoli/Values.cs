@@ -1,6 +1,7 @@
 ﻿using System.Text;
 using System.Collections.Generic;
 using System.Linq;
+using System;
 
 namespace Broccoli {
     /// <inheritdoc />
@@ -9,6 +10,8 @@ namespace Broccoli {
     /// </summary>
     public interface IValue : IValueExpressible {
         string Inspect();
+        object ToCSharp();
+        Type Type();
     }
 
     public interface IScalar : IValue { }
@@ -38,6 +41,10 @@ namespace Broccoli {
         public override string ToString() => Value.ToString();
 
         public string Inspect() => Value.ToString();
+
+        public object ToCSharp() => Value;
+
+        public Type Type() => typeof(long);
     }
 
     /// <summary>
@@ -67,6 +74,10 @@ namespace Broccoli {
         public override string ToString() => Value.ToString();
 
         public string Inspect() => Value.ToString();
+
+        public object ToCSharp() => Value;
+
+        public Type Type() => typeof(double);
     }
 
     /// <summary>
@@ -92,6 +103,10 @@ namespace Broccoli {
         public override string ToString() => Value;
 
         public string Inspect() => $"\"{System.Text.RegularExpressions.Regex.Escape(Value)}\"";
+
+        public object ToCSharp() => Value;
+
+        public Type Type() => typeof(string);
     }
 
     /// <summary>
@@ -120,6 +135,10 @@ namespace Broccoli {
         public override string ToString() => Value;
 
         public string Inspect() => Value;
+
+        public object ToCSharp() => Value;
+
+        public Type Type() => typeof(string);
     }
 
     /// <summary>
@@ -135,6 +154,10 @@ namespace Broccoli {
         public override string ToString() => Value;
 
         public string Inspect() => '$' + Value;
+
+        public object ToCSharp() => Value;
+
+        public Type Type() => typeof(string);
     }
 
     /// <summary>
@@ -150,6 +173,10 @@ namespace Broccoli {
         public override string ToString() => Value;
 
         public string Inspect() => '@' + Value;
+
+        public object ToCSharp() => Value;
+
+        public Type Type() => typeof(string);
     }
 
     /// <summary>
@@ -165,6 +192,10 @@ namespace Broccoli {
         public override string ToString() => Value;
 
         public string Inspect() => '%' + Value;
+
+        public object ToCSharp() => Value;
+
+        public Type Type() => typeof(string);
     }
 
     /// <summary>
@@ -199,13 +230,16 @@ namespace Broccoli {
         public override string ToString() => '(' + string.Join(' ', Value) + ')';
 
         public string Inspect() => '(' + string.Join(' ', Value.Select(value => value.Inspect())) + ')';
+
+        public object ToCSharp() => new List<IValue>(Value);
+
+        public Type Type() => typeof(List<IValue>);
     }
 
     /// <summary>
     /// Represents a dictionary of values paired with other values.
     /// </summary>
-    public class ValueDictionary : Dictionary<IValue, IValue>, IValue
-    {
+    public class ValueDictionary : Dictionary<IValue, IValue>, IValue {
         public ValueDictionary Value { get; }
         public ValueDictionary() : base() => Value = this;
         public ValueDictionary(IReadOnlyDictionary<IValue, IValue> values) : base(values) => Value = this;
@@ -238,5 +272,9 @@ namespace Broccoli {
             sb.Append(")");
             return sb.ToString();
         }
+
+        public object ToCSharp() => new Dictionary<IValue, IValue>(Value);
+
+        public Type Type() => typeof(Dictionary<IValue, IValue>);
     }
 }
