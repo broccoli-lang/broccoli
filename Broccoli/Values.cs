@@ -1,6 +1,7 @@
 ﻿using System.Text;
 using System.Collections.Generic;
 using System.Linq;
+
 namespace Broccoli {
     /// <inheritdoc />
     /// <summary>
@@ -33,6 +34,8 @@ namespace Broccoli {
         public override bool Equals(object other) => other is BInteger i && Value == i.Value;
 
         public override int GetHashCode() => Value.GetHashCode();
+
+        public override string ToString() => Value.ToString();
 
         public string Inspect() => Value.ToString();
     }
@@ -191,7 +194,7 @@ namespace Broccoli {
             return true;
         }
 
-        public override int GetHashCode() => base.GetHashCode();
+        public override int GetHashCode() => this.Aggregate(0, (p, c) => p * -1521134295 + c.GetHashCode());
 
         public override string ToString() => '(' + string.Join(' ', Value) + ')';
 
@@ -214,7 +217,7 @@ namespace Broccoli {
         public override bool Equals(object obj) => obj is IReadOnlyDictionary<IValue, IValue> rdict
             && rdict.Count == Count && !this.Except(rdict).Any();
 
-        public override int GetHashCode() => base.GetHashCode();
+        public override int GetHashCode() => this.Aggregate(0, (p, c) => p + c.Key.GetHashCode() + c.Value.GetHashCode());
 
         public override string ToString() {
             var sb = new StringBuilder("(");

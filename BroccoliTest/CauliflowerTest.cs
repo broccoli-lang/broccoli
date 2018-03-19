@@ -4,6 +4,8 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Broccoli;
 
 namespace BroccoliTest {
+    // TODO: test print, input, dict hashcode (to test this, use dict as dict key) (remember order doesn't matter)
+
     [TestClass]
     public class CauliflowerTest {
         private Interpreter _cauliflower;
@@ -20,6 +22,33 @@ namespace BroccoliTest {
         [TestInitialize]
         public void Initialize() {
             _run = (_cauliflower = new CauliflowerInterpreter()).Run;
+        }
+
+        [TestMethod]
+        public void TestLiterals() {
+            Assert.AreEqual(_run("\"\\rfoo\\\"\\t\\n\""), new BString("\rfoo\"\t\n"), "String escaping does not work correctly");
+            Assert.AreEqual(_run("\"\rfoo\n\""), new BString("\rfoo\n"), "Multiline strings do not work correctly");
+            Assert.AreEqual(_run("'(1 2 (3 4 foo (\"bar\")))"), new ValueList(
+                (BInteger) 1,
+                (BInteger) 2,
+                new ValueList(
+                    (BInteger) 3,
+                    (BInteger) 4,
+                    (BAtom) "foo",
+                    new ValueList(
+                        (BString) "bar"
+                    )
+                )
+            ), "Lists do not work correctly");
+            Assert.AreEqual(_run("`((1 2) ('(baz quux) \"a\"))"), new ValueDictionary {
+                { (BInteger) 1, (BInteger) 2},
+                { new ValueList((BAtom) "baz", (BAtom) "quux"), (BString) "a"}
+            }, "Dictionaries do not work correctly");
+        }
+
+        [TestMethod]
+        public void TestComments() {
+            Assert.AreEqual(_run("#| a #|;this is a comment.\n !@\r|#$%^&*()|#\n\"yey\""), new BString("yey"), "Comment does not work correctly");
         }
 
         [TestMethod]

@@ -57,7 +57,7 @@ namespace Broccoli {
                     if (current.UnfinishedString != null) {
                         rawMatch = _rStringEnd.Match(line);
                         if (!rawMatch.Success) {
-                            current.UnfinishedString += _rEscapes.Replace(line, "1");
+                            current.UnfinishedString += _rEscapes.Replace(line, "$1");
                             column = line.Length;
                             continue;
                         }

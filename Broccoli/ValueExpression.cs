@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace Broccoli {
@@ -45,7 +46,9 @@ namespace Broccoli {
                 if (node.Token != null)
                     return node.Token.ToIValue();
                 return new ValueDictionary(new Dictionary<IValue, IValue>(node.Children.Select(
-                    child => new KeyValuePair<IValue, IValue>(child.Children[0].Token.ToIValue(), child.Children[1].Token.ToIValue())
+                    child => child.Children?.Count == 2 ?
+                        new KeyValuePair<IValue, IValue>((IValue) Selector(child.Children[0]), (IValue) Selector(child.Children[1])) :
+                        throw new Exception($"Expected key value pair in dictionary literal, found {(child.Children == null ? child.Token.Literal.GetType().ToString() : child.Children.Count + " arguments")}")
                 )));
             }
 
@@ -54,6 +57,8 @@ namespace Broccoli {
                     return node.Token.ToIValue();
                 if (node.IsList)
                     return Listify(node);
+                if (node.IsDictionary)
+                    return Dictionarify(node);
                 return new ValueExpression(node.Children.Select(Selector));
             }
             return n.Children == null ?

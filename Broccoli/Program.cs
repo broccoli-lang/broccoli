@@ -17,9 +17,6 @@ namespace Broccoli {
         public static void Main(string[] args) {
             // TODO: remove as many try/catches as possible, this isn't Python, nor is it Java
             // TODO: do we even need row/col in ParseNode
-            var interpreter = IsCauliflower ? new CauliflowerInterpreter() : new Interpreter();
-            var prompt = IsCauliflower ? "cauliflower> " : "broccoli> ";
-            var continuationPrompt = IsCauliflower ? "           > " : "        > ";
             string file;
             bool getHelp = false, useREPL = args.Length == 0;
 
@@ -32,6 +29,9 @@ namespace Broccoli {
                     "c|cauliflower", "Use Cauliflower", n => IsCauliflower = n != null
                 }
             };
+            var interpreter = IsCauliflower ? new CauliflowerInterpreter() : new Interpreter();
+            var prompt = IsCauliflower ? "cauliflower> " : "broccoli> ";
+            var continuationPrompt = IsCauliflower ? "           > " : "        > ";
             IEnumerable<string> argv = options.Parse(args);
             file = argv.FirstOrDefault();
             if (file is null)

@@ -25,24 +25,19 @@ namespace BroccoliTest {
 
         [TestMethod]
         public void TestLiterals() {
-            Assert.AreEqual(_run("(first (list 42))"), new BInteger(42), "Integer does not work correctly");
-            Assert.AreEqual(_run("(first (list -42))"), new BInteger(-42), "Negative integer does not work correctly");
-            Assert.AreEqual(_run("(first (list 4.2))"), new BFloat(4.2), "Float does not work correctly");
-            Assert.AreEqual(_run("(first (list -4.2))"), new BFloat(-4.2), "Negative float does not work correctly");
-            Assert.AreEqual(_run("(first (list \"foo\"))"), new BString("foo"), "String does not work correctly");
-            Assert.AreEqual(_run("(first (list \"\\f\\o\\o\"))"), new BString("foo"), "String escaping does not work correctly");
-            Assert.AreEqual(_run("(first (list foo))"), new BAtom("foo"), "Atom does not work correctly");
+            Assert.AreEqual(_run("42"), new BInteger(42), "Integer does not work correctly");
+            Assert.AreEqual(_run("-42"), new BInteger(-42), "Negative integer does not work correctly");
+            Assert.AreEqual(_run("4.2"), new BFloat(4.2), "Float does not work correctly");
+            Assert.AreEqual(_run("-4.2"), new BFloat(-4.2), "Negative float does not work correctly");
+            Assert.AreEqual(_run("\"foo\""), new BString("foo"), "String does not work correctly");
+            Assert.AreEqual(_run("\"\\f\\o\\o\""), new BString("foo"), "String escaping does not work correctly");
+            Assert.AreEqual(_run("\"\r\\f\t\\o\\o\n\""), new BString("\rf\too\n"), "String escaping does not work correctly");
+            Assert.AreEqual(_run("foo"), new BAtom("foo"), "Atom does not work correctly");
         }
 
         [TestMethod]
         public void TestComments() {
-            Assert.AreEqual(_run(";this is a comment. !@#$%^&*()\n\"yey\""), new BString("yey"), "Integer does not work correctly");
-            Assert.AreEqual(_run("(first (list -42))"), new BInteger(-42), "Negative integer does not work correctly");
-            Assert.AreEqual(_run("(first (list 4.2))"), new BFloat(4.2), "Float does not work correctly");
-            Assert.AreEqual(_run("(first (list -4.2))"), new BFloat(-4.2), "Negative float does not work correctly");
-            Assert.AreEqual(_run("(first (list \"foo\"))"), new BString("foo"), "String does not work correctly");
-            Assert.AreEqual(_run("(first (list \"\\f\\o\\o\"))"), new BString("foo"), "String escaping does not work correctly");
-            Assert.AreEqual(_run("(first (list foo))"), new BAtom("foo"), "Atom does not work correctly");
+            Assert.AreEqual(_run(";this is a comment. !@#$%^&*()\n\"yey\""), new BString("yey"), "Comment does not work correctly");
         }
 
         // Meta-commands
