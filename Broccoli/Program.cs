@@ -29,10 +29,10 @@ namespace Broccoli {
                     "c|cauliflower", "Use Cauliflower", n => IsCauliflower = n != null
                 }
             };
+            IEnumerable<string> argv = options.Parse(args);
             var interpreter = IsCauliflower ? new CauliflowerInterpreter() : new Interpreter();
             var prompt = IsCauliflower ? "cauliflower> " : "broccoli> ";
             var continuationPrompt = IsCauliflower ? "           > " : "        > ";
-            IEnumerable<string> argv = options.Parse(args);
             file = argv.FirstOrDefault();
             if (file is null)
                 useREPL = true;

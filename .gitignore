@@ -4,3 +4,4 @@
 .vs/
 packages/
 bin/
+**/*.user
