@@ -8,7 +8,13 @@ namespace Broccoli {
     public class ParseNode {
         public bool Finished;
         public bool ExpectsList = false;
+        public bool ExpectsDictionary = false;
+        public bool IsList = false;
+        public bool IsDictionary = false;
+        public bool IsComment = false;
         public string UnfinishedString = null;
+        public string UnfinishedComment = null;
+        public int CommentDepth = 0;
         public Token Token { get; }
         public List<ParseNode> Children { get; }
 

@@ -6,7 +6,9 @@ namespace Broccoli {
     /// <summary>
     /// Represents a class that can be used as a value within a Broccoli program.
     /// </summary>
-    public interface IValue : IValueExpressible { }
+    public interface IValue : IValueExpressible {
+        string Inspect();
+    }
 
     public interface IScalar : IValue { }
 
@@ -32,7 +34,7 @@ namespace Broccoli {
 
         public override int GetHashCode() => Value.GetHashCode();
 
-        public override string ToString() => Value.ToString();
+        public string Inspect() => Value.ToString();
     }
 
     /// <summary>
@@ -60,6 +62,8 @@ namespace Broccoli {
         public override int GetHashCode() => Value.GetHashCode();
 
         public override string ToString() => Value.ToString();
+
+        public string Inspect() => Value.ToString();
     }
 
     /// <summary>
@@ -83,6 +87,8 @@ namespace Broccoli {
         public override int GetHashCode() => Value.GetHashCode();
 
         public override string ToString() => Value;
+
+        public string Inspect() => $"\"{System.Text.RegularExpressions.Regex.Escape(Value)}\"";
     }
 
     /// <summary>
@@ -109,6 +115,8 @@ namespace Broccoli {
         public override int GetHashCode() => Value.GetHashCode();
 
         public override string ToString() => Value;
+
+        public string Inspect() => Value;
     }
 
     /// <summary>
@@ -122,6 +130,8 @@ namespace Broccoli {
         }
 
         public override string ToString() => Value;
+
+        public string Inspect() => '$' + Value;
     }
 
     /// <summary>
@@ -135,6 +145,8 @@ namespace Broccoli {
         }
 
         public override string ToString() => Value;
+
+        public string Inspect() => '@' + Value;
     }
 
     /// <summary>
@@ -142,10 +154,14 @@ namespace Broccoli {
     /// </summary>
     public class DictVar : IScalar {
         public string Value { get; }
+
         public DictVar(string d) {
             Value = d;
         }
+
         public override string ToString() => Value;
+
+        public string Inspect() => '%' + Value;
     }
 
     /// <summary>
@@ -178,38 +194,46 @@ namespace Broccoli {
         public override int GetHashCode() => base.GetHashCode();
 
         public override string ToString() => '(' + string.Join(' ', Value) + ')';
+
+        public string Inspect() => '(' + string.Join(' ', Value.Select(value => value.Inspect())) + ')';
     }
 
     /// <summary>
     /// Represents a dictionary of values paired with other values.
     /// </summary>
-    public class ValueDict : Dictionary<IValue, IValue>, IValue
+    public class ValueDictionary : Dictionary<IValue, IValue>, IValue
     {
-        public ValueDict Value { get; }
-        public ValueDict() : base() => Value = this;
-        public ValueDict(IReadOnlyDictionary<IValue, IValue> values) : base(values) => Value = this;
+        public ValueDictionary Value { get; }
+        public ValueDictionary() : base() => Value = this;
+        public ValueDictionary(IReadOnlyDictionary<IValue, IValue> values) : base(values) => Value = this;
 
-        public static bool operator ==(ValueDict left, object right) => right is IReadOnlyDictionary<IValue, IValue> rdict
+        public static bool operator ==(ValueDictionary left, object right) => right is IReadOnlyDictionary<IValue, IValue> rdict
             && rdict.Count == left.Count && !left.Except(rdict).Any();
-        public static bool operator !=(ValueDict left, object right) => !(left == right);
+        public static bool operator !=(ValueDictionary left, object right) => !(left == right);
 
-        public override bool Equals(object obj) => this == obj;
+        public override bool Equals(object obj) => obj is IReadOnlyDictionary<IValue, IValue> rdict
+            && rdict.Count == Count && !this.Except(rdict).Any();
 
         public override int GetHashCode() => base.GetHashCode();
 
         public override string ToString() {
-            var sb = new StringBuilder("{");
+            var sb = new StringBuilder("(");
             foreach (KeyValuePair<IValue, IValue> i in this)
-            {
-                sb.Append($"{i.Key}: {i.Value},");
-            }
+                sb.Append($"{i.Key}: {i.Value}, ");
             if (sb.Length > 1)
-            {
-                sb.Length--;
-            }
-            sb.Append("}");
+                sb.Length -= 2;
+            sb.Append(")");
             return sb.ToString();
         }
-
+        
+        public string Inspect() {
+            var sb = new StringBuilder("(");
+            foreach (KeyValuePair<IValue, IValue> i in this)
+                sb.Append($"{i.Key.Inspect()}: {i.Value.Inspect()}, ");
+            if (sb.Length > 1)
+                sb.Length -= 2;
+            sb.Append(")");
+            return sb.ToString();
+        }
     }
 }

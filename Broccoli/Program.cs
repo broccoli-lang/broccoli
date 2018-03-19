@@ -32,7 +32,6 @@ namespace Broccoli {
                     "c|cauliflower", "Use Cauliflower", n => IsCauliflower = n != null
                 }
             };
-            
             IEnumerable<string> argv = options.Parse(args);
             file = argv.FirstOrDefault();
             if (file is null)
@@ -53,21 +52,31 @@ namespace Broccoli {
                             Environment.Exit(0);
                         return line;
                     }
-
-                    var parsed = interpreter.Parse(ReadOrDie());
+                    ParseNode parsed = null;
+                    try {
+                        parsed = interpreter.Parse(ReadOrDie() + '\n');
+                    } catch (Exception e) {
+                        WriteLine($"{e.GetType().ToString().Split('.').Last()}: {e.Message}");
+                        continue;
+                    }
                     while (!parsed.Finished) {
                         ForegroundColor = ConsoleColor.Green;
                         Write(continuationPrompt);
                         ForegroundColor = ConsoleColor.White;
-                        parsed = interpreter.Parse(ReadOrDie(), parsed);
+                        try {
+                            parsed = interpreter.Parse(ReadOrDie() + '\n', parsed);
+                        } catch (Exception e) {
+                            WriteLine($"{e.GetType().ToString().Split('.').Last()}: {e.Message}");
+                            continue;
+                        }
                     }
 
                     try {
                         var result = interpreter.Run(parsed);
                         if (result != null)
-                            WriteLine(result);
+                            WriteLine(result.Inspect());
                     } catch (Exception e) {
-                        WriteLine(e);
+                        WriteLine($"{e.GetType().ToString().Split('.').Last()}: {e.Message}");
                     }
                 }
 

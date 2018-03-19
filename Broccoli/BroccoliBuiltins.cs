@@ -21,6 +21,8 @@ namespace Broccoli {
                 var e = (ValueExpression) args[0];
                 if (e.IsValue)
                     return broccoli.Run(e.Values.First());
+                if (e.Values.Length == 0)
+                    throw new Exception("Expected function name");
                 var first = e.Values.First();
                 IFunction fn = null;
                 if (!(first is BAtom a))
@@ -491,7 +493,7 @@ namespace Broccoli {
                 foreach (var value in valueList) {
                     switch (args[0]) {
                         case ScalarVar s:
-                                if (value.GetType().In(typeof(ValueList), typeof(ValueDict)))
+                                if (value.GetType().In(typeof(ValueList), typeof(ValueDictionary)))
                                     throw new Exception("Only Scalars can be assigned to scalar ($) variables");
                                 broccoli.Scope[s] = value;
                                 break;
@@ -501,7 +503,7 @@ namespace Broccoli {
                             broccoli.Scope[l] = vList;
                             break;
                         case DictVar d when Program.IsCauliflower:
-                            if (!(value is ValueDict vDict))
+                            if (!(value is ValueDictionary vDict))
                                 throw new Exception("Only Dicts can be assigned to dict (%) variables");
                             broccoli.Scope[d] = vDict;
                             break;

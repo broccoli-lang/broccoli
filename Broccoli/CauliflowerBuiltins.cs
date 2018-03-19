@@ -20,6 +20,8 @@ namespace Broccoli {
                 var e = (ValueExpression) args[0];
                 if (e.IsValue)
                     return cauliflower.Run(e.Values.First());
+                if (e.Values.Length == 0)
+                    throw new Exception("Expected function name");
                 var first = e.Values.First();
                 IFunction fn = null;
                 if (first is BAtom fnAtom) {
@@ -84,7 +86,7 @@ namespace Broccoli {
                                 cauliflower.Scope[l] = list;
                                 break;
                             case DictVar d:
-                                if (!(toAssign is ValueDict dict))
+                                if (!(toAssign is ValueDictionary dict))
                                     throw new Exception("Only dictionaries can be assigned to dictionary (%) variables");
                                 cauliflower.Scope[d] = dict;
                                 break;
@@ -108,7 +110,7 @@ namespace Broccoli {
                 var toAssign = broccoli.Run(args[1]);
                 switch (args[0]) {
                     case ScalarVar s:
-                        if (toAssign is ValueList || toAssign is ValueDict)
+                        if (toAssign is ValueList || toAssign is ValueDictionary)
                             throw new Exception("Only scalars can be assigned to scalar ($) variables");
                         broccoli.Scope[s] = toAssign;
                         break;
@@ -118,7 +120,7 @@ namespace Broccoli {
                         broccoli.Scope[l] = list;
                         break;
                     case DictVar d:
-                        if (!(toAssign is ValueDict dict))
+                        if (!(toAssign is ValueDictionary dict))
                             throw new Exception("Only dicts can be assigned to dict (%) variables");
                         broccoli.Scope[d] = dict;
                         break;
@@ -216,7 +218,7 @@ namespace Broccoli {
                                 cauliflower.Scope[l] = list;
                                 break;
                             case DictVar d:
-                                if (!(toAssign is ValueDict dict))
+                                if (!(toAssign is ValueDictionary dict))
                                     throw new Exception("Only dictionaries can be assigned to dictionary (%) variables");
                                 cauliflower.Scope[d] = dict;
                                 break;
@@ -256,7 +258,7 @@ namespace Broccoli {
                         return new BInteger(l.Count);
                     case BString s:
                         return new BInteger(s.Value.Length);
-                    case ValueDict d:
+                    case ValueDictionary d:
                         return new BInteger(d.Count);
                     default:
                         throw new ArgumentTypeException(args[0], "list, dictionary or string", 1, "len");
@@ -336,42 +338,42 @@ namespace Broccoli {
                 throw new ArgumentTypeException(args[1], "list", 2, "any");
             })},
             {"mkdict", new Function("mkdict", 0, (cauliflower, args) => {
-                return new ValueDict();
+                return new ValueDictionary();
             })},
             {"setkey", new Function("setkey", 3, (cauliflower, args) => {
-                if (args[0] is ValueDict dict)
-                    return new ValueDict(new Dictionary<IValue, IValue>(dict){
+                if (args[0] is ValueDictionary dict)
+                    return new ValueDictionary(new Dictionary<IValue, IValue>(dict){
                         [args[1]] = args[2]
                     });
                 throw new Exception("First argument to rmkey must be a Dict.");
             })},
             {"getkey", new Function("getkey", 2, (cauliflower, args) => {
-                if (args[0] is ValueDict dict)
+                if (args[0] is ValueDictionary dict)
                     return dict[args[1]];
                 throw new Exception("First argument to rmkey must be a Dict.");
             })},
             {"rmkey", new Function("rmkey", 2, (cauliflower, args) => {
-                if (args[0] is ValueDict dict) {
+                if (args[0] is ValueDictionary dict) {
                     var d = new Dictionary<IValue, IValue>(dict);
                     d.Remove(args[1]);
-                    return new ValueDict(d);
+                    return new ValueDictionary(d);
                 }
                 throw new Exception("First argument to rmkey must be a Dict.");
             })},
             {"haskey", new Function("haskey", 2, (cauliflower, args) => {
-                if (args[0] is ValueDict dict) {
+                if (args[0] is ValueDictionary dict) {
                     return Boolean(dict.ContainsKey(args[1]));
                 }
                 throw new Exception("First argument to rmkey must be a Dict.");
             })},
             {"keys", new Function("keys", 1, (broccoli, args) => {
-                if (args[0] is ValueDict dict) {
+                if (args[0] is ValueDictionary dict) {
                     return new ValueList(dict.Keys);
                 }
                 throw new Exception("First argument to listkeys must be a Dict.");
             })},
             {"values", new Function("values", 1, (broccoli, args) => {
-                if (args[0] is ValueDict dict) {
+                if (args[0] is ValueDictionary dict) {
                     return new ValueList(dict.Values);
                 }
                 throw new Exception("First argument to listkeys must be a Dict.");

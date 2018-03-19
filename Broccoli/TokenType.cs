@@ -16,6 +16,7 @@ namespace Broccoli {
         DictionaryName,
 
         // Miscellaneous
-        None
+        Comment,
+        None,
     }
 }

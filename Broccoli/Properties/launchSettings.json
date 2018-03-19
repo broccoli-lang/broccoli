@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "Broccoli": {
+      "commandName": "Project"
+    },
+    "Cauliflower": {
+      "commandName": "Project",
+      "commandLineArgs": "-c"
+    }
+  }
+}

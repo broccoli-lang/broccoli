@@ -7,7 +7,7 @@ namespace Broccoli {
     public class Scope {
         public readonly Dictionary<string, IValue> Scalars = new Dictionary<string, IValue>();
         public readonly Dictionary<string, ValueList> Lists = new Dictionary<string, ValueList>();
-        public readonly Dictionary<string, ValueDict> Dictionaries = new Dictionary<string, ValueDict>();
+        public readonly Dictionary<string, ValueDictionary> Dictionaries = new Dictionary<string, ValueDictionary>();
         public readonly Dictionary<string, IFunction> Functions = new Dictionary<string, IFunction>();
         public readonly Scope Parent;
 
@@ -61,7 +61,7 @@ namespace Broccoli {
         /// Gets or sets the value of the given dictionary variable.
         /// </summary>
         /// <param name="d">The dictionary variable to access.</param>
-        public ValueDict this[DictVar d] {
+        public ValueDictionary this[DictVar d] {
             get => Dictionaries.ContainsKey(d.Value) ? Dictionaries[d.Value] : Parent?[d];
 
             set {

@@ -6,11 +6,11 @@ using System.Text.RegularExpressions;
 namespace Broccoli {
     public partial class Interpreter {
         private static Regex _rNewline = new Regex(@"(?<=[\r\n][\s\r\n]*[\r\n]|[\r\n])", RegexOptions.Compiled);
-        private static Regex _rComment = new Regex(@"\G;.*$", RegexOptions.Compiled);
+        private static Regex _rComment = new Regex(@"\G;[\s\S]*$", RegexOptions.Compiled);
         private static Regex _rWhitespace = new Regex(@"\G\s+", RegexOptions.Compiled);
-        private static Regex _rString = new Regex(@"\G""(?:\\.|[^""])*""", RegexOptions.Compiled);
-        private static Regex _rStringStart = new Regex(@"\G""(?:\\.|[^""])*$", RegexOptions.Compiled);
-        private static Regex _rStringEnd = new Regex(@"^(?:\\.|[^""])*""", RegexOptions.Compiled);
+        private static Regex _rString = new Regex(@"\G""(?:\\[\s\S]|[^""])*""", RegexOptions.Compiled);
+        private static Regex _rStringStart = new Regex(@"\G""(?:\\[\s\S]|[^""])*$", RegexOptions.Compiled);
+        private static Regex _rStringEnd = new Regex(@"^(?:\\[\s\S]|[^""])*""", RegexOptions.Compiled);
         private static Regex _rNumber = new Regex(@"\G-?(?:\d*\.\d+|\d+\.?\d*|\d*)", RegexOptions.Compiled);
         private static Regex _rScalar = new Regex(@"\G\$[^\s()$@%&|~][^\s()&|~]*", RegexOptions.Compiled);
         private static Regex _rList = new Regex(@"\G@[^\s()$@%&|~][^\s()&|~]*", RegexOptions.Compiled);
@@ -24,8 +24,8 @@ namespace Broccoli {
         /// <param name="p">A partially-parsed node coming from multiline inputs in the REPL.</param>
         /// <returns>Returns the root ParseNode that represents the string.</returns>
         /// <exception cref="Exception">Thrown when the parser fails to parse an token.</exception>
-        public virtual ParseNode Parse(string s, ParseNode p = null) {
-            var source = _rNewline.Split(_rComment.Replace(s, "")).ToList();
+        public virtual ParseNode Parse(string s, ParseNode p = null, bool keepComments = false) {
+            var source = _rNewline.Split(s).ToList();
             var result = new ParseNode();
             var stack = new List<ParseNode> { result };
             var current = result;
@@ -54,82 +54,100 @@ namespace Broccoli {
                     Match rawMatch = null;
                     string value = null;
                     string match = null;
-                    switch (c) {
-                        // S-expressions
-                        case '(':
-                            depth++;
-                            column++;
-                            var next = new ParseNode();
-                            current.Children.Add(next);
-                            current = next;
-                            stack.Add(current);
+                    if (current.UnfinishedString != null) {
+                        rawMatch = _rStringEnd.Match(line);
+                        if (!rawMatch.Success) {
+                            current.UnfinishedString += _rEscapes.Replace(line, "1");
+                            column = line.Length;
                             continue;
-                        case ')':
-                            depth--;
-                            column++;
-                            current.Finish();
-                            stack.RemoveAt(stack.Count - 1);
-                            current = stack.Last();
-                            continue;
-                        // Variables
-                        case '$':
-                            match = _rScalar.Match(line, column).ToString();
-                            value = match.Substring(1);
-                            type = TokenType.ScalarName;
-                            break;
-                        case '@':
-                            match = _rList.Match(line, column).ToString();
-                            value = match.Substring(1);
-                            type = TokenType.ListName;
-                            break;
-                        // Strings
-                        case '"':
-                            rawMatch = _rString.Match(line, column);
-                            if (!rawMatch.Success) {
-                                current.UnfinishedString = _rEscapes.Replace(_rStringStart.Match(line, column).ToString(), "$1");
+                        }
+                        match = rawMatch.ToString();
+                        value = current.UnfinishedString + _rEscapes.Replace(match.Substring(0, match.Length - 1), "$1");
+                        current.UnfinishedString = null;
+                        type = TokenType.String;
+                    } else
+                        switch (c) {
+                            // S-expressions
+                            case '(':
+                                depth++;
+                                column++;
+                                var next = new ParseNode();
+                                current.Children.Add(next);
+                                current = next;
+                                stack.Add(current);
                                 continue;
-                            }
-                            match = rawMatch.ToString();
-                            value = _rEscapes.Replace(match.Substring(1, match.Length - 2), "$1");
-                            type = TokenType.String;
-                            break;
-                        // Numbers
-                        case '-':
-                        case char _ when char.IsDigit(c):
-                            match = value = _rNumber.Match(line, column).ToString();
-                            if (value == "-") {
+                            case ')':
+                                if (--depth < 0)
+                                    throw new Exception("Unexpected stray ')' at top level");
+                                column++;
+                                current.Finish();
+                                stack.RemoveAt(stack.Count - 1);
+                                current = stack.Last();
+                                continue;
+                            // Variables
+                            case '$':
+                                match = _rScalar.Match(line, column).ToString();
+                                value = match.Substring(1);
+                                type = TokenType.ScalarName;
+                                break;
+                            case '@':
+                                match = _rList.Match(line, column).ToString();
+                                value = match.Substring(1);
+                                type = TokenType.ListName;
+                                break;
+                            // Strings
+                            case '"':
+                                rawMatch = _rString.Match(line, column);
+                                if (!rawMatch.Success) {
+                                    current.UnfinishedString = _rEscapes.Replace(_rStringStart.Match(line, column).ToString().Substring(1), "$1");
+                                    column = line.Length;
+                                    continue;
+                                }
+                                match = rawMatch.ToString();
+                                value = _rEscapes.Replace(match.Substring(1, match.Length - 2), "$1");
+                                type = TokenType.String;
+                                break;
+                            // Numbers
+                            case '-':
+                            case char _ when char.IsDigit(c):
+                                match = value = _rNumber.Match(line, column).ToString();
+                                if (value == "-") {
+                                    match = value = _rName.Match(line, column).ToString();
+                                    type = TokenType.Atom;
+                                } else
+                                    type = value.Contains('.') ? TokenType.Float : TokenType.Integer;
+                                break;
+                            // Whitespace
+                            case ' ':
+                            case '\t':
+                            case '\f':
+                            case '\v':
+                            case '\r':
+                            case '\n':
+                                match = _rWhitespace.Match(line, column).ToString();
+                                break;
+                            // Comments
+                            case ';':
+                                match = _rComment.Match(line, column).ToString();
+                                if (keepComments) {
+                                    value = match.Substring(match.Length > 2 && match[1] == ' ' ? 2 : 1);
+                                    type = TokenType.Comment;
+                                }
+                                break;
+                            // Identifiers (default)
+                            default:
                                 match = value = _rName.Match(line, column).ToString();
                                 type = TokenType.Atom;
-                            } else
-                                type = value.Contains('.') ? TokenType.Float : TokenType.Integer;
-                            break;
-                        // Whitespace
-                        case ' ':
-                        case '\t':
-                        case '\f':
-                        case '\v':
-                        case '\r':
-                        case '\n':
-                            match = _rWhitespace.Match(line, column).ToString();
-                            break;
-                        // Comments
-                        case ';':
-                            match = _rComment.Match(line, column).ToString();
-                            break;
-                        // Identifiers (default)
-                        default:
-                            match = value = _rName.Match(line, column).ToString();
-                            type = TokenType.Atom;
-                            break;
+                                break;
+                        }
+                        if (type != TokenType.None)
+                            current.Children.Add(new ParseNode(new Token(type, value)));
+                        if (match.Length == 0)
+                            throw new Exception($"Could not match token '{Regex.Escape("" + c)}' at {row + 1}:{column}");
+                        column += match.Length;
                     }
-                    if (type != TokenType.None)
-                        current.Children.Add(new ParseNode(new Token(type, value)));
-                    if (match.Length == 0)
-                        throw new Exception($"Could not match token '{Regex.Escape("" + c)}' at {row + 1}:{column}");
-                    column += match.Length;
                 }
-            }
-            if (result.Children.Count() == 0 || result.Children.Last().Finished)
+            if (current.UnfinishedString == null && (result.Children.Count() == 0 || result.Children.Last().Finished))
                 result.Finished = true;
             return result;
         }

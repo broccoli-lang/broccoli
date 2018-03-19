@@ -35,12 +35,34 @@ namespace Broccoli {
         /// <param name="n">The <see cref="ParseNode"/> to convert.</param>
         /// <returns>THe expression represented by the <see cref="ParseNode"/>.</returns>
         public static implicit operator ValueExpression(ParseNode n) {
+            IValue Listify(ParseNode node) {
+                if (node.Token != null)
+                    return node.Token.ToIValue();
+                return new ValueList(node.Children.Select(Listify));
+            }
+
+            IValue Dictionarify(ParseNode node) {
+                if (node.Token != null)
+                    return node.Token.ToIValue();
+                return new ValueDictionary(new Dictionary<IValue, IValue>(node.Children.Select(
+                    child => new KeyValuePair<IValue, IValue>(child.Children[0].Token.ToIValue(), child.Children[1].Token.ToIValue())
+                )));
+            }
+
             IValueExpressible Selector(ParseNode node) {
                 if (node.Token != null)
                     return node.Token.ToIValue();
+                if (node.IsList)
+                    return Listify(node);
                 return new ValueExpression(node.Children.Select(Selector));
             }
-            return n.Children == null ? new ValueExpression(n.Token.ToIValue()) : new ValueExpression(n.Children.Select(Selector));
+            return n.Children == null ?
+                new ValueExpression(n.Token.ToIValue()) :
+                n.IsList ?
+                new ValueExpression((IValueExpressible) new ValueList(n.Children.Select(Listify))) :
+                n.IsDictionary ?
+                new ValueExpression(Dictionarify(n)) :
+                new ValueExpression(n.Children.Select(Selector));
         }
 
         public override string ToString() {

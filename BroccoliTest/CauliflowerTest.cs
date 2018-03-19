@@ -24,13 +24,13 @@ namespace BroccoliTest {
 
         [TestMethod]
         public void TestDicts() {
-            Assert.AreEqual(_run("(mkdict)"), new ValueDict{}, "mkdict fails");
-            Assert.AreEqual(_run("(setkey (mkdict) 1 2)"), new ValueDict{{(BInteger)1, (BInteger)2}},
+            Assert.AreEqual(_run("(mkdict)"), new ValueDictionary{}, "mkdict fails");
+            Assert.AreEqual(_run("(setkey (mkdict) 1 2)"), new ValueDictionary{{(BInteger)1, (BInteger)2}},
              "setkey fails to add key");
             _run("(:= %dict (setkey (mkdict) 1 2))");
-            Assert.AreEqual(_run("(setkey %dict 1 3)"), new ValueDict{{(BInteger)1, (BInteger)3}},
+            Assert.AreEqual(_run("(setkey %dict 1 3)"), new ValueDictionary{{(BInteger)1, (BInteger)3}},
              "setkey fails to change key");
-            Assert.AreEqual(_run("(rmkey %dict 1)"), new ValueDict{}, "rmkey fails");
+            Assert.AreEqual(_run("(rmkey %dict 1)"), new ValueDictionary{}, "rmkey fails");
             Assert.AreEqual(_run("(haskey %dict 1)"), BAtom.True, "haskey fails");
             Assert.AreNotEqual(_run("(haskey %dict 42)"), BAtom.True, "haskey fails");
             Assert.AreEqual(_run("(getkey %dict 1)"), (BInteger)2);
