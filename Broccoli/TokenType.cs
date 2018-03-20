@@ -14,6 +14,7 @@ namespace Broccoli {
         ScalarName,
         ListName,
         DictionaryName,
+        Cast,
 
         // Miscellaneous
         Comment,

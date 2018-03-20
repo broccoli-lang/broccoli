@@ -5,7 +5,7 @@ namespace Broccoli {
     /// <summary>
     /// Represents a class that can act as a Broccoli function.
     /// </summary>
-    public interface IFunction {
+    public interface IFunction : IScalar {
         /// <summary>
         /// Invokes the Broccoli function with the given arguments.
         /// </summary>
@@ -57,6 +57,12 @@ namespace Broccoli {
             if (isVariadic ? args.Length < requiredArgc : args.Length != requiredArgc)
                 throw new Exception($"Function {name} requires {(isVariadic ? "at least" : "exactly")} {requiredArgc} arguments, {args.Length} provided");
         }
+
+        public string Inspect() => $"{_name}({_argc} arguments)";
+
+        public object ToCSharp() => _call;
+
+        public Type Type() => typeof(Call);
     }
 
     /// <summary>
@@ -81,12 +87,18 @@ namespace Broccoli {
             Function.ValidateArgs(_argc, args, _name);
             return _call(broccoli, args);
         }
+
+        public string Inspect() => $"{_name}({_argc} arguments)";
+
+        public object ToCSharp() => _call;
+
+        public Type Type() => typeof(Call);
     }
 
     /// <summary>
     /// Represents a Broccoli function that is also a value.
     /// </summary>
-    public struct AnonymousFunction : IFunction, IScalar {
+    public struct AnonymousFunction : IFunction {
         public delegate IValue Call(IValue[] args);
 
         private readonly int _argc;

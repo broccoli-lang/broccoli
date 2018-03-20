@@ -1,8 +1,13 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+
+// TODO: test "->"
+// TODO: "namespace" function & maybe various OOP things
+// TODO: try catch
 
 namespace Broccoli {
     static class TypeExtensions {
@@ -29,20 +34,30 @@ namespace Broccoli {
             if (value == null)
                 return null;
             switch (value) {
+                case char c:
+                    return new BInteger(c);
+                case short s:
+                    return new BInteger(s);
+                case int i:
+                    return new BInteger(i);
                 case long l:
                     return new BInteger(l);
+                case float f:
+                    return new BFloat(f);
                 case double d:
                     return new BFloat(d);
                 case bool b:
                     return Boolean(b);
                 case string s:
                     return new BString(s);
+                case IValue v:
+                    return v;
                 default:
                     return new BCSharpValue(value);
             }
         }
 
-        private class BCSharpValue : IValue {
+        private class BCSharpValue : IScalar {
             public object Value { get; }
 
             public BCSharpValue(object value) {
@@ -58,7 +73,7 @@ namespace Broccoli {
             public Type Type() => Value.GetType();
         }
 
-        private class BCSharpType : IValue {
+        private class BCSharpType : IScalar {
             public Type Value { get; }
 
             public BCSharpType(Type value) {
@@ -78,7 +93,7 @@ namespace Broccoli {
             public Type Type() => typeof(Type);
         }
 
-        private class BCSharpMethod : IValue {
+        private class BCSharpMethod : IScalar {
             public (Type type, string name) Value { get; }
 
             public BCSharpMethod(Type type, string name) {
@@ -164,16 +179,16 @@ namespace Broccoli {
         public new static readonly Dictionary<string, IFunction> StaticBuiltins = new Dictionary<string, IFunction> {
             {"", new ShortCircuitFunction("", 1, (cauliflower, args) => {
                 var e = (ValueExpression) args[0];
+                if (e.IsValue)
+                    return cauliflower.Run(e.Values.First());
+                if (e.Values.Length == 0)
+                    throw new Exception("Expected function name");
                 if (cauliflower.Run(e.Values[0]) is BCSharpMethod method)
                     try {
                         return CSharpMethod(method.Value.type, method.Value.name, null, e.Values.Skip(1).Select(cauliflower.Run));
                     } catch {
                         throw new Exception($"C# method '{method.Value.name}' not found for specified arguments. Are you missing a 'c#-import'?");
                     }
-                if (e.IsValue)
-                    return cauliflower.Run(e.Values.First());
-                if (e.Values.Length == 0)
-                    throw new Exception("Expected function name");
                 var first = e.Values.First();
                 IFunction fn = null;
                 if (first is BAtom fnAtom) {
@@ -188,6 +203,55 @@ namespace Broccoli {
                     throw new Exception($"Function name {first} must be an identifier or lambda");
 
                 return fn.Invoke(cauliflower, e.Values.Skip(1).ToArray());
+            })},
+            {"->", new ShortCircuitFunction("->", -2, (cauliflower, args) => {
+                var scope = cauliflower.Scope.Namespace;
+                foreach (var (item, index) in args.SkipLast(1).WithIndex())
+                    if (item is BAtom a) {
+                        if (scope.ContainsKey(a.Value))
+                            scope = scope[a.Value];
+                        else
+                            throw new Exception($"Object '{a.Value}' not found in namespace");
+                    } else
+                        throw new ArgumentTypeException(item, "atom", index + 1, "->");
+                switch (args.Last()) {
+                    case ScalarVar s:
+                        return scope.Value[s];
+                    case ListVar l:
+                        return scope.Value[l];
+                    case DictVar d:
+                        return scope.Value[d];
+                    case BString s:
+                        return scope.Value[s.Value];
+                    default:
+                        throw new ArgumentTypeException(args.Last(), "variable", args.Length, "->");
+                }
+            })},
+            {"$", new Function("$", 1, (cauliflower, args) => args[0] is IScalar ? args[0] : new BCSharpValue(args[0]))},
+            {"@", new Function("@", 1, (cauliflower, args) => {
+                if (args[0] is BList)
+                    return args[0];
+                var value = args[0].ToCSharp();
+                if (value.GetType().GetInterface("IEnumerable") != null) {
+                    var result = new BList();
+                    foreach (var item in (IEnumerable) value)
+                        result.Add(CreateValue(item));
+                    return result;
+                }
+                throw new ArgumentTypeException(args[0], "list", 1, "@");
+            })},
+            {"%", new Function("%", 1, (cauliflower, args) => {
+                if (args[0] is BDictionary)
+                    return args[0];
+                var value = args[0].ToCSharp();
+                if (value.GetType().GetInterface("IDictionary") != null) {
+                    var result = new BDictionary();
+                    var source = ((IDictionary) value);
+                    foreach (var key in source.Keys)
+                        result[CreateValue(key)] = CreateValue(source[key]);
+                    return result;
+                }
+                throw new ArgumentTypeException(args[0], "list", 1, "%");
             })},
             {"fn", new ShortCircuitFunction("fn", -3, (cauliflower, args) => {
                 if (!(cauliflower.Run(args[0]) is BAtom name))
@@ -342,6 +406,46 @@ namespace Broccoli {
                     throw new Exception($"C# property '{name}' not found for specified arguments. Are you missing a 'c#-import'?");
                 }
             })},
+            {"c#-char", new Function("c#-char", 1, (cauliflower, args) => {
+                switch (args[0]) {
+                    case BInteger i:
+                        return new BCSharpValue((char) i);
+                    case BFloat f:
+                        return new BCSharpValue((char) f);
+                    default:
+                        return args[0];
+                }
+            })},
+            {"c#-short", new Function("c#-short", 1, (cauliflower, args) => {
+                switch (args[0]) {
+                    case BInteger i:
+                        return new BCSharpValue((short) i);
+                    case BFloat f:
+                        return new BCSharpValue((short) f);
+                    default:
+                        return args[0];
+                }
+            })},
+            {"c#-int", new Function("c#-int", 1, (cauliflower, args) => {
+                switch (args[0]) {
+                    case BInteger i:
+                        return new BCSharpValue((int) i);
+                    case BFloat f:
+                        return new BCSharpValue((int) f);
+                    default:
+                        return args[0];
+                }
+            })},
+            {"c#-float", new Function("c#-float", 1, (cauliflower, args) => {
+                switch (args[0]) {
+                    case BInteger i:
+                        return new BCSharpValue((float) i);
+                    case BFloat f:
+                        return new BCSharpValue((float) f);
+                    default:
+                        return args[0];
+                }
+            })},
             {"help", new ShortCircuitFunction("help", 0, (cauliflower, args) => {
                 return new BList(cauliflower.Builtins.Keys.Skip(1).Select(key => (IValue) new BString(key)));
             })},
@@ -472,7 +576,7 @@ namespace Broccoli {
                     return result;
                 });
             })},
-
+            
             {"if", new ShortCircuitFunction("if", -3, (cauliflower, args) => {
                 var condition = CauliflowerInline.Truthy(cauliflower.Run(args[0]));
                 var elseIndex = Array.IndexOf(args.ToArray(), new BAtom("else"), 1);
@@ -528,7 +632,7 @@ namespace Broccoli {
                     case 1:
                         return new BList(Enumerable.Range(0, ints[0] + 1).Select(i => (IValue) new BInteger(i)));
                     case 2:
-                        return new BList(Enumerable.Range(ints[0], ints[1] - ints[0] + 1).Select(i => (IValue) new BInteger(i)));
+                        return new BList(Enumerable.Range(ints[0], ints[1] - ints[0]).Select(i => (IValue) new BInteger(i)));
                     case 3:
                         return new BList(Enumerable.Range(ints[0], ints[1] == ints[0] ? 0 : (ints[1] - ints[0] - 1) / ints[2] + 1).Select(i => (IValue) new BInteger(ints[0] + i * ints[2])));
                     default:
