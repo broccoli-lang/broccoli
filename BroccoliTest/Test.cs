@@ -3,24 +3,65 @@ using System.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Broccoli;
 using BString = Broccoli.BString;
+using System.Text;
 
 namespace BroccoliTest {
     [TestClass]
     public class Test {
         private Interpreter _broccoli;
         private Func<string, IValue> _run;
+        private System.IO.StringReader _input;
+        private Writer _output;
 
-        public static ValueList ValueListFrom() {
-            return new ValueList();
+        private class Writer : System.IO.TextWriter {
+            public override Encoding Encoding => Encoding.UTF8;
+
+            private StringBuilder _lastOutput = new StringBuilder();
+
+            public void Clear() {
+                _lastOutput.Clear();
+            }
+
+            public override void Write(char c) {
+                _lastOutput.Append(c);
+            }
+
+            public override string ToString() {
+                return _lastOutput.ToString();
+            }
         }
 
-        public static ValueList ValueListFrom(params int[] a) {
-            return new ValueList(a.Select(i => (IValue) new BInteger(i)));
+        private static BList ValueListFrom() {
+            return new BList();
+        }
+
+        private static BList ValueListFrom(params int[] a) {
+            return new BList(a.Select(i => (IValue) new BInteger(i)));
+        }
+
+        private void WriteInput(string input) {
+            _input = new System.IO.StringReader(input);
+            Console.SetIn(_input);
+        }
+
+        private string ReadOutput(params object[] ignored) {
+            var result = _output.ToString();
+            _output.Clear();
+            return result;
         }
 
         [TestInitialize]
         public void Initialize() {
             _run = (_broccoli = new Interpreter()).Run;
+            Console.SetOut(_output = new Writer());
+        }
+
+        [TestMethod]
+        public void TestIO() {
+            Assert.AreEqual(ReadOutput(_run("(print foo)")), "foo", "Print does not work correctly for atoms");
+            Assert.AreEqual(ReadOutput(_run("(print \"foo\")")), "foo", "Print does not work correctly for strings");
+            Assert.AreEqual(ReadOutput(_run("(print 3.3)")), "3.3", "Print does not work correctly for numbers");
+            Assert.AreEqual(ReadOutput(_run("(print (list foo bar))")), "(foo bar)", "Print does not work correctly for lists");
         }
 
         [TestMethod]

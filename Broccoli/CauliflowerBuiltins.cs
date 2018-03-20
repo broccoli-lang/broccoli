@@ -5,6 +5,22 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 
 namespace Broccoli {
+    static class TypeExtensions {
+        public static PropertyInfo TryGetProperty(this Type type, string name) {
+            var result = type.GetProperty(name);
+            if (result == null)
+                throw new Exception($"Type '{type.FullName}' has no field '{name}'");
+            return result;
+        }
+
+        public static FieldInfo TryGetField(this Type type, string name) {
+            var result = type.GetField(name);
+            if (result == null)
+                throw new Exception($"Type '{type.FullName}' has no field '{name}'");
+            return result;
+        }
+    }
+
     public partial class CauliflowerInterpreter : Interpreter {
         private static Assembly[] assemblies = null;
         private static Dictionary<string, Assembly> assemblyLookup = null;
@@ -35,7 +51,7 @@ namespace Broccoli {
 
             public override string ToString() => Value.ToString();
 
-            public string Inspect() => $"C#Value({Value.ToString()})";
+            public string Inspect() => $"C#Value<{Value.GetType().FullName}>({Value.ToString()})";
 
             public object ToCSharp() => Value;
 
@@ -51,6 +67,8 @@ namespace Broccoli {
 
             public static implicit operator BCSharpType(Type type) => new BCSharpType(type);
 
+            public static implicit operator Type(BCSharpType type) => type.Value;
+
             public override string ToString() => Value.FullName;
 
             public string Inspect() => $"C#Type({Value.FullName})";
@@ -58,6 +76,28 @@ namespace Broccoli {
             public object ToCSharp() => Value;
 
             public Type Type() => typeof(Type);
+        }
+
+        private class BCSharpMethod : IValue {
+            public (Type type, string name) Value { get; }
+
+            public BCSharpMethod(Type type, string name) {
+                Value = (type, name);
+            }
+
+            public override string ToString() => $"{Value.type.FullName}.{Value.name}";
+
+            public string Inspect() => $"C#Method({Value.type.FullName}.{Value.name})";
+
+            public object ToCSharp() => Value;
+
+            public Type Type() => typeof(Tuple<Type, string>);
+        }
+
+        private static void CSharpAddType(Interpreter interpreter, BCSharpType type) {
+            interpreter.Scope.Scalars[type.Value.Name] = type;
+            foreach (var method in new HashSet<string>(type.Value.GetMethods(BindingFlags.Public | BindingFlags.Static).Select(method => method.Name)))
+                interpreter.Scope.Scalars[type.Value.Name + '.' + method] = new BCSharpMethod(type, method);
         }
 
         private static void CSharpImport(Interpreter interpreter, BAtom name) {
@@ -68,18 +108,18 @@ namespace Broccoli {
             }
             var path = name.Value;
             if (assemblyLookup.ContainsKey(path)) {
-                foreach (var subType in assemblyLookup[path].GetTypes())
-                    interpreter.Scope.Scalars[subType.Name] = (BCSharpType) subType;
+                foreach (var subType in assemblyLookup[path].GetExportedTypes())
+                    CSharpAddType(interpreter, subType);
                 return;
             }
             Type type;
             if ((type = Type.GetType($"{path}")) != null) {
-                interpreter.Scope.Scalars[path] = (BCSharpType) type;
+                CSharpAddType(interpreter, type);
                 return;
             }
             foreach (var assembly in assemblies)
                 if ((type = Type.GetType($"{path}, {assembly.FullName}")) != null) {
-                    interpreter.Scope.Scalars[path] = (BCSharpType) type;
+                    CSharpAddType(interpreter, type);
                     return;
                 }
             throw new Exception($"C# type {path} not found");
@@ -90,10 +130,26 @@ namespace Broccoli {
                 .Invoke(parameters.Select(p => p.ToCSharp()).ToArray())
         );
 
-        private static IValue CSharpStatic(Type type, string name, IEnumerable<IValue> args) => CreateValue(
-            type.GetMethod(name, args.Select(arg => arg.Type()).ToArray())
-                .Invoke(null, args.Select(arg => arg.ToCSharp()).ToArray())
+        private static IValue CSharpMethod(BCSharpType type, BAtom name, IValue instance, IEnumerable<IValue> args) => CreateValue(
+            type.Value.GetMethod(name.Value, args.Select(arg => arg.Type()).ToArray())
+                .Invoke(instance?.ToCSharp(), args.Select(arg => arg.ToCSharp()).ToArray())
         );
+
+        private static IValue CSharpProperty(BCSharpType type, BAtom name, IValue instance) => CreateValue(
+            type.Value.TryGetProperty(name.Value).GetValue(instance?.ToCSharp())
+        );
+
+        private static void AssignCSharpProperty(BCSharpType type, BAtom name, IValue instance, IValue value) {
+            type.Value.TryGetProperty(name.Value).SetValue(instance?.ToCSharp(), value.ToCSharp());
+        }
+
+        private static IValue CSharpField(BCSharpType type, BAtom name, IValue instance) => CreateValue(
+            type.Value.TryGetField(name.Value).GetValue(instance?.ToCSharp())
+        );
+
+        private static void AssignCSharpField(BCSharpType type, BAtom name, IValue instance, IValue value) {
+            type.Value.TryGetField(name.Value).SetValue(instance?.ToCSharp(), value.ToCSharp());
+        }
 
         /// <summary>
         /// Converts a .NET boolean into the Broccoli equivalent.
@@ -108,6 +164,12 @@ namespace Broccoli {
         public new static readonly Dictionary<string, IFunction> StaticBuiltins = new Dictionary<string, IFunction> {
             {"", new ShortCircuitFunction("", 1, (cauliflower, args) => {
                 var e = (ValueExpression) args[0];
+                if (cauliflower.Run(e.Values[0]) is BCSharpMethod method)
+                    try {
+                        return CSharpMethod(method.Value.type, method.Value.name, null, e.Values.Skip(1).Select(cauliflower.Run));
+                    } catch {
+                        throw new Exception($"C# method '{method.Value.name}' not found for specified arguments. Are you missing a 'c#-import'?");
+                    }
                 if (e.IsValue)
                     return cauliflower.Run(e.Values.First());
                 if (e.Values.Length == 0)
@@ -171,12 +233,12 @@ namespace Broccoli {
                                 cauliflower.Scope[s] = toAssign;
                                 break;
                             case ListVar l:
-                                if (!(toAssign is ValueList list))
+                                if (!(toAssign is BList list))
                                     throw new Exception("Only lists can be assigned to list (@) variables");
                                 cauliflower.Scope[l] = list;
                                 break;
                             case DictVar d:
-                                if (!(toAssign is ValueDictionary dict))
+                                if (!(toAssign is BDictionary dict))
                                     throw new Exception("Only dictionaries can be assigned to dictionary (%) variables");
                                 cauliflower.Scope[d] = dict;
                                 break;
@@ -186,7 +248,7 @@ namespace Broccoli {
                         }
                     }
                     if (varargs != null)
-                        cauliflower.Scope[(ListVar) varargs] = new ValueList(innerArgs.Skip(argNames.Count));
+                        cauliflower.Scope[(ListVar) varargs] = new BList(innerArgs.Skip(argNames.Count));
                     IValue result = null;
                     foreach (var statement in statements)
                         result = cauliflower.Run(statement);
@@ -203,49 +265,102 @@ namespace Broccoli {
                 CSharpImport(cauliflower, a);
                 return null;
             })},
-            {"c#-create", new Function("c#-import", -2, (cauliflower, args) => {
-                if (!(args[0] is BAtom a))
-                    throw new ArgumentTypeException(args[0], "atom", 1, "c#-import");
-                var parts = a.Value.Split('.');
-                var name = parts.Last();
-                var path = string.Join('.', parts.SkipLast(1));
-                if (!(cauliflower.Scope.Scalars[path] is BCSharpType type))
-                    throw new Exception($"C# type {path} not found. Are you missing a 'c#-import'?");
+            {"c#-create", new Function("c#-create", -2, (cauliflower, args) => {
+                if (!(args[0] is BCSharpType type))
+                    throw new ArgumentTypeException(args[0], "C# type", 1, "c#-create");
                 return CSharpCreate(type, args.Skip(1));
             })},
             {"c#-static", new Function("c#-static", -2, (cauliflower, args) => {
-                if (!(args[0] is BAtom a))
-                    throw new ArgumentTypeException(args[0], "atom", 1, "c#-static");
-                var parts = a.Value.Split('.');
-                var name = parts.Last();
-                var path = string.Join('.', parts.SkipLast(1));
-                if (!(cauliflower.Scope.Scalars[path] is BCSharpType type))
-                    throw new Exception($"C# type '{path}' not found. Are you missing a 'c#-import'?");
+                if (args[0] is BCSharpMethod method)
+                    try {
+                        return CSharpMethod(method.Value.type, method.Value.name, null, args.Skip(1));
+                    } catch {
+                        throw new Exception($"C# method '{method.Value.name}' not found for specified arguments. Are you missing a 'c#-import'?");
+                    }
+                if (!(args[0] is BCSharpType type))
+                    throw new ArgumentTypeException(args[0], "C# type or method", 1, "c#-static");
+                if (!(args[1] is BAtom name))
+                    throw new ArgumentTypeException(args[1], "atom", 2, "c#-static");
                 try {
-                    return CSharpStatic(type.Value, name, args.Skip(1));
+                    return CSharpMethod(type, name, null, args.Skip(2));
                 } catch {
-                    throw new Exception($"C# method '{a.Value}' not found for specified arguments. Are you missing a 'c#-import'?");
+                    throw new Exception($"C# method '{name}' not found for specified arguments. Are you missing a 'c#-import'?");
+                }
+            })},
+            {"c#-method", new Function("c#-method", -3, (cauliflower, args) => {
+                if (!(args[0] is BCSharpValue value))
+                    throw new ArgumentTypeException(args[0], "C# value", 1, "c#-method");
+                if (!(args[1] is BAtom name))
+                    throw new ArgumentTypeException(args[1], "atom", 2, "c#-method");
+                try {
+                    return CSharpMethod(value.Type(), name, value, args.Skip(2));
+                } catch {
+                    throw new Exception($"C# method '{name}' not found for specified arguments. Are you missing a 'c#-import'?");
+                }
+            })},
+            {"c#-property", new Function("c#-property", -2, (cauliflower, args) => {
+                if (args[0] is BCSharpType type && args[1] is BAtom a) {
+                    if (args.Length > 2) {
+                        AssignCSharpProperty(type.Value, a, null, args[2]);
+                        return null;
+                    }
+                    return CSharpProperty(type.Value, a, null);
+                }
+                if (!(args[0] is BCSharpValue value))
+                    throw new ArgumentTypeException(args[0], "C# value or type", 1, "c#-property");
+                if (!(args[1] is BAtom name))
+                    throw new ArgumentTypeException(args[1], "atom", 2, "c#-property");
+                try {
+                    if (args.Length > 2) {
+                        AssignCSharpProperty(value.Type(), name, value, args[2]);
+                        return null;
+                    }
+                    return CSharpProperty(value.Type(), name, value);
+                } catch {
+                    throw new Exception($"C# property '{name}' not found for specified arguments. Are you missing a 'c#-import'?");
+                }
+            })},
+            {"c#-field", new Function("c#-field", -2, (cauliflower, args) => {
+                if (args[0] is BCSharpType type && args[1] is BAtom a) {
+                    if (args.Length > 2) {
+                        AssignCSharpField(type.Value, a, null, args[2]);
+                        return null;
+                    }
+                    return CSharpField(type.Value, a, null);
+                }
+                if (!(args[0] is BCSharpValue value))
+                    throw new ArgumentTypeException(args[0], "C# value or type", 1, "c#-field");
+                if (!(args[1] is BAtom name))
+                    throw new ArgumentTypeException(args[1], "atom", 2, "c#-field");
+                try {
+                    if (args.Length > 2) {
+                        AssignCSharpField(value.Type(), name, value, args[2]);
+                        return null;
+                    }
+                    return CSharpField(value.Type(), name, value);
+                } catch {
+                    throw new Exception($"C# property '{name}' not found for specified arguments. Are you missing a 'c#-import'?");
                 }
             })},
             {"help", new ShortCircuitFunction("help", 0, (cauliflower, args) => {
-                return new ValueList(cauliflower.Builtins.Keys.Skip(1).Select(key => (IValue) new BString(key)));
+                return new BList(cauliflower.Builtins.Keys.Skip(1).Select(key => (IValue) new BString(key)));
             })},
 
             {":=", new ShortCircuitFunction(":=", 2, (broccoli, args) => {
                 var toAssign = broccoli.Run(args[1]);
                 switch (args[0]) {
                     case ScalarVar s:
-                        if (toAssign is ValueList || toAssign is ValueDictionary)
+                        if (toAssign is BList || toAssign is BDictionary)
                             throw new Exception("Only scalars can be assigned to scalar ($) variables");
                         broccoli.Scope[s] = toAssign;
                         break;
                     case ListVar l:
-                        if (!(toAssign is ValueList list))
+                        if (!(toAssign is BList list))
                             throw new Exception("Only lists can be assigned to list (@) variables");
                         broccoli.Scope[l] = list;
                         break;
                     case DictVar d:
-                        if (!(toAssign is ValueDictionary dict))
+                        if (!(toAssign is BDictionary dict))
                             throw new Exception("Only dicts can be assigned to dict (%) variables");
                         broccoli.Scope[d] = dict;
                         break;
@@ -335,12 +450,12 @@ namespace Broccoli {
                                 cauliflower.Scope[s] = toAssign;
                                 break;
                             case ListVar l:
-                                if (!(toAssign is ValueList list))
+                                if (!(toAssign is BList list))
                                     throw new Exception("Only lists can be assigned to list (@) variables");
                                 cauliflower.Scope[l] = list;
                                 break;
                             case DictVar d:
-                                if (!(toAssign is ValueDictionary dict))
+                                if (!(toAssign is BDictionary dict))
                                     throw new Exception("Only dictionaries can be assigned to dictionary (%) variables");
                                 cauliflower.Scope[d] = dict;
                                 break;
@@ -349,7 +464,7 @@ namespace Broccoli {
                         }
                     }
                     if (varargs != null)
-                        cauliflower.Scope[(ListVar) varargs] = new ValueList(innerArgs.Skip(argNames.Count));
+                        cauliflower.Scope[(ListVar) varargs] = new BList(innerArgs.Skip(argNames.Count));
                     IValue result = null;
                     foreach (var statement in statements)
                         result = cauliflower.Run(statement);
@@ -372,18 +487,18 @@ namespace Broccoli {
 
             {"len", new Function("len", 1, (broccoli, args) => {
                 switch (args[0]) {
-                    case ValueList l:
+                    case BList l:
                         return new BInteger(l.Count);
                     case BString s:
                         return new BInteger(s.Value.Length);
-                    case ValueDictionary d:
+                    case BDictionary d:
                         return new BInteger(d.Count);
                     default:
                         throw new ArgumentTypeException(args[0], "list, dictionary or string", 1, "len");
                 }
             })},
             {"slice", new Function("slice", -2, (cauliflower, args) => {
-                if (!(args[0] is ValueList list))
+                if (!(args[0] is BList list))
                     throw new ArgumentTypeException(args[0], "list", 1, "slice");
                 foreach (var (arg, index) in args.Skip(1).WithIndex())
                     if (!(arg is BInteger i))
@@ -394,11 +509,11 @@ namespace Broccoli {
                     case 0:
                         return list;
                     case 1:
-                        return new ValueList(list.Skip(ints[0]));
+                        return new BList(list.Skip(ints[0]));
                     case 2:
-                        return new ValueList(list.Skip(ints[0]).Take(ints[1] - Math.Max(0, ints[0])));
+                        return new BList(list.Skip(ints[0]).Take(ints[1] - Math.Max(0, ints[0])));
                     case 3:
-                        return new ValueList(Enumerable.Range(ints[0], ints[1] == ints[0] ? 0 : (ints[1] - ints[0] - 1) / ints[2] + 1).Select(i => list[ints[0] + i * ints[2]]));
+                        return new BList(Enumerable.Range(ints[0], ints[1] == ints[0] ? 0 : (ints[1] - ints[0] - 1) / ints[2] + 1).Select(i => list[ints[0] + i * ints[2]]));
                     default:
                         throw new Exception($"Function slice requires 1 to 4 arguments, {args.Length} provided");
                 }
@@ -411,11 +526,11 @@ namespace Broccoli {
 
                 switch (ints.Length) {
                     case 1:
-                        return new ValueList(Enumerable.Range(0, ints[0] + 1).Select(i => (IValue) new BInteger(i)));
+                        return new BList(Enumerable.Range(0, ints[0] + 1).Select(i => (IValue) new BInteger(i)));
                     case 2:
-                        return new ValueList(Enumerable.Range(ints[0], ints[1] - ints[0] + 1).Select(i => (IValue) new BInteger(i)));
+                        return new BList(Enumerable.Range(ints[0], ints[1] - ints[0] + 1).Select(i => (IValue) new BInteger(i)));
                     case 3:
-                        return new ValueList(Enumerable.Range(ints[0], ints[1] == ints[0] ? 0 : (ints[1] - ints[0] - 1) / ints[2] + 1).Select(i => (IValue) new BInteger(ints[0] + i * ints[2])));
+                        return new BList(Enumerable.Range(ints[0], ints[1] == ints[0] ? 0 : (ints[1] - ints[0] - 1) / ints[2] + 1).Select(i => (IValue) new BInteger(ints[0] + i * ints[2])));
                     default:
                         throw new Exception($"Function range requires 1 to 3 arguments, {args.Length} provided");
                 }
@@ -423,76 +538,76 @@ namespace Broccoli {
             {"map", new Function("map", 2, (cauliflower, args) => {
                 var func = CauliflowerInline.FindFunction("map", cauliflower, args[0]);
 
-                if (args[1] is ValueList l)
-                    return new ValueList(l.Select(x => func.Invoke(cauliflower, x)));
+                if (args[1] is BList l)
+                    return new BList(l.Select(x => func.Invoke(cauliflower, x)));
                 throw new ArgumentTypeException(args[1], "list", 2, "map");
             })},
             {"filter", new Function("filter", 2, (cauliflower, args) => {
                 var func = CauliflowerInline.FindFunction("filter", cauliflower, args[0]);
 
-                if (args[1] is ValueList l)
-                    return new ValueList(l.Where(x => CauliflowerInline.Truthy(func.Invoke(cauliflower, x))));
+                if (args[1] is BList l)
+                    return new BList(l.Where(x => CauliflowerInline.Truthy(func.Invoke(cauliflower, x))));
                 throw new ArgumentTypeException(args[1], "list", 2, "filter");
             })},
             {"reduce", new Function("reduce", 2, (cauliflower, args) => {
                 var func = CauliflowerInline.FindFunction("reduce", cauliflower, args[0]);
 
-                if (args[1] is ValueList l)
+                if (args[1] is BList l)
                     return l.Aggregate((res, elem) => func.Invoke(cauliflower, res, elem));
                 throw new ArgumentTypeException(args[1], "list", 2, "reduce");
             })},
             {"all", new Function("all", 2, (cauliflower, args) => {
                 var func = CauliflowerInline.FindFunction("all", cauliflower, args[0]);
 
-                if (args[1] is ValueList l)
+                if (args[1] is BList l)
                     return Boolean(l.All(CauliflowerInline.Truthy));
                 throw new ArgumentTypeException(args[1], "list", 2, "all");
             })},
             {"any", new Function("any", 2, (cauliflower, args) => {
                 var func = CauliflowerInline.FindFunction("any", cauliflower, args[0]);
 
-                if (args[1] is ValueList l)
+                if (args[1] is BList l)
                     return Boolean(l.Any(CauliflowerInline.Truthy));
                 throw new ArgumentTypeException(args[1], "list", 2, "any");
             })},
             {"mkdict", new Function("mkdict", 0, (cauliflower, args) => {
-                return new ValueDictionary();
+                return new BDictionary();
             })},
             {"setkey", new Function("setkey", 3, (cauliflower, args) => {
-                if (args[0] is ValueDictionary dict)
-                    return new ValueDictionary(new Dictionary<IValue, IValue>(dict){
+                if (args[0] is BDictionary dict)
+                    return new BDictionary(new Dictionary<IValue, IValue>(dict){
                         [args[1]] = args[2]
                     });
                 throw new Exception("First argument to rmkey must be a Dict.");
             })},
             {"getkey", new Function("getkey", 2, (cauliflower, args) => {
-                if (args[0] is ValueDictionary dict)
+                if (args[0] is BDictionary dict)
                     return dict[args[1]];
                 throw new Exception("First argument to rmkey must be a Dict.");
             })},
             {"rmkey", new Function("rmkey", 2, (cauliflower, args) => {
-                if (args[0] is ValueDictionary dict) {
+                if (args[0] is BDictionary dict) {
                     var d = new Dictionary<IValue, IValue>(dict);
                     d.Remove(args[1]);
-                    return new ValueDictionary(d);
+                    return new BDictionary(d);
                 }
                 throw new Exception("First argument to rmkey must be a Dict.");
             })},
             {"haskey", new Function("haskey", 2, (cauliflower, args) => {
-                if (args[0] is ValueDictionary dict) {
+                if (args[0] is BDictionary dict) {
                     return Boolean(dict.ContainsKey(args[1]));
                 }
                 throw new Exception("First argument to rmkey must be a Dict.");
             })},
             {"keys", new Function("keys", 1, (broccoli, args) => {
-                if (args[0] is ValueDictionary dict) {
-                    return new ValueList(dict.Keys);
+                if (args[0] is BDictionary dict) {
+                    return new BList(dict.Keys);
                 }
                 throw new Exception("First argument to listkeys must be a Dict.");
             })},
             {"values", new Function("values", 1, (broccoli, args) => {
-                if (args[0] is ValueDictionary dict) {
-                    return new ValueList(dict.Values);
+                if (args[0] is BDictionary dict) {
+                    return new BList(dict.Values);
                 }
                 throw new Exception("First argument to listkeys must be a Dict.");
             })},
@@ -541,7 +656,7 @@ namespace Broccoli {
                         return s.Value.Length != 0;
                     case BAtom a:
                         return !a.Equals(BAtom.Nil);
-                    case ValueList v:
+                    case BList v:
                         return v.Value.Count != 0;
                     case IFunction f:
                         return true;
