@@ -3,9 +3,9 @@ using System.Linq;
 
 namespace Broccoli {
     public partial class CauliflowerInterpreter : Interpreter {
-        public CauliflowerInterpreter(ValueList argv = null) {
+        public CauliflowerInterpreter(BList argv = null) {
             Builtins = StaticBuiltins;
-            Scope.Lists["ARGV"] = argv ?? new ValueList();
+            Scope.Lists["ARGV"] = argv ?? new BList();
         }
 
         /// <summary>

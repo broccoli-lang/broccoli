@@ -48,12 +48,12 @@ namespace Broccoli {
                         var toAssign = innerArgs[i];
                         switch (argNames[i]) {
                             case ScalarVar s:
-                                if (toAssign is ValueList)
+                                if (toAssign is BList)
                                     throw new Exception("Only scalars can be assigned to scalar ($) variables");
                                 broccoli.Scope[s] = toAssign;
                                 break;
                             case ListVar l:
-                                if (!(toAssign is ValueList list))
+                                if (!(toAssign is BList list))
                                     throw new Exception("Only lists can be assigned to list (@) variables");
                                 broccoli.Scope[l] = list;
                                 break;
@@ -77,7 +77,7 @@ namespace Broccoli {
                 return null;
             })},
             {"help", new ShortCircuitFunction("help", 0, (broccoli, args) => {
-                return new ValueList(broccoli.Builtins.Keys.Where(key => !new []{ "", "fn", "env" }.Contains(key)).Select(key => (IValue) new BString(key)));
+                return new BList(broccoli.Builtins.Keys.Where(key => !new []{ "", "fn", "env" }.Contains(key)).Select(key => (IValue) new BString(key)));
             })},
             {"clear", new ShortCircuitFunction("clear", 0, (broccoli, args) => {
                 broccoli.Scope.Scalars.Clear();
@@ -235,7 +235,7 @@ namespace Broccoli {
                         broccoli.Scope[s] = toAssign;
                         break;
                     case ListVar l:
-                        if (!(toAssign is ValueList list))
+                        if (!(toAssign is BList list))
                             throw new Exception("Only lists can be assigned to list (@) variables");
                         broccoli.Scope[l] = list;
                         break;
@@ -485,7 +485,7 @@ namespace Broccoli {
                     throw new ArgumentTypeException($"Received atom '{inAtom.Value}' instead of atom 'in' in argument 2 for 'for'");
 
                 var iterable = broccoli.Run(args[2]);
-                if (!(iterable is ValueList valueList))
+                if (!(iterable is BList valueList))
                     throw new ArgumentTypeException(iterable, "list", 3, "for");
 
                 broccoli.Scope = new Scope(broccoli.Scope);
@@ -493,17 +493,17 @@ namespace Broccoli {
                 foreach (var value in valueList) {
                     switch (args[0]) {
                         case ScalarVar s:
-                                if (value.GetType().In(typeof(ValueList), typeof(ValueDictionary)))
+                                if (value.GetType().In(typeof(BList), typeof(BDictionary)))
                                     throw new Exception("Only Scalars can be assigned to scalar ($) variables");
                                 broccoli.Scope[s] = value;
                                 break;
                         case ListVar l:
-                            if (!(value is ValueList vList))
+                            if (!(value is BList vList))
                                 throw new Exception("Only Lists can be assigned to list (@) variables");
                             broccoli.Scope[l] = vList;
                             break;
                         case DictVar d when Program.IsCauliflower:
-                            if (!(value is ValueDictionary vDict))
+                            if (!(value is BDictionary vDict))
                                 throw new Exception("Only Dicts can be assigned to dict (%) variables");
                             broccoli.Scope[d] = vDict;
                             break;
@@ -517,10 +517,10 @@ namespace Broccoli {
             })},
 
             // List Functions
-            {"list", new Function("list", -1, (broccoli, args) => new ValueList(args.ToList()))},
+            {"list", new Function("list", -1, (broccoli, args) => new BList(args.ToList()))},
             {"len", new Function("len", 1, (broccoli, args) => {
                 switch (args[0]) {
-                    case ValueList l:
+                    case BList l:
                         return new BInteger(l.Count);
                     case BString s:
                         return new BInteger(s.Value.Length);
@@ -529,19 +529,19 @@ namespace Broccoli {
                 }
             })},
             {"first", new Function("first", 1, (broccoli, args) => {
-                if (!(args[0] is ValueList list))
+                if (!(args[0] is BList list))
                     throw new ArgumentTypeException(args[0], "list", 1, "first");
 
                 return list.Count == 0 ? BAtom.Nil : list[0];
             })},
             {"rest", new Function("rest", 1, (broccoli, args) => {
-                if (!(args[0] is ValueList list))
+                if (!(args[0] is BList list))
                     throw new ArgumentTypeException(args[0], "list", 1, "rest");
 
-                return new ValueList(list.Skip(1).ToList());
+                return new BList(list.Skip(1).ToList());
             })},
             {"slice", new Function("slice", 3, (broccoli, args) => {
-                if (!(args[0] is ValueList list))
+                if (!(args[0] is BList list))
                     throw new ArgumentTypeException(args[0], "list", 1, "slice");
                 if (!(args[1] is BInteger i1))
                     throw new ArgumentTypeException(args[1], "integer", 2, "slice");
@@ -550,7 +550,7 @@ namespace Broccoli {
 
                 var start = (int) i1.Value;
                 var end = (int) i2.Value;
-                return new ValueList(list.Skip(start).Take(end - Math.Max(0, start)));
+                return new BList(list.Skip(start).Take(end - Math.Max(0, start)));
             })},
             {"range", new Function("range", 2, (broccoli, args) => {
                 if (!(args[0] is BInteger i1))
@@ -560,14 +560,14 @@ namespace Broccoli {
 
                 var start = (int) i1.Value;
                 var end = (int) i2.Value;
-                return new ValueList(Enumerable.Range(start, end - start + 1).Select(value => (IValue) new BInteger(value)));
+                return new BList(Enumerable.Range(start, end - start + 1).Select(value => (IValue) new BInteger(value)));
             })},
             {"cat", new Function("cat", -3, (broccoli, args) => {
                 foreach (var (value, index) in args.WithIndex())
-                    if (!(value is ValueList))
+                    if (!(value is BList))
                         throw new ArgumentTypeException(value, "list", index + 1, "cat");
-                var result = new ValueList();
-                foreach (ValueList list in args)
+                var result = new BList();
+                foreach (BList list in args)
                     result.AddRange(list);
                 return result;
             })},

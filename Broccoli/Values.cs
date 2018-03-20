@@ -136,7 +136,16 @@ namespace Broccoli {
 
         public string Inspect() => Value;
 
-        public object ToCSharp() => Value;
+        public object ToCSharp() {
+            switch (Value) {
+                case "t":
+                    return true;
+                case "nil":
+                    return false;
+                default:
+                    return Value;
+            }
+        }
 
         public Type Type() => typeof(string);
     }
@@ -201,23 +210,23 @@ namespace Broccoli {
     /// <summary>
     /// Represents a list of values.
     /// </summary>
-    public class ValueList : List<IValue>, IValue {
-        public ValueList Value { get; }
+    public class BList : List<IValue>, IValue {
+        public BList Value { get; }
 
-        public ValueList() : base() => Value = this;
+        public BList() : base() => Value = this;
 
-        public ValueList(IEnumerable<IValue> values) : base(values) => Value = this;
+        public BList(IEnumerable<IValue> values) : base(values) => Value = this;
 
-        public ValueList(params IValue[] values) : base(values) => Value = this;
+        public BList(params IValue[] values) : base(values) => Value = this;
 
-        public static implicit operator ValueList(IValue[] values) => new ValueList(values);
+        public static implicit operator BList(IValue[] values) => new BList(values);
 
-        public static bool operator ==(ValueList left, object right) => right is ValueList list && left.Equals(list);
+        public static bool operator ==(BList left, object right) => right is BList list && left.Equals(list);
 
-        public static bool operator !=(ValueList left, object right) => !(left == right);
+        public static bool operator !=(BList left, object right) => !(left == right);
 
         public override bool Equals(object other) {
-            if (!(other is ValueList otherList) || otherList.Count != Count)
+            if (!(other is BList otherList) || otherList.Count != Count)
                 return false;
             for (var i = 0; i < Count; i++)
                 if (!this[i].Equals(otherList[i]))
@@ -231,22 +240,57 @@ namespace Broccoli {
 
         public string Inspect() => '(' + string.Join(' ', Value.Select(value => value.Inspect())) + ')';
 
-        public object ToCSharp() => new List<IValue>(Value);
+        public object ToCSharp() => new BCSharpList(Value.Select(item => item.ToCSharp()));
 
-        public Type Type() => typeof(List<IValue>);
+        public Type Type() => typeof(List<object>);
+    }
+
+    public class BCSharpList : List<object>, IValue {
+        public BCSharpList Value { get; }
+
+        public BCSharpList() : base() => Value = this;
+
+        public BCSharpList(IEnumerable<object> values) : base(values) => Value = this;
+
+        public BCSharpList(params object[] values) : base(values) => Value = this;
+
+        public static bool operator ==(BCSharpList left, object right) => right is BCSharpList list && left.Equals(list);
+
+        public static bool operator !=(BCSharpList left, object right) => !(left == right);
+
+        public override bool Equals(object other) {
+            if (!(other is BCSharpList otherList) || otherList.Count != Count)
+                return false;
+            for (var i = 0; i < Count; i++)
+                if (!this[i].Equals(otherList[i]))
+                    return false;
+            return true;
+        }
+
+        public override int GetHashCode() => this.Aggregate(0, (p, c) => p * -1521134295 + c.GetHashCode());
+
+        public override string ToString() => '(' + string.Join(' ', Value) + ')';
+
+        public string Inspect() => '(' + string.Join(' ', Value) + ')';
+
+        public object ToCSharp() => Value;
+
+        public Type Type() => typeof(List<object>);
     }
 
     /// <summary>
     /// Represents a dictionary of values paired with other values.
     /// </summary>
-    public class ValueDictionary : Dictionary<IValue, IValue>, IValue {
-        public ValueDictionary Value { get; }
-        public ValueDictionary() : base() => Value = this;
-        public ValueDictionary(IReadOnlyDictionary<IValue, IValue> values) : base(values) => Value = this;
+    public class BDictionary : Dictionary<IValue, IValue>, IValue {
+        public BDictionary Value { get; }
 
-        public static bool operator ==(ValueDictionary left, object right) => right is IReadOnlyDictionary<IValue, IValue> rdict
+        public BDictionary() : base() => Value = this;
+
+        public BDictionary(IReadOnlyDictionary<IValue, IValue> values) : base(values) => Value = this;
+
+        public static bool operator ==(BDictionary left, object right) => right is IReadOnlyDictionary<IValue, IValue> rdict
             && rdict.Count == left.Count && !left.Except(rdict).Any();
-        public static bool operator !=(ValueDictionary left, object right) => !(left == right);
+        public static bool operator !=(BDictionary left, object right) => !(left == right);
 
         public override bool Equals(object obj) => obj is IReadOnlyDictionary<IValue, IValue> rdict
             && rdict.Count == Count && !this.Except(rdict).Any();
@@ -262,7 +306,7 @@ namespace Broccoli {
             sb.Append(")");
             return sb.ToString();
         }
-        
+
         public string Inspect() {
             var sb = new StringBuilder("(");
             foreach (KeyValuePair<IValue, IValue> i in this)
@@ -273,8 +317,49 @@ namespace Broccoli {
             return sb.ToString();
         }
 
-        public object ToCSharp() => new Dictionary<IValue, IValue>(Value);
+        public object ToCSharp() => new BCSharpDictionary(Value.ToDictionary(item => item.Key.ToCSharp(), item => item.Value.ToCSharp()));
 
         public Type Type() => typeof(Dictionary<IValue, IValue>);
+    }
+
+    public class BCSharpDictionary : Dictionary<object, object>, IValue {
+        public BCSharpDictionary Value { get; }
+
+        public BCSharpDictionary() : base() => Value = this;
+
+        public BCSharpDictionary(IReadOnlyDictionary<object, object> values) : base(values) => Value = this;
+
+        public static bool operator ==(BCSharpDictionary left, object right) => right is IReadOnlyDictionary<object, object> rdict
+            && rdict.Count == left.Count && !left.Except(rdict).Any();
+        public static bool operator !=(BCSharpDictionary left, object right) => !(left == right);
+
+        public override bool Equals(object obj) => obj is IReadOnlyDictionary<object, object> rdict
+            && rdict.Count == Count && !this.Except(rdict).Any();
+
+        public override int GetHashCode() => this.Aggregate(0, (p, c) => p + c.Key.GetHashCode() + c.Value.GetHashCode());
+
+        public override string ToString() {
+            var sb = new StringBuilder("(");
+            foreach (var i in this)
+                sb.Append($"{i.Key}: {i.Value}, ");
+            if (sb.Length > 1)
+                sb.Length -= 2;
+            sb.Append(")");
+            return sb.ToString();
+        }
+
+        public string Inspect() {
+            var sb = new StringBuilder("(");
+            foreach (var i in this)
+                sb.Append($"{i.Key}: {i.Value}, ");
+            if (sb.Length > 1)
+                sb.Length -= 2;
+            sb.Append(")");
+            return sb.ToString();
+        }
+
+        public object ToCSharp() => Value;
+
+        public Type Type() => typeof(Dictionary<object, object>);
     }
 }

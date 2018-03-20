@@ -39,13 +39,13 @@ namespace Broccoli {
             IValue Listify(ParseNode node) {
                 if (node.Token != null)
                     return node.Token.ToIValue();
-                return new ValueList(node.Children.Select(Listify));
+                return new BList(node.Children.Select(Listify));
             }
 
             IValue Dictionarify(ParseNode node) {
                 if (node.Token != null)
                     return node.Token.ToIValue();
-                return new ValueDictionary(new Dictionary<IValue, IValue>(node.Children.Select(
+                return new BDictionary(new Dictionary<IValue, IValue>(node.Children.Select(
                     child => child.Children?.Count == 2 ?
                         new KeyValuePair<IValue, IValue>((IValue) Selector(child.Children[0]), (IValue) Selector(child.Children[1])) :
                         throw new Exception($"Expected key value pair in dictionary literal, found {(child.Children == null ? child.Token.Literal.GetType().ToString() : child.Children.Count + " arguments")}")
@@ -64,7 +64,7 @@ namespace Broccoli {
             return n.Children == null ?
                 new ValueExpression(n.Token.ToIValue()) :
                 n.IsList ?
-                new ValueExpression((IValueExpressible) new ValueList(n.Children.Select(Listify))) :
+                new ValueExpression((IValueExpressible) new BList(n.Children.Select(Listify))) :
                 n.IsDictionary ?
                 new ValueExpression(Dictionarify(n)) :
                 new ValueExpression(n.Children.Select(Selector));

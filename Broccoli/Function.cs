@@ -86,7 +86,7 @@ namespace Broccoli {
     /// <summary>
     /// Represents a Broccoli function that is also a value.
     /// </summary>
-    public struct AnonymousFunction : IFunction, IValue {
+    public struct AnonymousFunction : IFunction, IScalar {
         public delegate IValue Call(IValue[] args);
 
         private readonly int _argc;
