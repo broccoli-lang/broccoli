@@ -124,28 +124,52 @@ namespace Broccoli {
                                     finished.IsList = true;
                                 if (current.ExpectsDictionary)
                                     finished.IsDictionary = true;
+                                if (current.Children.Count > 1 && current.Children[current.Children.Count - 2].Token?.Type == TokenType.Cast) {
+                                    var castNode = new ParseNode(new[] {
+                                        new ParseNode(new Token(TokenType.Atom, current.Children[current.Children.Count - 2].Token.Literal)),
+                                        finished
+                                    });
+                                    castNode.Finish();
+                                    current.Children[current.Children.Count - 2] = castNode;
+                                    current.Children.RemoveAt(current.Children.Count - 1);
+                                }
                                 continue;
                             // Variables
                             case '$':
                                 match = _rScalar.Match(line, column).ToString();
                                 if (match.Contains("|#"))
                                     throw new Exception("Unexpected '|#' outside of comment");
-                                value = match.Substring(1);
-                                type = TokenType.ScalarName;
+                                if (match == "") {
+                                    match = value = "$";
+                                    type = TokenType.Cast;
+                                } else {
+                                    value = match.Substring(1);
+                                    type = TokenType.ScalarName;
+                                }
                                 break;
                             case '@':
                                 match = _rList.Match(line, column).ToString();
                                 if (match.Contains("|#"))
                                     throw new Exception("Unexpected '|#' outside of comment");
-                                value = match.Substring(1);
-                                type = TokenType.ListName;
+                                if (match == "") {
+                                    match = value = "@";
+                                    type = TokenType.Cast;
+                                } else {
+                                    value = match.Substring(1);
+                                    type = TokenType.ListName;
+                                }
                                 break;
                             case '%':
                                 match = _rDict.Match(line, column).ToString();
                                 if (match.Contains("|#"))
                                     throw new Exception("Unexpected '|#' outside of comment");
-                                value = match.Substring(1);
-                                type = TokenType.DictionaryName;
+                                if (match == "") {
+                                    match = value = "%";
+                                    type = TokenType.Cast;
+                                } else {
+                                    value = match.Substring(1);
+                                    type = TokenType.DictionaryName;
+                                }
                                 break;
                             // Lists
                             case '\'':
@@ -224,7 +248,13 @@ namespace Broccoli {
                                 break;
                         }
                     if (type != TokenType.None && (type != TokenType.Comment || value.Length != 0))
-                        current.Children.Add(new ParseNode(new Token(type, value)));
+                        if (current.Children.Count != 0 && current.Children.Last().Token?.Type == TokenType.Cast) {
+                            current.Children[current.Children.Count - 1] = new ParseNode(new[] {
+                                new ParseNode(new Token(TokenType.Atom, current.Children.Last().Token.Literal)),
+                                new ParseNode(new Token(type, value))
+                            });
+                        } else
+                            current.Children.Add(new ParseNode(new Token(type, value)));
                     if (match.Length == 0)
                         throw new Exception($"Could not match token '{Regex.Escape("" + c)}' at {row + 1}:{column}");
                     column += match.Length;

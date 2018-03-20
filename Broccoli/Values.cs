@@ -26,9 +26,31 @@ namespace Broccoli {
             Value = i;
         }
 
+        public static implicit operator BInteger(char i) => new BInteger(i);
+
+        public static implicit operator BInteger(short i) => new BInteger(i);
+
         public static implicit operator BInteger(int i) => new BInteger(i);
 
         public static implicit operator BInteger(long i) => new BInteger(i);
+
+        public static implicit operator BInteger(float f) => new BInteger((int) f);
+
+        public static implicit operator BInteger(double f) => new BInteger((int) f);
+
+        public static implicit operator char (BInteger i) => (char) i.Value;
+
+        public static implicit operator short (BInteger i) => (short) i.Value;
+
+        public static implicit operator int (BInteger i) => (int) i.Value;
+
+        public static implicit operator long (BInteger i) => i.Value;
+
+        public static implicit operator float (BInteger i) => i.Value;
+
+        public static implicit operator double (BInteger i) => i.Value;
+
+        public static implicit operator BInteger(BFloat f) => new BInteger((int) f.Value);
 
         public static bool operator ==(BInteger left, object right) => right is BInteger i && left.Value == i.Value;
 
@@ -57,11 +79,31 @@ namespace Broccoli {
             Value = f;
         }
 
+        public static implicit operator BFloat(char i) => new BFloat(i);
+
+        public static implicit operator BFloat(short i) => new BFloat(i);
+
+        public static implicit operator BFloat(int i) => new BFloat(i);
+
+        public static implicit operator BFloat(long i) => new BFloat(i);
+
         public static implicit operator BFloat(float f) => new BFloat(f);
 
         public static implicit operator BFloat(double f) => new BFloat(f);
 
-        public static implicit operator BFloat(BInteger f) => new BFloat(f.Value);
+        public static implicit operator char(BFloat f) => (char) f.Value;
+
+        public static implicit operator short(BFloat f) => (short) f.Value;
+
+        public static implicit operator int(BFloat f) => (int) f.Value;
+
+        public static implicit operator long(BFloat f) => (long) f.Value;
+
+        public static implicit operator float(BFloat f) => (float) f.Value;
+
+        public static implicit operator double(BFloat f) => f.Value;
+
+        public static implicit operator BFloat(BInteger i) => new BFloat(i.Value);
 
         public static bool operator ==(BFloat left, object right) => right is BFloat f && left.Value == f.Value;
 

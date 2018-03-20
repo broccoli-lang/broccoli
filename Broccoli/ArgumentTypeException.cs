@@ -8,9 +8,18 @@ namespace Broccoli {
         public int Argument { get; }
         public string Caller { get; }
 
+        private static string TypeName(Type type) {
+            var name = type.Name;
+            var fullName = type.FullName;
+            return name.Substring(name.Length > 2 && name[0] == 'B' && char.IsUpper(name[1]) && fullName.Contains("Broccoli") ? 1 : 0);
+        }
+
         public ArgumentTypeException(object o, string expectedType, int n, string caller) : base(
-            $"Recieved {o.GetType().ToString().Split('.').Last().ToLower().Substring(o.GetType().ToString().Contains("Broccoli") ? 1 : 0)} instead of {expectedType} in argument {n} for '{caller}'"
+            $"Recieved {TypeName(o.GetType())} instead of {expectedType} in argument {n} for '{caller}'"
         ) {
+            var t = o.GetType();
+            var u = t.GetInterfaces();
+            var v = t.GetInterface("IEnumerabke");
             Object = o;
             ExpectedType = expectedType;
             Argument = n;
