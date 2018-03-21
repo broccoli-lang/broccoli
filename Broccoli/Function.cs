@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace Broccoli {
@@ -24,12 +25,14 @@ namespace Broccoli {
         private readonly string _name;
         private readonly int _argc;
         private readonly Call _call;
+        private readonly IEnumerable<IValueExpressible> _args;
 
         // If the function has variadic arguments, argc is -n - 1, where n is the number of required args
-        public Function(string name, int argc, Call call) {
+        public Function(string name, int argc, Call call, IEnumerable<IValueExpressible> args = null) {
             _name = name;
             _argc = argc;
             _call = call;
+            _args = args;
         }
 
         // ReSharper disable once UnusedMethodReturnValue.Global
@@ -58,7 +61,9 @@ namespace Broccoli {
                 throw new Exception($"Function {name} requires {(isVariadic ? "at least" : "exactly")} {requiredArgc} arguments, {args.Length} provided");
         }
 
-        public string Inspect() => $"{_name}({_argc} arguments)";
+        public override string ToString() => _args == null ? $"{_name}({_argc} arguments)" : $"{_name}({string.Join(' ', _args.Select(arg => arg.Inspect()))})";
+
+        public string Inspect() => ToString();
 
         public object ToCSharp() => _call;
 
@@ -74,12 +79,14 @@ namespace Broccoli {
         private readonly string _name;
         private readonly int _argc;
         private readonly Call _call;
+        private readonly IEnumerable<IValueExpressible> _args;
 
         // If the function has variadic arguments, argc is -n-1, where n is the number of required args
-        public ShortCircuitFunction(string name, int argc, Call call) {
+        public ShortCircuitFunction(string name, int argc, Call call, IEnumerable<IValueExpressible> args = null) {
             _name = name;
             _argc = argc;
             _call = call;
+            _args = args;
         }
 
         // ReSharper disable once UnusedMethodReturnValue.Global
@@ -88,7 +95,9 @@ namespace Broccoli {
             return _call(broccoli, args);
         }
 
-        public string Inspect() => $"{_name}({_argc} arguments)";
+        public override string ToString() => _args == null ? $"{_name}({_argc} arguments)" : $"{_name}({string.Join(' ', _args.Select(arg => arg.Inspect()))})";
+
+        public string Inspect() => ToString();
 
         public object ToCSharp() => _call;
 
@@ -103,10 +112,12 @@ namespace Broccoli {
 
         private readonly int _argc;
         private readonly Call _call;
+        private readonly IEnumerable<IValueExpressible> _args;
 
-        public AnonymousFunction(int argc, Call call) {
+        public AnonymousFunction(int argc, Call call, IEnumerable<IValueExpressible> args = null) {
             _argc = argc;
             _call = call;
+            _args = args;
         }
 
         public IValue Invoke(Interpreter broccoli, params IValueExpressible[] args) {
@@ -115,9 +126,9 @@ namespace Broccoli {
             return _call(runArgs);
         }
 
-        public override string ToString() => $"(anonymous function with {_argc} arguments)";
+        public override string ToString() => _args == null ? $"<anonymous>({_argc} arguments)" : $"<anonymous>({string.Join(' ', _args.Select(arg => arg.Inspect()))})";
 
-        public string Inspect() => $"(anonymous function with {_argc} arguments)";
+        public string Inspect() => ToString();
 
         public object ToCSharp() => _call;
 

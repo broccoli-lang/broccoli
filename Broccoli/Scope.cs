@@ -7,13 +7,21 @@ namespace Broccoli {
     public class Scope {
         public class Tree<K, V> : Dictionary<K, Tree<K, V>> {
             public V Value;
+
+            public void Add(Tree<K, V> other) {
+                foreach (var (key, value) in other)
+                    if (ContainsKey(key))
+                        this[key].Add(value);
+                    else
+                        this[key] = value;
+            }
         }
 
         public readonly Dictionary<string, IValue> Scalars = new Dictionary<string, IValue>();
         public readonly Dictionary<string, BList> Lists = new Dictionary<string, BList>();
         public readonly Dictionary<string, BDictionary> Dictionaries = new Dictionary<string, BDictionary>();
         public readonly Dictionary<string, IFunction> Functions = new Dictionary<string, IFunction>();
-        public readonly Tree<string, Scope> Namespace = new Tree<string, Scope>();
+        public readonly Tree<string, Scope> Namespaces = new Tree<string, Scope>();
         public readonly Scope Parent;
 
         public Scope() { }

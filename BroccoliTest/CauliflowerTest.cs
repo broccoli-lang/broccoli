@@ -85,6 +85,29 @@ namespace BroccoliTest {
         }
 
         [TestMethod]
+        public void TestAdd() {
+            Assert.AreEqual(_run("(+ \"foo\" \"bar\" \"baz\")"), new BString("foobarbaz"), "List addition does not work");
+            Assert.AreEqual(_run("(+ '(1 2) '(3 4) '(5 6))"), _run("'(1 2 3 4 5 6)"), "List addition does not work");
+            Assert.AreEqual(_run("(+ `((1 2)) `((3 4)) `((5 6)) `((5 7)))"), _run("`((1 2) (3 4) (5 7))"), "Dictionary addition does not work");
+        }
+
+        [TestMethod]
+        public void TestEquality() {
+            Assert.AreEqual(_run("(= \"foo\" \"foo\" \"foo\")"), BAtom.True, "String equality does not succeed correctly");
+            Assert.AreEqual(_run("(= \"foo\" \"foo\" \"foos\")"), BAtom.Nil, "String equality does not fail correctly");
+            Assert.AreEqual(_run("(= foo foo foo)"), BAtom.True, "Atom equality does not succeed correctly");
+            Assert.AreEqual(_run("(= foo foo foos)"), BAtom.Nil, "Atom equality does not fail correctly");
+            Assert.AreEqual(_run("(= '(1 2) '(1 2) '(1 2))"), BAtom.True, "List equality does not succeed correctly");
+            Assert.AreEqual(_run("(= '(1 2) '(1 3) '(1 3))"), BAtom.Nil, "List equality does not fail correctly");
+            Assert.AreEqual(_run("(= `((1 2) (3 4)) `((1 2) (3 4)) `((1 2) (3 4)))"), BAtom.True, "Dictionary equality does not succeed correctly");
+            Assert.AreEqual(_run("(= `((1 2) (3 4)) `((1 2) (3 4)) `((1 2) (3 5)))"), BAtom.Nil, "Dictionary equality does not fail correctly");
+            Assert.AreEqual(_run("(= `((1 2) (3 4)) `((1 2) (3 4)) `((1 3) (3 4)))"), BAtom.Nil, "Dictionary equality does not fail correctly");
+            Assert.AreEqual(_run("(/= `((1 2) (3 4)) `((1 2) (3 4)) `((1 3) (3 4)))"), BAtom.Nil, "Dictionary inequality does not fail correctly");
+            Assert.AreEqual(_run("(/= `((1 2) (3 4)) `((1 2) (4 4)) `((1 3) (3 4)))"), BAtom.True, "Dictionary inequality does not fail correctly");
+
+        }
+
+        [TestMethod]
         public void TestComments() {
             Assert.AreEqual(_run("#| a #|;this is a comment.\n !@\r|#$%^&*()|#\n\"yey\""), new BString("yey"), "Comment does not work correctly");
         }
@@ -117,6 +140,11 @@ namespace BroccoliTest {
             Assert.AreEqual(ReadOutput(_run("(print 3.3)")), "3.3", "Print does not work correctly for numbers");
             Assert.AreEqual(ReadOutput(_run("(print '(foo bar))")), "(foo bar)", "Print does not work correctly for lists");
             Assert.AreEqual(ReadOutput(_run("(print `((foo bar)(baz quux))")), "(foo: bar, baz: quux)", "Print does not work correctly for dictionaries");
+        }
+
+        [TestMethod]
+        public void TestOOP() {
+            Assert.AreEqual(_run("(namespace foo (namespace bar (fn baz ($a $b) (+ $a $b)))) (-> foo bar baz)").Inspect(), "baz($a $b)", "Nested namespaces do not work");
         }
         
         [TestMethod]
