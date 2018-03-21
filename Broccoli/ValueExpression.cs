@@ -6,7 +6,9 @@ namespace Broccoli {
     /// <summary>
     /// Represents a class that can be stored in a <see cref="ValueExpression"/>.
     /// </summary>
-    public interface IValueExpressible { }
+    public interface IValueExpressible {
+        string Inspect();
+    }
 
     /// <summary>
     /// Represents an unevaluated Broccoli expression full of values.
@@ -70,8 +72,8 @@ namespace Broccoli {
                 new ValueExpression(n.Children.Select(Selector));
         }
 
-        public override string ToString() {
-            return '(' + string.Join<IValueExpressible>(' ', Values) + ')';
-        }
+        public override string ToString() => '(' + string.Join<IValueExpressible>(' ', Values) + ')';
+
+        public string Inspect() => ToString();
     }
 }

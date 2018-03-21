@@ -9,7 +9,6 @@ namespace Broccoli {
     /// Represents a class that can be used as a value within a Broccoli program.
     /// </summary>
     public interface IValue : IValueExpressible {
-        string Inspect();
         object ToCSharp();
         Type Type();
     }

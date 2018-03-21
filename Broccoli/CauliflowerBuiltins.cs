@@ -205,7 +205,7 @@ namespace Broccoli {
                 return fn.Invoke(cauliflower, e.Values.Skip(1).ToArray());
             })},
             {"->", new ShortCircuitFunction("->", -2, (cauliflower, args) => {
-                var scope = cauliflower.Scope.Namespace;
+                var scope = cauliflower.Scope.Namespaces;
                 foreach (var (item, index) in args.SkipLast(1).WithIndex())
                     if (item is BAtom a) {
                         if (scope.ContainsKey(a.Value))
@@ -221,7 +221,7 @@ namespace Broccoli {
                         return scope.Value[l];
                     case DictVar d:
                         return scope.Value[d];
-                    case BString s:
+                    case BAtom s:
                         return scope.Value[s.Value];
                     default:
                         throw new ArgumentTypeException(args.Last(), "variable", args.Length, "->");
@@ -318,7 +318,7 @@ namespace Broccoli {
                         result = cauliflower.Run(statement);
                     cauliflower.Scope = cauliflower.Scope.Parent;
                     return result;
-                });
+                }, argExpressions.Values);
                 return null;
             })},
 
@@ -474,6 +474,24 @@ namespace Broccoli {
                 return toAssign;
             })},
 
+            // OOP
+            {"namespace", new ShortCircuitFunction("namespace", -1, (cauliflower, args) => {
+                if (!(cauliflower.Run(args[0]) is BAtom a))
+                    throw new ArgumentTypeException(args[0], "atom", 1, "namespace");
+                //(namespace foo (namespace bar (fn baz ($a $b) (+ $a $b)))) (-> foo bar baz)
+                var tempCauliflower = new CauliflowerInterpreter();
+                foreach (var arg in args.Skip(1))
+                    tempCauliflower.Run(arg);
+                if (cauliflower.Scope.Namespaces.ContainsKey(a.Value))
+                    cauliflower.Scope.Namespaces[a.Value].Add(tempCauliflower.Scope.Namespaces);
+                else
+                    cauliflower.Scope.Namespaces[a.Value] = tempCauliflower.Scope.Namespaces;
+                var scope = cauliflower.Scope.Namespaces[a.Value].Value = (cauliflower.Scope.Namespaces[a.Value].Value ?? new Scope());
+                foreach (var (key, value) in tempCauliflower.Scope.Functions)
+                    scope[key] = value;
+                return null;
+            })},
+
             // I/O commands
             {"input", new Function("input", 0, (cauliflower, args) => new BString(Console.ReadLine()))},
 
@@ -502,6 +520,59 @@ namespace Broccoli {
                     default:
                         throw new ArgumentTypeException(args[0], "integer, float or string", 1, "float");
                 }
+            })},
+
+            // Basic math
+            {"+", new Function("+", -1, (broccoli, args) => {
+                if (args.Length == 0 || args[0] is BInteger || args[0] is BFloat)
+                    foreach (var (value, index) in args.WithIndex()) {
+                        if (!(value is BInteger || value is BFloat))
+                            throw new ArgumentTypeException(value, "integer or float", index + 1, "+");
+                    }
+                else {
+                    var type = args[0].GetType();
+                    string typeString = new Dictionary<Type, string>{
+                        {typeof(BString), "string"},
+                        {typeof(BAtom), "atom"},
+                        {typeof(BList), "list"},
+                        {typeof(BDictionary), "dictioanry"}
+                    }.GetValueOrDefault(type, "C# value");
+                    foreach (var (value, index) in args.WithIndex())
+                        if (value.GetType() != type)
+                            throw new ArgumentTypeException(value, typeString, index + 1, "+");
+                    if (type == typeof(BString)) {
+                        var b = new System.Text.StringBuilder();
+                        foreach (var arg in args)
+                            b.Append(((BString) arg).Value);
+                        return new BString(b.ToString());
+                    }
+                    if (type == typeof(BAtom))
+                        throw new ArgumentTypeException(args[0], "number, string, list or dictionary", 1, "+");
+                    if (type == typeof(BList))
+                        return new BList(args.Cast<BList>().Aggregate<IEnumerable<IValue>>((m, v) => m.Concat(v)));
+                    if (type == typeof(BDictionary)) {
+                        var result = new BDictionary();
+                        foreach (var arg in args)
+                            foreach (var (key, value) in (BDictionary) arg)
+                                result[key] = value;
+                        return result;
+                    }
+                }
+
+                return args.Aggregate((IValue) new BInteger(1), (m, v) => {
+                    if (m is BInteger im && v is BInteger iv)
+                        return new BInteger(im.Value + iv.Value);
+                    double fm, fv;
+                    if (m is BInteger mValue)
+                        fm = mValue.Value;
+                    else
+                        fm = ((BFloat) m).Value;
+                    if (v is BInteger vValue)
+                        fv = vValue.Value;
+                    else
+                        fv = ((BFloat) v).Value;
+                    return new BFloat(fm + fv);
+                });
             })},
 
             {"not", new Function("not", 1, (cauliflower, args) => Boolean(CauliflowerInline.Truthy(args[0]).Equals(BAtom.Nil)))},
