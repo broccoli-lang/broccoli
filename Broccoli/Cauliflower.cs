@@ -2,6 +2,9 @@
 using System.Linq;
 
 namespace Broccoli {
+    /// <summary>
+    /// The interpreter for the Broccoli dialect Cauliflower.
+    /// </summary>
     public partial class CauliflowerInterpreter : Interpreter {
         public CauliflowerInterpreter(BList argv = null) {
             Builtins = StaticBuiltins;

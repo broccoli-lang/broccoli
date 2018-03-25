@@ -58,10 +58,10 @@ namespace Broccoli {
             int requiredArgc = isVariadic ? -argc - 1 : argc;
 
             if (isVariadic ? args.Length < requiredArgc : args.Length != requiredArgc)
-                throw new Exception($"Function {name} requires {(isVariadic ? "at least" : "exactly")} {requiredArgc} arguments, {args.Length} provided");
+                throw new Exception($"Function '{name}' requires {(isVariadic ? "at least" : "exactly")} {requiredArgc} arguments, {args.Length} provided");
         }
 
-        public override string ToString() => _args == null ? $"{_name}({_argc} arguments)" : $"{_name}({string.Join(' ', _args.Select(arg => arg.Inspect()))})";
+        public override string ToString() => _args == null ? $"{_name}({(_argc < 0 ? _argc.ToString().Substring(1) + '+' : _argc.ToString())} argument{(_argc == 1 ? "" : "s")})" : $"{_name}({string.Join(' ', _args.Select(arg => arg.Inspect()))})";
 
         public string Inspect() => ToString();
 
@@ -95,7 +95,7 @@ namespace Broccoli {
             return _call(broccoli, args);
         }
 
-        public override string ToString() => _args == null ? $"{_name}({_argc} arguments)" : $"{_name}({string.Join(' ', _args.Select(arg => arg.Inspect()))})";
+        public override string ToString() => _args == null ? $"{_name}({(_argc < 0 ? _argc.ToString().Substring(1) + '+' : _argc.ToString())} argument{(_argc == 1 ? "" : "s")})" : $"{_name}({string.Join(' ', _args.Select(arg => arg.Inspect()))})";
 
         public string Inspect() => ToString();
 
@@ -126,7 +126,7 @@ namespace Broccoli {
             return _call(runArgs);
         }
 
-        public override string ToString() => _args == null ? $"<anonymous>({_argc} arguments)" : $"<anonymous>({string.Join(' ', _args.Select(arg => arg.Inspect()))})";
+        public override string ToString() => _args == null ? $"<anonymous>({(_argc < 1 ? _argc.ToString().Substring(1) + '+' : _argc.ToString())} argument{(_argc == 1 ? "" : "s")})" : $"<anonymous>({string.Join(' ', _args.Select(arg => arg.Inspect()))})";
 
         public string Inspect() => ToString();
 

@@ -144,7 +144,7 @@ namespace BroccoliTest {
 
         [TestMethod]
         public void TestOOP() {
-            Assert.AreEqual(_run("(namespace foo (namespace bar (fn baz ($a $b) (+ $a $b)))) (-> foo bar baz)").Inspect(), "baz($a $b)", "Nested namespaces do not work");
+            Assert.AreEqual(_run("(namespace foo (namespace bar (fn baz ($a $b) (+ $a $b)))) (. foo bar baz)").Inspect(), "baz($a $b)", "Nested namespaces do not work");
         }
         
         [TestMethod]
@@ -152,8 +152,8 @@ namespace BroccoliTest {
             Assert.AreEqual(ReadOutput(_run("(c#-import System.Console) ($Console.Write \"foo {0} {1}\" t '(1 2))")), "foo True (1 2)", "Calling static methods directly does not work");
             Assert.AreEqual(ReadOutput(_run("(c#-import System.Console) (c#-static $Console.Write \"foo {0} {1}\" t '(1 2))")), "foo True (1 2)", "Calling static methods via value with c#-static does not work");
             Assert.AreEqual(ReadOutput(_run("(c#-import System.Console) (c#-static $Console Write \"foo {0} {1}\" t '(1 2))")), "foo True (1 2)", "Calling static methods via type and name with c#-static does not work");
-            Assert.AreEqual(_run("(c#-import System.Text.RegularExpressions) (c#-method (c#-create $Regex \"asdf+\") IsMatch \"asdfghjkl\")"), BAtom.True, "Calling instance methods does not work");
-            Assert.AreEqual(_run("(c#-import System.Text.RegularExpressions) (c#-method (c#-create $Regex \"asdf+\") IsMatch \"asfdghjkl\")"), BAtom.Nil, "Calling instance methods does not work");
+            Assert.AreEqual(_run("(c#-import System.Text.RegularExpressions) (c#-method (c#-new $Regex \"asdf+\") IsMatch \"asdfghjkl\")"), BAtom.True, "Calling instance methods does not work");
+            Assert.AreEqual(_run("(c#-import System.Text.RegularExpressions) (c#-method (c#-new $Regex \"asdf+\") IsMatch \"asfdghjkl\")"), BAtom.Nil, "Calling instance methods does not work");
             Assert.AreEqual(_run("(c#-import System.Linq) @($Enumerable.Range (c#-int 0) (c#-int 100))"), _run("(range 0 100)"), "Enumerable.Range does not match builtin range");
         }
 

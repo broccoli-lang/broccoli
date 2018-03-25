@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace Broccoli {
     /// <summary>
-    /// The core interpreter interpreter of a Broccoli program.
+    /// The interpreter for the Broccoli language.
     /// </summary>
     public partial class Interpreter {
         public Scope Scope = new Scope();

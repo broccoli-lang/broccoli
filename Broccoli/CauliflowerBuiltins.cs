@@ -1,16 +1,28 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text;
 
-// TODO: test "->"
-// TODO: "namespace" function & maybe various OOP things
+// TODO: test "." and "->" and "import"
+// TODO: finish "namespace" function & maybe various OOP things
 // TODO: try catch
 
 namespace Broccoli {
+    /// <summary>
+    /// Useful variants of type methods.
+    /// </summary>
     static class TypeExtensions {
+        /// <summary>
+        /// Gets property of object.
+        /// </summary>
+        /// <param name="type">Type to get property from.</param>
+        /// <param name="name">Name of property.</param>
+        /// <returns>Property.</returns>
+        /// <exception cref="Exception">Throws when property is not found.</exception>
         public static PropertyInfo TryGetProperty(this Type type, string name) {
             var result = type.GetProperty(name);
             if (result == null)
@@ -18,6 +30,13 @@ namespace Broccoli {
             return result;
         }
 
+        /// <summary>
+        /// Gets field of object.
+        /// </summary>
+        /// <param name="type">Type to get field from.</param>
+        /// <param name="name">Name of field.</param>
+        /// <returns>Field.</returns>
+        /// <exception cref="Exception">Throws when field is not found.</exception>
         public static FieldInfo TryGetField(this Type type, string name) {
             var result = type.GetField(name);
             if (result == null)
@@ -27,10 +46,52 @@ namespace Broccoli {
     }
 
     public partial class CauliflowerInterpreter : Interpreter {
+        /// <summary>
+        /// Array of all assembles used by this project.
+        /// </summary>
         private static Assembly[] assemblies = null;
+
+        /// <summary>
+        /// Dictionary of assembly full name to Assembly object.
+        /// </summary>
         private static Dictionary<string, Assembly> assemblyLookup = null;
 
-        private static IValue CreateValue(object value) {
+        /// <summary>
+        /// Base path of Cauliflower module storage.
+        /// </summary>
+        private static string basePath = null;
+
+        /// <summary>
+        /// Path separator of OS.
+        /// </summary>
+        private static string pathSeparator = null;
+
+        /// <summary>
+        /// Cache of methods grouped by type.
+        /// </summary>
+        private static Dictionary<Type, Dictionary<string, MethodBase>> methods = new Dictionary<Type, Dictionary<string, MethodBase>>();
+
+        /// <summary>
+        /// Cache of fields grouped by type.
+        /// </summary>
+        private static Dictionary<Type, Dictionary<string, FieldInfo>> fields = new Dictionary<Type, Dictionary<string, FieldInfo>>();
+
+        /// <summary>
+        /// Cache of properties grouped by type.
+        /// </summary>
+        private static Dictionary<Type, Dictionary<string, PropertyInfo>> properties = new Dictionary<Type, Dictionary<string, PropertyInfo>>();
+
+        /// <summary>
+        /// Valid class item modifiers.
+        /// </summary>
+        private static string[] modifiers = new[] { "private", "protected", "public", "readonly", "static" };
+
+        /// <summary>
+        /// Creates an IValue from an object.
+        /// </summary>
+        /// <param name="value">The value to convert.</param>
+        /// <returns>An IValue with an equivalent value.</returns>
+        public static IValue CreateValue(object value) {
             if (value == null)
                 return null;
             switch (value) {
@@ -57,6 +118,9 @@ namespace Broccoli {
             }
         }
 
+        /// <summary>
+        /// IScalar wrapper for C# objects.
+        /// </summary>
         private class BCSharpValue : IScalar {
             public object Value { get; }
 
@@ -73,6 +137,9 @@ namespace Broccoli {
             public Type Type() => Value.GetType();
         }
 
+        /// <summary>
+        /// IScalar wrapper for C# types.
+        /// </summary>
         private class BCSharpType : IScalar {
             public Type Value { get; }
 
@@ -86,13 +153,30 @@ namespace Broccoli {
 
             public override string ToString() => Value.FullName;
 
-            public string Inspect() => $"C#Type({Value.FullName})";
+            public virtual string Inspect() => $"C#Type({Value.FullName})";
 
             public object ToCSharp() => Value;
 
             public Type Type() => typeof(Type);
         }
 
+        /// <summary>
+        /// IScalar wrapper for Cauliflower native module types.
+        /// </summary>
+        private class BCauliflowerType : BCSharpType {
+            public BCauliflowerType(Type value) : base(value) { }
+
+            public static implicit operator BCauliflowerType(Type type) => new BCauliflowerType(type);
+
+            public static implicit operator Type(BCauliflowerType type) => type.Value;
+
+            public override string Inspect() => $"CauliflowerType({Value.FullName.Replace('+', '.')})";
+        }
+
+
+        /// <summary>
+        /// IScalar wrapper for C# methods.
+        /// </summary>
         private class BCSharpMethod : IScalar {
             public (Type type, string name) Value { get; }
 
@@ -102,19 +186,39 @@ namespace Broccoli {
 
             public override string ToString() => $"{Value.type.FullName}.{Value.name}";
 
-            public string Inspect() => $"C#Method({Value.type.FullName}.{Value.name})";
+            public virtual string Inspect() => $"C#Method({Value.type.FullName}.{Value.name})";
 
             public object ToCSharp() => Value;
 
             public Type Type() => typeof(Tuple<Type, string>);
         }
 
+
+        /// <summary>
+        /// IScalar wrapper for Cauliflower native method types.
+        /// </summary>
+        private class BCauliflowerMethod : BCSharpMethod {
+            public BCauliflowerMethod(Type type, string name) : base(type, name) { }
+
+            public override string Inspect() => $"CauliflowerMethod({Value.type.FullName.Replace('+', '.')}.{Value.name})";
+        }
+
+        /// <summary>
+        /// Adds C# type to current scope.
+        /// </summary>
+        /// <param name="interpreter">Interpreter to add types to.</param>
+        /// <param name="type">Type to add.</param>
         private static void CSharpAddType(Interpreter interpreter, BCSharpType type) {
             interpreter.Scope.Scalars[type.Value.Name] = type;
             foreach (var method in new HashSet<string>(type.Value.GetMethods(BindingFlags.Public | BindingFlags.Static).Select(method => method.Name)))
                 interpreter.Scope.Scalars[type.Value.Name + '.' + method] = new BCSharpMethod(type, method);
         }
 
+        /// <summary>
+        /// Imports a C# type or assembly given its name.
+        /// </summary>
+        /// <param name="interpreter">Interpreter to import to.</param>
+        /// <param name="name">Name of type or assembly.</param>
         private static void CSharpImport(Interpreter interpreter, BAtom name) {
             // Basically lazy load assemblies
             if (assemblies == null) {
@@ -140,41 +244,119 @@ namespace Broccoli {
             throw new Exception($"C# type {path} not found");
         }
 
+        /// <summary>
+        /// Create a C# value.
+        /// </summary>
+        /// <param name="type">Type of value to create.</param>
+        /// <param name="parameters">Parameters to feed to the constructor</param>
+        /// <returns>The created value.</returns>
         private static BCSharpValue CSharpCreate(BCSharpType type, IEnumerable<IValue> parameters) => new BCSharpValue(
             type.Value.GetConstructor(parameters.Select(p => p.Type()).ToArray())
                 .Invoke(parameters.Select(p => p.ToCSharp()).ToArray())
         );
 
+        /// <summary>
+        /// Create a Cauliflower native value.
+        /// </summary>
+        /// <param name="type">Type of value to create.</param>
+        /// <param name="parameters">Parameters to feed to the constructor.</param>
+        /// <returns>The created value.</returns>
+        private static IValue CauliflowerCreate(BCauliflowerType type, IEnumerable<IValue> parameters) => (IValue) (
+            type.Value.GetConstructor(new[] { typeof(IValue[]) }).Invoke(new[] { parameters.ToArray() })
+        );
+
+        /// <summary>
+        /// Call a C# method.
+        /// </summary>
+        /// <param name="type">Type method is on.</param>
+        /// <param name="name">Name of method.</param>
+        /// <param name="instance">Object to call method on, or null if method is static.</param>
+        /// <param name="args">Arguments to pass to method.</param>
+        /// <returns>Return value of method.</returns>
         private static IValue CSharpMethod(BCSharpType type, BAtom name, IValue instance, IEnumerable<IValue> args) => CreateValue(
             type.Value.GetMethod(name.Value, args.Select(arg => arg.Type()).ToArray())
                 .Invoke(instance?.ToCSharp(), args.Select(arg => arg.ToCSharp()).ToArray())
         );
 
+        /// <summary>
+        /// Call a Cauliflower native method.
+        /// </summary>
+        /// <param name="type">Type method is on.</param>
+        /// <param name="name">Name of method.</param>
+        /// <param name="instance">Object to call method on, or null if method is static.</param>
+        /// <param name="args">Arguments to pass to method.</param>
+        /// <returns>Return value of method.</returns>
+        private static IValue CauliflowerMethod(BCSharpType type, BAtom name, IValue instance, IEnumerable<IValue> args) => (IValue) (
+            type.Value.GetMethod(name.Value).Invoke(instance?.ToCSharp(), new[] { args.ToArray() })
+        );
+
+        /// <summary>
+        /// Get the value of a C# property.
+        /// </summary>
+        /// <param name="type">Type property is on.</param>
+        /// <param name="name">Name of property.</param>
+        /// <param name="instance">Object to get property from.</param>
+        /// <returns>Value of property.</returns>
         private static IValue CSharpProperty(BCSharpType type, BAtom name, IValue instance) => CreateValue(
             type.Value.TryGetProperty(name.Value).GetValue(instance?.ToCSharp())
         );
 
+        /// <summary>
+        /// Sets the value of a C# property.
+        /// </summary>
+        /// <param name="type">Type property is on.</param>
+        /// <param name="name">Name of property.</param>
+        /// <param name="instance">Object to set property on.</param>
+        /// <param name="value">New value of property.</param>
         private static void AssignCSharpProperty(BCSharpType type, BAtom name, IValue instance, IValue value) {
             type.Value.TryGetProperty(name.Value).SetValue(instance?.ToCSharp(), value.ToCSharp());
         }
 
+        /// <summary>
+        /// Get the value of a C# field.
+        /// </summary>
+        /// <param name="type">Type field is on.</param>
+        /// <param name="name">Name of field.</param>
+        /// <param name="instance">Object to get field from.</param>
+        /// <returns>Value of field.</returns>
         private static IValue CSharpField(BCSharpType type, BAtom name, IValue instance) => CreateValue(
             type.Value.TryGetField(name.Value).GetValue(instance?.ToCSharp())
         );
 
+        /// <summary>
+        /// Sets the value of a C# field.
+        /// </summary>
+        /// <param name="type">Type field is on.</param>
+        /// <param name="name">Name of field.</param>
+        /// <param name="instance">Object to set field on.</param>
+        /// <param name="value">New value of field.</param>
         private static void AssignCSharpField(BCSharpType type, BAtom name, IValue instance, IValue value) {
             type.Value.TryGetField(name.Value).SetValue(instance?.ToCSharp(), value.ToCSharp());
         }
 
         /// <summary>
-        /// Converts a .NET boolean into the Broccoli equivalent.
+        /// Add Cauliflower native types to interpreter.
         /// </summary>
-        /// <param name="b">The boolean to convert.</param>
-        /// <returns>The Broccoli equivalent of the boolean.</returns>
-        private static BAtom Boolean(bool b) => b ? BAtom.True : BAtom.Nil;
+        /// <param name="type">Type containing wanted types.</param>
+        /// <param name="space">Namespace to set value on.</param>
+        private static void AddTypes(Type type, Scope.Tree<string, Scope> space) {
+            var name = type.Name.Replace('_', '-');
+            if (!(space.ContainsKey(name))) {
+                space[name] = new Scope.Tree<string, Scope> { Value = new Scope() };
+            }
+            foreach (var nested in type.GetNestedTypes(BindingFlags.Public).Where(t => !t.Name.Contains("<"))) {
+                AddTypes(nested, space[name]);
+                if (nested.GetInterface("IValue") != null)
+                    space.Value.Scalars[nested.Name.Replace('_', '-')] = (BCauliflowerType) nested;
+            }
+            foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.Static))
+                space[name].Value.Functions[method.Name.Replace('_', '-')] = new Function(
+                    name, ~0, (_, innerArgs) => CauliflowerMethod(type, method.Name, null, innerArgs)
+                );
+        }
 
         /// <summary>
-        /// A dictionary containing all the default builtin functions of Cauliflower.
+        /// A dictionary containing all the builtin functions of Cauliflower.
         /// </summary>
         public new static readonly Dictionary<string, IFunction> StaticBuiltins = new Dictionary<string, IFunction> {
             {"", new ShortCircuitFunction("", 1, (cauliflower, args) => {
@@ -183,13 +365,19 @@ namespace Broccoli {
                     return cauliflower.Run(e.Values.First());
                 if (e.Values.Length == 0)
                     throw new Exception("Expected function name");
-                if (cauliflower.Run(e.Values[0]) is BCSharpMethod method)
+                var first = cauliflower.Run(e.Values[0]);
+                if (first is BCSharpMethod method)
                     try {
                         return CSharpMethod(method.Value.type, method.Value.name, null, e.Values.Skip(1).Select(cauliflower.Run));
                     } catch {
                         throw new Exception($"C# method '{method.Value.name}' not found for specified arguments. Are you missing a 'c#-import'?");
                     }
-                var first = e.Values.First();
+                if (first is BCauliflowerMethod cauliflowerMethod)
+                    try {
+                        return CauliflowerMethod(cauliflowerMethod.Value.type, cauliflowerMethod.Value.name, null, e.Values.Skip(1).Select(cauliflower.Run));
+                    } catch {
+                        throw new Exception($"Cauliflower method '{cauliflowerMethod.Value.name}' not found for specified arguments. Are you missing an 'import'?");
+                    }
                 IFunction fn = null;
                 if (first is BAtom fnAtom) {
                     var fnName = fnAtom.Value;
@@ -204,7 +392,7 @@ namespace Broccoli {
 
                 return fn.Invoke(cauliflower, e.Values.Skip(1).ToArray());
             })},
-            {"->", new ShortCircuitFunction("->", -2, (cauliflower, args) => {
+            {".", new ShortCircuitFunction(".", -2, (cauliflower, args) => {
                 var scope = cauliflower.Scope.Namespaces;
                 foreach (var (item, index) in args.SkipLast(1).WithIndex())
                     if (item is BAtom a) {
@@ -213,7 +401,7 @@ namespace Broccoli {
                         else
                             throw new Exception($"Object '{a.Value}' not found in namespace");
                     } else
-                        throw new ArgumentTypeException(item, "atom", index + 1, "->");
+                        throw new ArgumentTypeException(item, "atom", index + 1, ".");
                 switch (args.Last()) {
                     case ScalarVar s:
                         return scope.Value[s];
@@ -222,10 +410,54 @@ namespace Broccoli {
                     case DictVar d:
                         return scope.Value[d];
                     case BAtom s:
-                        return scope.Value[s.Value];
+                        return scope.Value[s.Value] ?? (IValue) scope[s.Value].Value;
                     default:
-                        throw new ArgumentTypeException(args.Last(), "variable", args.Length, "->");
+                        throw new ArgumentTypeException(args.Last(), "variable", args.Length, ".");
                 }
+            })},
+            {"->", new ShortCircuitFunction("->", -2, (cauliflower, args) => {
+                var result = cauliflower.Run(args[0]);
+                var type = result.GetType();
+                foreach (var (item, index) in args.Skip(1).WithIndex())
+                    if (type == null)
+                        throw new Exception("Cannot get property of method");
+                    else if (item is BAtom a) {
+                        var name = a.Value;
+                        var members = result.GetType().GetMember(name);
+                        if (members.Length != 0) {
+                            switch (members[0].MemberType) {
+                                case MemberTypes.Method:
+                                    if (!methods.ContainsKey(type))
+                                        methods[type] = new Dictionary<string, MethodBase>();
+                                    if (!methods[type].ContainsKey(name))
+                                        methods[type][name] = type.GetMethod(name);
+                                    var method = methods[type][name];
+                                    var obj = result;
+                                    result = new Function(name, -1, (_, innerArgs) => (IValue) method.Invoke(obj, new object[] { cauliflower, innerArgs }));
+                                    type = null;
+                                    break;
+                                case MemberTypes.Field:
+                                    if (!fields.ContainsKey(type))
+                                        fields[type] = new Dictionary<string, FieldInfo>();
+                                    if (!fields[type].ContainsKey(name))
+                                        fields[type][name] = type.GetField(name);
+                                    var field = fields[type][name];
+                                    type = (result = (IValue) field.GetValue(result)).GetType();
+                                    break;
+                                case MemberTypes.Property:
+                                    if (!properties.ContainsKey(type))
+                                        properties[type] = new Dictionary<string, PropertyInfo>();
+                                    if (!properties[type].ContainsKey(name))
+                                        properties[type][name] = type.GetProperty(name);
+                                    var property = properties[type][name];
+                                    type = (result = (IValue) property.GetValue(result)).GetType();
+                                    break;
+                            }
+                        } else
+                            throw new Exception($"Member '{a.Value}' not found in item");
+                    } else
+                        throw new ArgumentTypeException(item, "atom", index + 1, ".");
+                return result;
             })},
             {"$", new Function("$", 1, (cauliflower, args) => args[0] is IScalar ? args[0] : new BCSharpValue(args[0]))},
             {"@", new Function("@", 1, (cauliflower, args) => {
@@ -323,15 +555,20 @@ namespace Broccoli {
             })},
 
             // Meta-commands
+            {"new", new Function("new", -2, (cauliflower, args) => {
+                if (!(args[0] is BCauliflowerType type))
+                    throw new ArgumentTypeException(args[0], "Cauliflower type", 1, "new");
+                return CauliflowerCreate(type, args.Skip(1));
+            })},
             {"c#-import", new Function("c#-import", -2, (cauliflower, args) => {
                 if (!(args[0] is BAtom a))
                     throw new ArgumentTypeException(args[0], "atom", 1, "c#-import");
                 CSharpImport(cauliflower, a);
                 return null;
             })},
-            {"c#-create", new Function("c#-create", -2, (cauliflower, args) => {
+            {"c#-new", new Function("c#-new", -2, (cauliflower, args) => {
                 if (!(args[0] is BCSharpType type))
-                    throw new ArgumentTypeException(args[0], "C# type", 1, "c#-create");
+                    throw new ArgumentTypeException(args[0], "C# type", 1, "c#-new");
                 return CSharpCreate(type, args.Skip(1));
             })},
             {"c#-static", new Function("c#-static", -2, (cauliflower, args) => {
@@ -449,6 +686,27 @@ namespace Broccoli {
             {"help", new ShortCircuitFunction("help", 0, (cauliflower, args) => {
                 return new BList(cauliflower.Builtins.Keys.Skip(1).Select(key => (IValue) new BString(key)));
             })},
+            {"import", new Function("import", -2, (cauliflower, args) => {
+                if (args[0] is BAtom) {
+                    CauliflowerInline.Import(cauliflower, args);
+                    return null;
+                }
+                if (args.Length != 1)
+                    throw new Exception($"Function 'import' requires exactly 1 argument, 3 provided");
+                if (!(args[0] is BString s))
+                    throw new ArgumentTypeException(args[0], "string", 1, "import");
+                var tempCauliflower = new CauliflowerInterpreter();
+                tempCauliflower.Run(File.ReadAllText(s.Value));
+                foreach (var (key, value) in tempCauliflower.Scope.Functions)
+                    cauliflower.Scope[key] = value;
+                return null;
+            })},
+            {"import-static", new Function("import-static", -2, (cauliflower, args) => {
+                if (!(args[0] is BAtom))
+                    throw new ArgumentTypeException(args[0], "atom", 1, "import-static");
+                CauliflowerInline.Import(cauliflower, args, true);
+                return null;
+            })},
 
             {":=", new ShortCircuitFunction(":=", 2, (broccoli, args) => {
                 var toAssign = broccoli.Run(args[1]);
@@ -475,10 +733,9 @@ namespace Broccoli {
             })},
 
             // OOP
-            {"namespace", new ShortCircuitFunction("namespace", -1, (cauliflower, args) => {
+            {"namespace", new ShortCircuitFunction("namespace", ~0, (cauliflower, args) => {
                 if (!(cauliflower.Run(args[0]) is BAtom a))
                     throw new ArgumentTypeException(args[0], "atom", 1, "namespace");
-                //(namespace foo (namespace bar (fn baz ($a $b) (+ $a $b)))) (-> foo bar baz)
                 var tempCauliflower = new CauliflowerInterpreter();
                 foreach (var arg in args.Skip(1))
                     tempCauliflower.Run(arg);
@@ -491,9 +748,45 @@ namespace Broccoli {
                     scope[key] = value;
                 return null;
             })},
+            {"class", new ShortCircuitFunction("class", ~0, (cauliflower, args) => {
+                var items = new List<(string, List<string>, ValueExpression)>();
+                foreach (var (arg, index) in args.WithIndex()) {
+                    if (!(arg is ValueExpression e))
+                        throw new ArgumentTypeException(arg, "expression", index + 1, "class");
+                    if (e.Values.Length == 0)
+                        throw new Exception($"Found empty expression in statement {index + 1} of 'class'");
+                    int i = 0;
+                    var m = new List<string>();
+                    if (e.Values[0] is BAtom mod && modifiers.Contains(mod.Value)) {
+                        while ((e.Values[++i] is BAtom atom) && modifiers.Contains(atom.Value))
+                            m.Add(atom.Value);
+                        if (!(e.Values[i] is ValueExpression e2))
+                            throw new ArgumentTypeException(arg, "expression", index + 1, "class");
+                        e = e2;
+                    }
+                    if (!(e.Values[0] is BAtom a))
+                        throw new Exception($"Expected atom in statement {index + 1} of 'class', found {e.Values[0].GetType()} instead");
+                    items.Add((a.Value, m, new ValueExpression(e.Values.Skip(1))));
+                }
+                // TODO
+                return null;
+            })},
 
             // I/O commands
             {"input", new Function("input", 0, (cauliflower, args) => new BString(Console.ReadLine()))},
+            {"read", new Function("read", 1, (cauliflower, args) => {
+                if (!(args[0] is BString path))
+                    throw new ArgumentTypeException(args[0], "string", 1, "read");
+                return new BString(File.ReadAllText(path.Value));
+            })},
+            {"write", new Function("write", 2, (cauliflower, args) => {
+                if (!(args[0] is BString path))
+                    throw new ArgumentTypeException(args[0], "string", 1, "write");
+                if (!(args[1] is BString toWrite))
+                    throw new ArgumentTypeException(args[0], "string", 2, "write");
+                File.WriteAllText(path.Value, toWrite.Value);
+                return null;
+            })},
 
             {"string", new Function("string", 1, (cauliflower, args) => new BString(args[0].ToString()))},
             {"bool", new Function("bool", 1, (cauliflower, args) => Boolean(CauliflowerInline.Truthy(args[0])))},
@@ -523,7 +816,7 @@ namespace Broccoli {
             })},
 
             // Basic math
-            {"+", new Function("+", -1, (broccoli, args) => {
+            {"+", new Function("+", ~0, (broccoli, args) => {
                 if (args.Length == 0 || args[0] is BInteger || args[0] is BFloat)
                     foreach (var (value, index) in args.WithIndex()) {
                         if (!(value is BInteger || value is BFloat))
@@ -541,7 +834,7 @@ namespace Broccoli {
                         if (value.GetType() != type)
                             throw new ArgumentTypeException(value, typeString, index + 1, "+");
                     if (type == typeof(BString)) {
-                        var b = new System.Text.StringBuilder();
+                        var b = new StringBuilder();
                         foreach (var arg in args)
                             b.Append(((BString) arg).Value);
                         return new BString(b.ToString());
@@ -576,14 +869,14 @@ namespace Broccoli {
             })},
 
             {"not", new Function("not", 1, (cauliflower, args) => Boolean(CauliflowerInline.Truthy(args[0]).Equals(BAtom.Nil)))},
-            {"and", new ShortCircuitFunction("and", -1, (cauliflower, args) =>
+            {"and", new ShortCircuitFunction("and", ~0, (cauliflower, args) =>
                 Boolean(!args.Any(arg => CauliflowerInline.Truthy(cauliflower.Run(arg))))
             )},
-            {"or", new ShortCircuitFunction("or", -1, (cauliflower, args) =>
+            {"or", new ShortCircuitFunction("or", ~0, (cauliflower, args) =>
                 Boolean(args.Any(arg => !CauliflowerInline.Truthy(cauliflower.Run(arg))))
             )},
 
-            {"\\", new ShortCircuitFunction("\\", -2, (cauliflower, args) => {
+            {"\\", new ShortCircuitFunction("\\", ~1, (cauliflower, args) => {
                 if (!(args[0] is ValueExpression argExpressions)) {
                     if (args[0] is ScalarVar s)
                         argExpressions = new ValueExpression(s);
@@ -648,7 +941,7 @@ namespace Broccoli {
                 });
             })},
             
-            {"if", new ShortCircuitFunction("if", -3, (cauliflower, args) => {
+            {"if", new ShortCircuitFunction("if", ~2, (cauliflower, args) => {
                 var condition = CauliflowerInline.Truthy(cauliflower.Run(args[0]));
                 var elseIndex = Array.IndexOf(args.ToArray(), new BAtom("else"), 1);
                 IEnumerable<IValueExpressible> statements = elseIndex != -1 ?
@@ -672,7 +965,7 @@ namespace Broccoli {
                         throw new ArgumentTypeException(args[0], "list, dictionary or string", 1, "len");
                 }
             })},
-            {"slice", new Function("slice", -2, (cauliflower, args) => {
+            {"slice", new Function("slice", ~2, (cauliflower, args) => {
                 if (!(args[0] is BList list))
                     throw new ArgumentTypeException(args[0], "list", 1, "slice");
                 foreach (var (arg, index) in args.Skip(1).WithIndex())
@@ -693,7 +986,7 @@ namespace Broccoli {
                         throw new Exception($"Function slice requires 1 to 4 arguments, {args.Length} provided");
                 }
             })},
-            {"range", new Function("range", -2, (cauliflower, args) => {
+            {"range", new Function("range", ~1, (cauliflower, args) => {
                 foreach (var (arg, index) in args.WithIndex())
                     if (!(arg is BInteger i))
                         throw new ArgumentTypeException(arg, "integer", index + 1, "range");
@@ -796,7 +1089,7 @@ namespace Broccoli {
             /// Finds the function to execute given a value.
             /// </summary>
             /// <param name="callerName">The function call name.</param>
-            /// <param name="cauliflower">The containing Broccoli interpreter.</param>
+            /// <param name="cauliflower">The containing Cauliflower interpreter.</param>
             /// <param name="func">The value to try and find a function for.</param>
             /// <returns>The function to execute.</returns>
             /// <exception cref="Exception">Throws when the wrong kind of value is given or when the function cannot be found.</exception>
@@ -816,7 +1109,7 @@ namespace Broccoli {
             }
 
             /// <summary>
-            /// Returns whether a Broccoli value is truthy.
+            /// Returns whether a Cauliflower value is truthy.
             /// </summary>
             /// <param name="value">The value to check.</param>
             /// <returns>The truthiness of the value.</returns>
@@ -837,6 +1130,65 @@ namespace Broccoli {
                         return true;
                     default:
                         return false;
+                }
+            }
+
+            public static void Import(Interpreter cauliflower, IValue[] args, bool isStatic = false) {
+                if (cauliflower.Scope.Namespaces.Value == null)
+                    cauliflower.Scope.Namespaces.Value = new Scope();
+                if (basePath == null) {
+                    var linux = System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Linux);
+                    pathSeparator = linux ? "/" : "\\";
+                    Directory.CreateDirectory(
+                        basePath = linux ?
+                            "/usr/local/lib/cauliflower" :
+                            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) + "\\Cauliflower"
+                    );
+                    AppDomain.CurrentDomain.AssemblyResolve += (sender, assemblyInfo) => {
+                        try {
+                            return Assembly.Load(assemblyInfo.Name);
+                        } catch {
+                            return Assembly.LoadFile(basePath + pathSeparator + "dependencies" + pathSeparator + new AssemblyName(assemblyInfo.Name).Name);
+                        }
+                    };
+                }
+                var directory = basePath + pathSeparator + "modules";
+                Assembly module = null;
+                StringBuilder fullModuleName = new StringBuilder("cauliflower.");
+                StringBuilder fullTypeName = new StringBuilder();
+                string typeName = null;
+                foreach (var (item, index) in args.WithIndex()) {
+                    if (!(item is BAtom a))
+                        throw new ArgumentTypeException(item, "atom", index + 1, "import");
+                    if (module == null) {
+                        fullModuleName.Append(a.Value).Append('.');
+                        var next = directory + pathSeparator + a.Value;
+                        if (Directory.Exists(next))
+                            directory = next;
+                        else if (File.Exists(next + ".dll"))
+                            module = Assembly.LoadFile(next + ".dll");
+                        else
+                            throw new Exception($"Directory '{directory + pathSeparator + a.Value}' not found");
+                    } else {
+                        if (fullTypeName.Length != 0)
+                            fullTypeName.Append('.');
+                        fullTypeName.Append(typeName = a.Value);
+                    }
+                }
+                if (module != null && typeName == null) {
+                    foreach (var nested in module.GetExportedTypes().Where(t => !t.Name.Contains("<"))) {
+                        AddTypes(nested, cauliflower.Scope.Namespaces);
+                        if (isStatic)
+                            foreach (var method in nested.GetMethods(BindingFlags.Public | BindingFlags.Static)) {
+                                var name = method.Name.Replace('_', '-');
+                                cauliflower.Scope.Functions[method.Name.Replace('_', '-')] = new Function(
+                                    name, ~0, (_, innerArgs) => CauliflowerMethod(nested, method.Name, null, innerArgs)
+                                );
+                            }
+                        else
+                            if (nested.GetInterface("IValue") != null)
+                                cauliflower.Scope.Namespaces.Value.Scalars[nested.Name.Replace('_', '-')] = (BCauliflowerType) nested;
+                    }
                 }
             }
         }

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
+using System.Runtime.CompilerServices;
 
 namespace Broccoli {
     public partial class Interpreter {
@@ -10,10 +11,11 @@ namespace Broccoli {
         /// </summary>
         /// <param name="b">The boolean to convert.</param>
         /// <returns>The Broccoli equivalent of the boolean.</returns>
-        private static BAtom Boolean(bool b) => b ? BAtom.True : BAtom.Nil;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static BAtom Boolean(bool b) => b ? BAtom.True : BAtom.Nil;
 
         /// <summary>
-        /// A dictionary containing all the default builtin functions of Broccoli.
+        /// A dictionary containing all the builtin functions of Broccoli.
         /// </summary>
         public static readonly Dictionary<string, IFunction> StaticBuiltins = new Dictionary<string, IFunction> {
             // Core Language Features
@@ -35,7 +37,7 @@ namespace Broccoli {
 
                 return fn.Invoke(broccoli, e.Values.Skip(1).ToArray());
             })},
-            {"fn", new ShortCircuitFunction("fn", -3, (broccoli, args) => {
+            {"fn", new ShortCircuitFunction("fn", ~2, (broccoli, args) => {
                 if (!(broccoli.Run(args[0]) is BAtom name))
                     throw new ArgumentTypeException(args[0], "atom", 1, "fn");
                 if (!(args[1] is ValueExpression argExpressions))
@@ -90,7 +92,7 @@ namespace Broccoli {
                 broccoli.Scope.Lists.Clear();
                 return null;
             })},
-            {"bench", new ShortCircuitFunction("bench", -2, (broccoli, args) => {
+            {"bench", new ShortCircuitFunction("bench", ~1, (broccoli, args) => {
                 var start = DateTime.Now;
                 foreach (var expression in args)
                     broccoli.Run(expression);
@@ -101,7 +103,7 @@ namespace Broccoli {
                     throw new ArgumentTypeException(args[0], "string", 1, "eval");
                 return broccoli.Run(s.Value);
             })},
-            {"call", new ShortCircuitFunction("call", -2, (broccoli, args) => {
+            {"call", new ShortCircuitFunction("call", ~1, (broccoli, args) => {
                 IFunction fn = null;
                 var value = broccoli.Run(args[0]);
                 if (!(broccoli.Run(value) is BAtom a))
@@ -130,7 +132,7 @@ namespace Broccoli {
             })},
 
             // I/O Commands
-            {"print", new Function("print", -2, (broccoli, args) => {
+            {"print", new Function("print", ~1, (broccoli, args) => {
                 foreach (var value in args) {
                     string print = null;
                     if (value is BAtom atom)
@@ -148,7 +150,7 @@ namespace Broccoli {
             })},
 
             // Basic Math
-            {"+", new Function("+", -1, (broccoli, args) => {
+            {"+", new Function("+", ~0, (broccoli, args) => {
                 foreach (var (value, index) in args.WithIndex())
                     if (!(value is BInteger || value is BFloat))
                         throw new ArgumentTypeException(value, "integer or float", index + 1, "+");
@@ -168,7 +170,7 @@ namespace Broccoli {
                     return new BFloat(fm + fv);
                 });
             })},
-            {"*", new Function("*", -1, (broccoli, args) => {
+            {"*", new Function("*", ~0, (broccoli, args) => {
                 foreach (var (value, index) in args.WithIndex())
                     if (!(value is BInteger || value is BFloat))
                         throw new ArgumentTypeException(value, "integer or float", index + 1, "*");
@@ -188,7 +190,7 @@ namespace Broccoli {
                     return new BFloat(fm * fv);
                 });
             })},
-            {"-", new Function("-", -2, (broccoli, args) => {
+            {"-", new Function("-", ~1, (broccoli, args) => {
                 foreach (var (value, index) in args.WithIndex())
                     if (!(value is BInteger || value is BFloat))
                         throw new ArgumentTypeException(value, "integer or float", index + 1, "-");
@@ -208,7 +210,7 @@ namespace Broccoli {
                     return new BFloat(fm - fv);
                 });
             })},
-            {"/", new Function("/", -2, (broccoli, args) => {
+            {"/", new Function("/", ~1, (broccoli, args) => {
                 foreach (var (value, index) in args.WithIndex())
                     if (!(value is BInteger || value is BFloat))
                         throw new ArgumentTypeException(value, "integer or float", index + 1, "/");
@@ -266,16 +268,16 @@ namespace Broccoli {
             })},
 
             // Comparison
-            {"=", new Function("=", -2, (broccoli, args) => {
+            {"=", new Function("=", ~1, (broccoli, args) => {
                 return Boolean(args.Skip(1).All(element => args[0].Equals(element)));
             })},
-            {"/=", new Function("/=", -2, (broccoli, args) => {
+            {"/=", new Function("/=", ~1, (broccoli, args) => {
                 if (args.Length == 1)
                     return BAtom.Nil;
                 return Boolean(args.Skip(1).All(element => !args[0].Equals(element)));
             })},
             // TODO: make this shorter
-            {"<", new Function("<", -3, (broccoli, args) => {
+            {"<", new Function("<", ~2, (broccoli, args) => {
                 foreach (var (value, index) in args.WithIndex())
                     if (!(value is BInteger || value is BFloat))
                         throw new ArgumentTypeException(args[0], "integer or float", index + 11, "<");
@@ -363,7 +365,7 @@ namespace Broccoli {
                 }
                 return BAtom.True;
             })},
-            {"<=", new Function("<=", -3, (broccoli, args) => {
+            {"<=", new Function("<=", ~2, (broccoli, args) => {
                 foreach (var (value, index) in args.WithIndex())
                     if (!(value is BInteger || value is BFloat))
                         throw new ArgumentTypeException(args[0], "integer or float", index + 11, "<=");
@@ -407,7 +409,7 @@ namespace Broccoli {
                 }
                 return BAtom.True;
             })},
-            {">=", new Function(">=", -3, (broccoli, args) => {
+            {">=", new Function(">=", ~2, (broccoli, args) => {
                 foreach (var (value, index) in args.WithIndex())
                     if (!(value is BInteger || value is BFloat))
                         throw new ArgumentTypeException(args[0], "integer or float", index + 11, ">=");
@@ -456,11 +458,11 @@ namespace Broccoli {
 
             // Logic
             {"not", new Function("not", 1, (broccoli, args) => Boolean(args[0].Equals(BAtom.Nil)))},
-            {"and", new Function("and", -1, (broccoli, args) => Boolean(args.All(arg => !arg.Equals(BAtom.Nil))))},
-            {"or", new Function("or", -1, (broccoli, args) => Boolean(args.Any(arg => !arg.Equals(BAtom.Nil))))},
+            {"and", new Function("and", ~0, (broccoli, args) => Boolean(args.All(arg => !arg.Equals(BAtom.Nil))))},
+            {"or", new Function("or", ~0, (broccoli, args) => Boolean(args.Any(arg => !arg.Equals(BAtom.Nil))))},
 
             // Flow control
-            {"if", new ShortCircuitFunction("if", -3, (broccoli, args) => {
+            {"if", new ShortCircuitFunction("if", ~2, (broccoli, args) => {
                 var condition = broccoli.Run(args[0]);
                 if (!condition.Equals(BAtom.True) && !condition.Equals(BAtom.Nil))
                     throw new ArgumentTypeException(args[0], "boolean", 1, "if");
@@ -477,7 +479,7 @@ namespace Broccoli {
                     result = broccoli.Run(statement);
                 return result;
             })},
-            {"for", new ShortCircuitFunction("for", -3, (broccoli, args) => {
+            {"for", new ShortCircuitFunction("for", ~2, (broccoli, args) => {
                 var inValue = broccoli.Run(args[1]);
                 if (!(inValue is BAtom inAtom))
                     throw new ArgumentTypeException(inValue, "atom", 2, "for");
@@ -517,7 +519,7 @@ namespace Broccoli {
             })},
 
             // List Functions
-            {"list", new Function("list", -1, (broccoli, args) => new BList(args.ToList()))},
+            {"list", new Function("list", ~0, (broccoli, args) => new BList(args.ToList()))},
             {"len", new Function("len", 1, (broccoli, args) => {
                 switch (args[0]) {
                     case BList l:
@@ -562,7 +564,7 @@ namespace Broccoli {
                 var end = (int) i2.Value;
                 return new BList(Enumerable.Range(start, end - start + 1).Select(value => (IValue) new BInteger(value)));
             })},
-            {"cat", new Function("cat", -3, (broccoli, args) => {
+            {"cat", new Function("cat", ~2, (broccoli, args) => {
                 foreach (var (value, index) in args.WithIndex())
                     if (!(value is BList))
                         throw new ArgumentTypeException(value, "list", index + 1, "cat");

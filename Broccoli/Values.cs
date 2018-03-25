@@ -163,7 +163,9 @@ namespace Broccoli {
             Value = a;
         }
 
-        public static implicit operator BAtom(string a) => new BAtom(a);
+        public static implicit operator BAtom(string s) => new BAtom(s);
+
+        public static implicit operator string(BAtom a) => a.Value;
 
         public static bool operator ==(BAtom left, object right) => right is BAtom a && left.Value == a.Value;
 
@@ -201,6 +203,10 @@ namespace Broccoli {
             Value = s;
         }
 
+        public static implicit operator ScalarVar(string s) => new ScalarVar(s);
+
+        public static implicit operator string(ScalarVar s) => s.Value;
+
         public override string ToString() => Value;
 
         public string Inspect() => '$' + Value;
@@ -219,6 +225,10 @@ namespace Broccoli {
         public ListVar(string l) {
             Value = l;
         }
+        
+        public static implicit operator ListVar(string s) => new ListVar(s);
+
+        public static implicit operator string(ListVar l) => l.Value;
 
         public override string ToString() => Value;
 
@@ -238,6 +248,10 @@ namespace Broccoli {
         public DictVar(string d) {
             Value = d;
         }
+
+        public static implicit operator DictVar(string s) => new DictVar(s);
+
+        public static implicit operator string(DictVar d) => d.Value;
 
         public override string ToString() => Value;
 
