@@ -105,7 +105,7 @@ namespace Broccoli {
     }
 
     /// <summary>
-    /// Represents a Broccoli function that is also a value.
+    /// Represents a Cauliflower function that is also a value.
     /// </summary>
     public struct AnonymousFunction : IFunction {
         public delegate IValue Call(IValue[] args);

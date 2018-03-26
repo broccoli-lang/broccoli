@@ -1,4 +1,5 @@
 ﻿using System;
+using System.CodeDom;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -84,7 +85,7 @@ namespace Broccoli {
         /// <summary>
         /// Valid class item modifiers.
         /// </summary>
-        private static string[] modifiers = new[] { "private", "protected", "public", "readonly", "static" };
+        private static string[] modifiers = { "private", "protected", "public", "readonly", "static" };
 
         /// <summary>
         /// Creates an IValue from an object.
@@ -749,8 +750,23 @@ namespace Broccoli {
                 return null;
             })},
             {"class", new ShortCircuitFunction("class", ~0, (cauliflower, args) => {
-                var items = new List<(string, List<string>, ValueExpression)>();
-                foreach (var (arg, index) in args.WithIndex()) {
+                if (!(args[0] is BAtom name))
+                    throw new ArgumentTypeException(args[0], "atom", 1, "class");
+
+                // Generate initial class
+                var globalNs = new CodeNamespace();
+                var targetUnit = new CodeCompileUnit();
+                var targetClass = new CodeTypeDeclaration(name.Value) {
+                    IsClass = true,
+                    Attributes = MemberAttributes.Public
+                };
+
+                globalNs.Types.Add(targetClass);
+                targetUnit.Namespaces.Add(globalNs);
+
+                // Validate + collate statements
+                var statements = new List<(string, List<string>, ValueExpression)>();
+                foreach (var (arg, index) in args.Skip(1).WithIndex()) {
                     if (!(arg is ValueExpression e))
                         throw new ArgumentTypeException(arg, "expression", index + 1, "class");
                     if (e.Values.Length == 0)
@@ -758,6 +774,7 @@ namespace Broccoli {
                     int i = 0;
                     var m = new List<string>();
                     if (e.Values[0] is BAtom mod && modifiers.Contains(mod.Value)) {
+                        m.Add(mod.Value);
                         while ((e.Values[++i] is BAtom atom) && modifiers.Contains(atom.Value))
                             m.Add(atom.Value);
                         if (!(e.Values[i] is ValueExpression e2))
@@ -766,9 +783,59 @@ namespace Broccoli {
                     }
                     if (!(e.Values[0] is BAtom a))
                         throw new Exception($"Expected atom in statement {index + 1} of 'class', found {e.Values[0].GetType()} instead");
-                    items.Add((a.Value, m, new ValueExpression(e.Values.Skip(1))));
+                    statements.Add((a.Value, m, new ValueExpression(e.Values.Skip(1))));
                 }
-                // TODO
+
+                foreach (var (sName, sModifiers, sArgs) in statements) {
+                    Console.WriteLine(string.Join(", ", sName, $"[{string.Join(", ", sModifiers)}]", sArgs));
+
+                    void SetAttributesFromMods(CodeTypeMember member, IEnumerable<string> mods) {
+                        member.Attributes = mods.Select(mod => {
+                            switch (mod) {
+                                case "public":
+                                    return MemberAttributes.Public;
+                                case "private":
+                                    return MemberAttributes.Private;
+                                case "protected":
+                                    return MemberAttributes.Family;
+                                case "static":
+                                    return MemberAttributes.Static;
+                                default:
+                                    throw new Exception($"Unrecognized modifier {mod}");
+                            }
+                        }).Aggregate(member.Attributes & ~MemberAttributes.AccessMask, (a, b) => a | b);
+                    }
+
+                    switch (sName) {
+                        case "field":
+                            if (!(sArgs.Values[0] is BAtom fieldName))
+                                throw new ArgumentTypeException(sArgs.Values[0], "atom", 1, "field");
+
+                            var newField = new CodeMemberField(typeof(IValue), fieldName.Value);
+                            SetAttributesFromMods(newField, sModifiers);
+                            newField.InitExpression = new CodePrimitiveExpression(sArgs.Values.ElementAtOrDefault(1));
+                            targetClass.Members.Add(newField);
+                            break;
+                        case "prop":
+                            if (!(sArgs.Values[0] is BAtom propName))
+                                throw new ArgumentTypeException(sArgs.Values[0], "atom", 1, "field");
+
+                            var newProp = new CodeMemberProperty {
+                                Name = propName.Value,
+                                Type = new CodeTypeReference(typeof(IValue))
+                            };
+                            SetAttributesFromMods(newProp, sModifiers);
+
+                            // TODO: prop bodies, auto-backing field
+                            break;
+                        case "fn":
+                            // TODO
+                            break;
+                        default:
+                            throw new Exception($"Unrecognized class definition statement '{sName}'");
+                    }
+                }
+
                 return null;
             })},
 
