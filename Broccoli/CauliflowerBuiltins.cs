@@ -765,26 +765,7 @@ namespace Broccoli {
                 targetUnit.Namespaces.Add(globalNs);
 
                 // Validate + collate statements
-                var statements = new List<(string, List<string>, ValueExpression)>();
-                foreach (var (arg, index) in args.Skip(1).WithIndex()) {
-                    if (!(arg is ValueExpression e))
-                        throw new ArgumentTypeException(arg, "expression", index + 1, "class");
-                    if (e.Values.Length == 0)
-                        throw new Exception($"Found empty expression in statement {index + 1} of 'class'");
-                    int i = 0;
-                    var m = new List<string>();
-                    if (e.Values[0] is BAtom mod && modifiers.Contains(mod.Value)) {
-                        m.Add(mod.Value);
-                        while ((e.Values[++i] is BAtom atom) && modifiers.Contains(atom.Value))
-                            m.Add(atom.Value);
-                        if (!(e.Values[i] is ValueExpression e2))
-                            throw new ArgumentTypeException(arg, "expression", index + 1, "class");
-                        e = e2;
-                    }
-                    if (!(e.Values[0] is BAtom a))
-                        throw new Exception($"Expected atom in statement {index + 1} of 'class', found {e.Values[0].GetType()} instead");
-                    statements.Add((a.Value, m, new ValueExpression(e.Values.Skip(1))));
-                }
+                var statements = CauliflowerInline.GetStatements(args.Skip(1));
 
                 foreach (var (sName, sModifiers, sArgs) in statements) {
                     Console.WriteLine(string.Join(", ", sName, $"[{string.Join(", ", sModifiers)}]", sArgs));
@@ -1200,7 +1181,14 @@ namespace Broccoli {
                 }
             }
 
-            public static void Import(Interpreter cauliflower, IValue[] args, bool isStatic = false) {
+            /// <summary>
+            /// Imports a Cauliflower native module.
+            /// </summary>
+            /// <param name="cauliflower">Interpreter instance wanting to import module</param>
+            /// <param name="path">Path to module</param>
+            /// <param name="isStatic">Whether to static import module</param>
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static void Import(Interpreter cauliflower, IValue[] path, bool isStatic = false) {
                 if (cauliflower.Scope.Namespaces.Value == null)
                     cauliflower.Scope.Namespaces.Value = new Scope();
                 if (basePath == null) {
@@ -1224,7 +1212,7 @@ namespace Broccoli {
                 StringBuilder fullModuleName = new StringBuilder("cauliflower.");
                 StringBuilder fullTypeName = new StringBuilder();
                 string typeName = null;
-                foreach (var (item, index) in args.WithIndex()) {
+                foreach (var (item, index) in path.WithIndex()) {
                     if (!(item is BAtom a))
                         throw new ArgumentTypeException(item, "atom", index + 1, "import");
                     if (module == null) {
@@ -1257,6 +1245,36 @@ namespace Broccoli {
                                 cauliflower.Scope.Namespaces.Value.Scalars[nested.Name.Replace('_', '-')] = (BCauliflowerType) nested;
                     }
                 }
+            }
+
+            /// <summary>
+            /// Gets statements from a list of expressions
+            /// </summary>
+            /// <param name="expressions">Expressions to turn into statements</param>
+            /// <returns></returns>
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static List<(string, List<string>, ValueExpression)> GetStatements(IEnumerable<IValueExpressible> expressions) {
+                var statements = new List<(string, List<string>, ValueExpression)>();
+                foreach (var (arg, index) in expressions.WithIndex()) {
+                    if (!(arg is ValueExpression e))
+                        throw new ArgumentTypeException(arg, "expression", index + 1, "class");
+                    if (e.Values.Length == 0)
+                        throw new Exception($"Found empty expression in statement {index + 1} of 'class'");
+                    int i = 0;
+                    var m = new List<string>();
+                    if (e.Values[0] is BAtom mod && modifiers.Contains(mod.Value)) {
+                        m.Add(mod.Value);
+                        while ((e.Values[++i] is BAtom atom) && modifiers.Contains(atom.Value))
+                            m.Add(atom.Value);
+                        if (!(e.Values[i] is ValueExpression e2))
+                            throw new ArgumentTypeException(arg, "expression", index + 1, "class");
+                        e = e2;
+                    }
+                    if (!(e.Values[0] is BAtom a))
+                        throw new Exception($"Expected atom in statement {index + 1} of 'class', found {e.Values[0].GetType()} instead");
+                    statements.Add((a.Value, m, new ValueExpression(e.Values.Skip(1))));
+                }
+                return statements;
             }
         }
     }
