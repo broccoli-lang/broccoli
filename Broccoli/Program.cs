@@ -13,16 +13,12 @@ namespace Broccoli {
     ///     The main class of the Broccoli .NET interpreter.
     /// </summary>
     public static class Program {
-        /// <summary>
-        ///     Represents whether the current Broccoli program uses the Cauliflower environment.
-        /// </summary>
-        public static bool IsCauliflower { get; set; }
 
         public static void Main(string[] args) {
             // TODO: remove as many try/catches as possible, this isn't Python, nor is it Java
             // TODO: do we even need row/col in ParseNode
             string file;
-            bool getHelp = false, useREPL = args.Length == 0;
+            bool getHelp = false, useREPL = args.Length == 0, isCauliflower = false;
 
             var options = new OptionSet {
                 {
@@ -30,15 +26,15 @@ namespace Broccoli {
                 }, {
                     "r|repl", "Use REPL", n => useREPL = n != null
                 }, {
-                    "c|cauliflower", "Use Cauliflower", n => IsCauliflower = n != null
+                    "c|cauliflower", "Use Cauliflower", n => isCauliflower = n != null
                 }
             };
             IEnumerable<string> argv = options.Parse(args);
-            var interpreter = IsCauliflower
+            var interpreter = isCauliflower
                 ? new CauliflowerInterpreter(new BList(argv.Skip(1).Select(i => new BString(i))))
                 : new Interpreter();
-            var prompt = IsCauliflower ? "cauliflower> " : "broccoli> ";
-            var continuationPrompt = IsCauliflower ? "           > " : "        > ";
+            var prompt = isCauliflower ? "cauliflower> " : "broccoli> ";
+            var continuationPrompt = isCauliflower ? "           > " : "        > ";
             file = argv.FirstOrDefault();
             if (file is null)
                 useREPL = true;
