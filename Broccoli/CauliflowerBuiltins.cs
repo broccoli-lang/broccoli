@@ -762,17 +762,24 @@ namespace Broccoli {
                 ctor.Parameters.Add(
                     new CodeParameterDeclarationExpression(typeof(CauliflowerInterpreter),
                         "interpreter"));
-                ctor.Statements.Add(new CodeAssignStatement(
-                    new CodeFieldReferenceExpression(
-                        new CodeThisReferenceExpression(),
-                        "(interpreter)"
-                    ),
-                    new CodeVariableReferenceExpression("interpreter")
-                ));
+
+                ctor.Statements.AddRange(new []{
+//                    newScope,
+                    new CodeAssignStatement(
+                        new CodeFieldReferenceExpression(
+                            new CodeThisReferenceExpression(),
+                            "(interpreter)"
+                        ),
+                        new CodeVariableReferenceExpression("interpreter")
+                    )
+                });
 
                 var targetClass = new CodeTypeDeclaration(name.Value) {
                     IsClass = true,
                     Attributes = MemberAttributes.Public,
+                    BaseTypes = {
+                        typeof(IScalar)
+                    },
                     Members = {
                         // Interpreter for evaluation stuff
                         new CodeMemberField(typeof(CauliflowerInterpreter), "(interpreter)"),
@@ -783,6 +790,35 @@ namespace Broccoli {
 
                 globalNs.Types.Add(targetClass);
                 targetUnit.Namespaces.Add(globalNs);
+
+                var scopeRef = new CodeFieldReferenceExpression(
+                    new CodeFieldReferenceExpression(
+                        new CodeThisReferenceExpression(),
+                        "(interpreter)"
+                    ),
+                    "Scope"
+                );
+                var newScope = new CodeAssignStatement(
+                    scopeRef,
+                    new CodeObjectCreateExpression(typeof(Scope), scopeRef)
+                );
+                var returnParentScope = new CodeAssignStatement(
+                    scopeRef,
+                    new CodeFieldReferenceExpression(
+                        scopeRef,
+                        "Parent"
+                    )
+                );
+                var addThis = new CodeAssignStatement(
+                    new CodeIndexerExpression(
+                        scopeRef,
+                        new CodeObjectCreateExpression(
+                            typeof(ScalarVar),
+                            new CodePrimitiveExpression("this")
+                        )
+                    ),
+                    new CodeThisReferenceExpression()
+                );
 
                 // Validate + collate statements
                 var statements = CauliflowerInline.GetStatements(args.Skip(1));
@@ -817,7 +853,7 @@ namespace Broccoli {
 
                             var initFieldVal = sArgs.Values.ElementAtOrDefault(1);
                             if (initFieldVal != null)
-                                ctor.Statements.Add(new CodeAssignStatement(
+                                ctor.Statements.Insert(1, new CodeAssignStatement(
                                     new CodeFieldReferenceExpression(
                                         new CodeThisReferenceExpression(),
                                         fieldName.Value
@@ -846,6 +882,7 @@ namespace Broccoli {
 
                             var backingField = new CodeMemberField(typeof(IValue), propName.Value + "(backing)");
 
+                            // TODO: Figure out if access control is even possible on accessors with CodeDOM
                             foreach (var (aType, aModifiers, aArgs) in propStatements) {
                                 // Make sure nobody's trying to combine auto-properties and bodies
                                 var argsEmpty = aArgs.Values.Length <= 0;
@@ -867,9 +904,14 @@ namespace Broccoli {
                                                 )
                                             ));
                                         } else {
-                                            newProp.GetStatements.Add(new CodeMethodReturnStatement(
-                                                CauliflowerInline.InvokeInterpreter(aArgs)
-                                            ));
+                                            newProp.GetStatements.AddRange(new CodeStatementCollection {
+                                                newScope,
+                                                addThis,
+                                                new CodeMethodReturnStatement(
+                                                    CauliflowerInline.InvokeInterpreter(aArgs)
+                                                ),
+                                                returnParentScope
+                                            });
                                         }
                                         break;
                                     case "set":
@@ -882,9 +924,22 @@ namespace Broccoli {
                                                 new CodePropertySetValueReferenceExpression()
                                             ));
                                         } else {
-                                            newProp.SetStatements.Add(
-                                                CauliflowerInline.InvokeInterpreter(aArgs)
-                                            );
+                                            newProp.SetStatements.AddRange(new CodeStatementCollection {
+                                                newScope,
+                                                addThis,
+                                                new CodeAssignStatement(
+                                                    new CodeIndexerExpression(
+                                                        scopeRef,
+                                                        new CodeObjectCreateExpression(
+                                                            typeof(ScalarVar),
+                                                            new CodePrimitiveExpression("value")
+                                                        )
+                                                    ),
+                                                    new CodePropertySetValueReferenceExpression()
+                                                ),
+                                                CauliflowerInline.InvokeInterpreter(aArgs),
+                                                returnParentScope
+                                            });
                                         }
                                         break;
                                     default:
@@ -894,7 +949,7 @@ namespace Broccoli {
 
                             var initPropVal = sArgs.Values.ElementAtOrDefault(2);
                             if (initPropVal != null)
-                                ctor.Statements.Add(new CodeAssignStatement(
+                                ctor.Statements.Insert(1, new CodeAssignStatement(
                                     new CodeFieldReferenceExpression(
                                         new CodeThisReferenceExpression(),
                                         propName.Value
@@ -908,7 +963,123 @@ namespace Broccoli {
                             targetClass.Members.Add(newProp);
                             break;
                         case "fn":
-                            // TODO
+                            if (!(sArgs.Values[0] is BAtom fnName))
+                                throw new ArgumentTypeException(sArgs.Values[0], "atom", 1, "fn");
+
+                            var isCtor = fnName.Value == "init";
+                            var newMethod = !isCtor ? new CodeMemberMethod {
+                                Name = fnName.Value,
+                                ReturnType = new CodeTypeReference(typeof(IValue))
+                            } : ctor;
+                            SetAttributesFromMods(newMethod, sModifiers);
+
+                            if (!(sArgs.Values[1] is ValueExpression vexp))
+                                throw new ArgumentTypeException(sArgs.Values[1], "expression", 2, "fn");
+
+                            newMethod.Statements.Add(newScope);
+
+                            foreach (var (param, index) in vexp.Values.WithIndex()) {
+                                switch (param) {
+                                    case ScalarVar s:
+                                        newMethod.Parameters.Add(new CodeParameterDeclarationExpression(
+                                            typeof(IScalar),
+                                            s.Value
+                                        ));
+                                        newMethod.Statements.Add(new CodeAssignStatement(
+                                            new CodeIndexerExpression(
+                                                scopeRef,
+                                                new CodeObjectCreateExpression(
+                                                    typeof(ScalarVar),
+                                                    new CodePrimitiveExpression(s.Value)
+                                                )
+                                            ),
+                                            new CodeVariableReferenceExpression(s.Value)
+                                        ));
+                                        break;
+                                    case ListVar l:
+                                        newMethod.Parameters.Add(new CodeParameterDeclarationExpression(
+                                            typeof(BList),
+                                            l.Value
+                                        ));
+                                        newMethod.Statements.Add(new CodeAssignStatement(
+                                            new CodeIndexerExpression(
+                                                scopeRef,
+                                                new CodeObjectCreateExpression(
+                                                    typeof(ListVar),
+                                                    new CodePrimitiveExpression(l.Value)
+                                                )
+                                            ),
+                                            new CodeVariableReferenceExpression(l.Value)
+                                        ));
+                                        break;
+                                    case DictVar d:
+                                        newMethod.Parameters.Add(new CodeParameterDeclarationExpression(
+                                            typeof(BDictionary),
+                                            d.Value
+                                        ));
+                                        newMethod.Statements.Add(new CodeAssignStatement(
+                                            new CodeIndexerExpression(
+                                                scopeRef,
+                                                new CodeObjectCreateExpression(
+                                                    typeof(DictVar),
+                                                    new CodePrimitiveExpression(d.Value)
+                                                )
+                                            ),
+                                            new CodeVariableReferenceExpression(d.Value)
+                                        ));
+                                        break;
+                                    // Rest args
+                                    case ValueExpression v:
+                                        if (!(v.Values[0] is ListVar rest))
+                                            throw new ArgumentTypeException(v.Values[0], "rest arguments list variable", index + 1, "fn parameters");
+
+                                        var restDecl = new CodeParameterDeclarationExpression(
+                                            typeof(IValue[]),
+                                            rest.Value
+                                        );
+                                        restDecl.CustomAttributes.Add(new CodeAttributeDeclaration(
+                                            new CodeTypeReference(typeof(ParamArrayAttribute))
+                                        ));
+                                        newMethod.Parameters.Add(restDecl);
+                                        newMethod.Statements.Add(new CodeAssignStatement(
+                                            new CodeIndexerExpression(
+                                                scopeRef,
+                                                new CodeObjectCreateExpression(
+                                                    typeof(ListVar),
+                                                    new CodePrimitiveExpression(rest.Value)
+                                                )
+                                            ),
+                                            new CodeVariableReferenceExpression(rest.Value)
+                                        ));
+                                        break;
+                                    default:
+                                        throw new ArgumentTypeException(param, "variable name", index + 1, "fn parameters");
+                                }
+                            }
+
+                            if (isCtor) {
+                                newMethod.Statements.AddRange(new CodeStatementCollection {
+                                    addThis,
+                                    CauliflowerInline.InvokeInterpreter(new ValueExpression(sArgs.Values.Skip(2))),
+                                    returnParentScope
+                                });
+                            } else {
+                                newMethod.Statements.AddRange(new CodeStatementCollection {
+                                    addThis,
+                                    new CodeVariableDeclarationStatement(
+                                        typeof(IValue),
+                                        "retVal",
+                                        CauliflowerInline.InvokeInterpreter(
+                                            new ValueExpression(sArgs.Values.Skip(2)))
+                                    ),
+                                    returnParentScope,
+                                    new CodeMethodReturnStatement(
+                                        new CodeVariableReferenceExpression("retVal")
+                                    )
+                                });
+                            }
+
+                            if (!isCtor) targetClass.Members.Add(newMethod);
                             break;
                         default:
                             throw new Exception($"Unrecognized class definition statement '{sName}'");
