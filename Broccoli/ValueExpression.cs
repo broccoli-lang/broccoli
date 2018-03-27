@@ -72,7 +72,7 @@ namespace Broccoli {
                 new ValueExpression(n.Children.Select(Selector));
         }
 
-        public override string ToString() => '(' + string.Join<IValueExpressible>(' ', Values) + ')';
+        public override string ToString() => '(' + string.Join(' ', Values.Select(v => v.Inspect())) + ')';
 
         public string Inspect() => ToString();
     }

@@ -799,7 +799,7 @@ namespace Broccoli {
                             break;
                         case "prop":
                             if (!(sArgs.Values[0] is BAtom propName))
-                                throw new ArgumentTypeException(sArgs.Values[0], "atom", 1, "field");
+                                throw new ArgumentTypeException(sArgs.Values[0], "atom", 1, "prop");
 
                             var newProp = new CodeMemberProperty {
                                 Name = propName.Value,
@@ -807,7 +807,68 @@ namespace Broccoli {
                             };
                             SetAttributesFromMods(newProp, sModifiers);
 
-                            // TODO: prop bodies, auto-backing field
+                            if (!(sArgs.Values[1] is ValueExpression exp))
+                                throw new ArgumentTypeException(sArgs.Values[1], "expression", 2, "prop");
+
+                            var propStatements = CauliflowerInline.GetStatements(exp.Values);
+
+                            bool? hasBody = null;
+
+                            var backingField = new CodeMemberField(typeof(IValue), propName.Value + "(backing)");
+
+                            foreach (var (aType, aModifiers, aArgs) in propStatements) {
+                                Console.WriteLine(string.Join(", ", aType, $"[{string.Join(", ", aModifiers)}]", aArgs));
+
+                                // Make sure nobody's trying to combine auto-properties and bodies
+                                var argsEmpty = aArgs.Values.Length > 0;
+                                if (hasBody.HasValue) {
+                                    if (!(argsEmpty == hasBody.Value))
+                                        throw new Exception("Property definitions cannot have both auto-accessors and accessor bodies");
+                                } else {
+                                    if (argsEmpty)
+                                        hasBody = false;
+                                }
+
+                                switch (aType) {
+                                    case "get":
+                                        if (argsEmpty) {
+                                            newProp.GetStatements.Add(new CodeMethodReturnStatement(
+                                                new CodeFieldReferenceExpression(
+                                                    new CodeThisReferenceExpression(),
+                                                    backingField.Name
+                                                )
+                                            ));
+                                        } else {
+                                            newProp.GetStatements.Add(new CodeMethodReturnStatement(
+                                                new CodeMethodInvokeExpression(
+                                                    // TODO: Somehow get "cauliflower.Run" in here?
+                                                )
+                                            ));
+                                        }
+                                        break;
+                                    case "set":
+                                        if (argsEmpty) {
+                                            newProp.GetStatements.Add(new CodeAssignStatement(
+                                                new CodeFieldReferenceExpression(
+                                                    new CodeThisReferenceExpression(),
+                                                    backingField.Name
+                                                ),
+                                                new CodePropertySetValueReferenceExpression()
+                                            ));
+                                        } else {
+                                            newProp.GetStatements.Add(new CodeMethodInvokeExpression(
+                                                // TODO: Somehow get "cauliflower.Run" in here?
+                                            ));
+                                        }
+                                        break;
+                                    default:
+                                        throw new Exception(
+                                            $"Unrecognized property accessor '{aType}'");
+                                }
+                            }
+
+                            if (!hasBody.Value)
+                                targetClass.Members.Add(backingField);
                             break;
                         case "fn":
                             // TODO
@@ -1256,8 +1317,14 @@ namespace Broccoli {
             public static List<(string, List<string>, ValueExpression)> GetStatements(IEnumerable<IValueExpressible> expressions) {
                 var statements = new List<(string, List<string>, ValueExpression)>();
                 foreach (var (arg, index) in expressions.WithIndex()) {
-                    if (!(arg is ValueExpression e))
-                        throw new ArgumentTypeException(arg, "expression", index + 1, "class");
+                    if (!(arg is ValueExpression e)) {
+                        if (!(arg is BAtom a1))
+                            throw new ArgumentTypeException(arg, "expression or atom", index + 1,
+                            "class");
+
+                        e = new ValueExpression(a1);
+                    }
+
                     if (e.Values.Length == 0)
                         throw new Exception($"Found empty expression in statement {index + 1} of 'class'");
                     int i = 0;
@@ -1266,9 +1333,16 @@ namespace Broccoli {
                         m.Add(mod.Value);
                         while ((e.Values[++i] is BAtom atom) && modifiers.Contains(atom.Value))
                             m.Add(atom.Value);
-                        if (!(e.Values[i] is ValueExpression e2))
-                            throw new ArgumentTypeException(arg, "expression", index + 1, "class");
-                        e = e2;
+                        if (!(e.Values[i] is ValueExpression e2)) {
+                            if (!(e.Values[i] is BAtom a2))
+                                throw new ArgumentTypeException(arg, "expression or atom",
+                                    index + 1,
+                                    "class");
+
+                            e = new ValueExpression(a2);
+                        } else {
+                            e = e2;
+                        }
                     }
                     if (!(e.Values[0] is BAtom a))
                         throw new Exception($"Expected atom in statement {index + 1} of 'class', found {e.Values[0].GetType()} instead");
