@@ -1,5 +1,6 @@
 ﻿using System;
 using System.CodeDom;
+using System.CodeDom.Compiler;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -756,9 +757,28 @@ namespace Broccoli {
                 // Generate initial class
                 var globalNs = new CodeNamespace();
                 var targetUnit = new CodeCompileUnit();
+
+                var ctor = new CodeConstructor();
+                ctor.Parameters.Add(
+                    new CodeParameterDeclarationExpression(typeof(CauliflowerInterpreter),
+                        "interpreter"));
+                ctor.Statements.Add(new CodeAssignStatement(
+                    new CodeFieldReferenceExpression(
+                        new CodeThisReferenceExpression(),
+                        "(interpreter)"
+                    ),
+                    new CodeVariableReferenceExpression("interpreter")
+                ));
+
                 var targetClass = new CodeTypeDeclaration(name.Value) {
                     IsClass = true,
-                    Attributes = MemberAttributes.Public
+                    Attributes = MemberAttributes.Public,
+                    Members = {
+                        // Interpreter for evaluation stuff
+                        new CodeMemberField(typeof(CauliflowerInterpreter), "(interpreter)"),
+                        // Constructor
+                        ctor
+                    }
                 };
 
                 globalNs.Types.Add(targetClass);
@@ -794,7 +814,17 @@ namespace Broccoli {
 
                             var newField = new CodeMemberField(typeof(IValue), fieldName.Value);
                             SetAttributesFromMods(newField, sModifiers);
-                            newField.InitExpression = new CodePrimitiveExpression(sArgs.Values.ElementAtOrDefault(1));
+
+                            var initFieldVal = sArgs.Values.ElementAtOrDefault(1);
+                            if (initFieldVal != null)
+                                ctor.Statements.Add(new CodeAssignStatement(
+                                    new CodeFieldReferenceExpression(
+                                        new CodeThisReferenceExpression(),
+                                        fieldName.Value
+                                    ),
+                                    CauliflowerInline.InvokeInterpreter(initFieldVal)
+                                ));
+
                             targetClass.Members.Add(newField);
                             break;
                         case "prop":
@@ -817,12 +847,10 @@ namespace Broccoli {
                             var backingField = new CodeMemberField(typeof(IValue), propName.Value + "(backing)");
 
                             foreach (var (aType, aModifiers, aArgs) in propStatements) {
-                                Console.WriteLine(string.Join(", ", aType, $"[{string.Join(", ", aModifiers)}]", aArgs));
-
                                 // Make sure nobody's trying to combine auto-properties and bodies
-                                var argsEmpty = aArgs.Values.Length > 0;
+                                var argsEmpty = aArgs.Values.Length <= 0;
                                 if (hasBody.HasValue) {
-                                    if (!(argsEmpty == hasBody.Value))
+                                    if (argsEmpty == hasBody.Value)
                                         throw new Exception("Property definitions cannot have both auto-accessors and accessor bodies");
                                 } else {
                                     if (argsEmpty)
@@ -840,15 +868,13 @@ namespace Broccoli {
                                             ));
                                         } else {
                                             newProp.GetStatements.Add(new CodeMethodReturnStatement(
-                                                new CodeMethodInvokeExpression(
-                                                    // TODO: Somehow get "cauliflower.Run" in here?
-                                                )
+                                                CauliflowerInline.InvokeInterpreter(aArgs)
                                             ));
                                         }
                                         break;
                                     case "set":
                                         if (argsEmpty) {
-                                            newProp.GetStatements.Add(new CodeAssignStatement(
+                                            newProp.SetStatements.Add(new CodeAssignStatement(
                                                 new CodeFieldReferenceExpression(
                                                     new CodeThisReferenceExpression(),
                                                     backingField.Name
@@ -856,19 +882,30 @@ namespace Broccoli {
                                                 new CodePropertySetValueReferenceExpression()
                                             ));
                                         } else {
-                                            newProp.GetStatements.Add(new CodeMethodInvokeExpression(
-                                                // TODO: Somehow get "cauliflower.Run" in here?
-                                            ));
+                                            newProp.SetStatements.Add(
+                                                CauliflowerInline.InvokeInterpreter(aArgs)
+                                            );
                                         }
                                         break;
                                     default:
-                                        throw new Exception(
-                                            $"Unrecognized property accessor '{aType}'");
+                                        throw new Exception($"Unrecognized property accessor '{aType}'");
                                 }
                             }
 
-                            if (!hasBody.Value)
+                            var initPropVal = sArgs.Values.ElementAtOrDefault(2);
+                            if (initPropVal != null)
+                                ctor.Statements.Add(new CodeAssignStatement(
+                                    new CodeFieldReferenceExpression(
+                                        new CodeThisReferenceExpression(),
+                                        propName.Value
+                                    ),
+                                    CauliflowerInline.InvokeInterpreter(initPropVal)
+                                ));
+
+                            if (hasBody.HasValue && !hasBody.Value)
                                 targetClass.Members.Add(backingField);
+
+                            targetClass.Members.Add(newProp);
                             break;
                         case "fn":
                             // TODO
@@ -877,6 +914,9 @@ namespace Broccoli {
                             throw new Exception($"Unrecognized class definition statement '{sName}'");
                     }
                 }
+
+                var provider = CodeDomProvider.CreateProvider("CSharp");
+                provider.GenerateCodeFromCompileUnit(targetUnit, Console.Out, new CodeGeneratorOptions());
 
                 return null;
             })},
@@ -1349,6 +1389,23 @@ namespace Broccoli {
                     statements.Add((a.Value, m, new ValueExpression(e.Values.Skip(1))));
                 }
                 return statements;
+            }
+
+            /// <summary>
+            /// Builds an CodeDOM expression for evaluating code using the Cauliflower interpreter.
+            /// </summary>
+            /// <param name="expr">The code to evaluate.</param>
+            /// <returns>The generated expression.</returns>
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static CodeMethodInvokeExpression InvokeInterpreter(IValueExpressible expr) {
+                return new CodeMethodInvokeExpression(
+                    new CodeFieldReferenceExpression(
+                        new CodeThisReferenceExpression(),
+                        "(interpreter)"
+                    ),
+                    "Run",
+                    new CodePrimitiveExpression(expr.Inspect())
+                );
             }
         }
     }
