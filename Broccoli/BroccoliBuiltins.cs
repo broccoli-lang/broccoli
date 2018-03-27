@@ -504,11 +504,6 @@ namespace Broccoli {
                                 throw new Exception("Only Lists can be assigned to list (@) variables");
                             broccoli.Scope[l] = vList;
                             break;
-                        case DictVar d when Program.IsCauliflower:
-                            if (!(value is BDictionary vDict))
-                                throw new Exception("Only Dicts can be assigned to dict (%) variables");
-                            broccoli.Scope[d] = vDict;
-                            break;
                     }
                     foreach (var statement in statements)
                         broccoli.Run(statement);
