@@ -83,9 +83,15 @@ namespace Broccoli {
         private static Dictionary<Type, Dictionary<string, PropertyInfo>> properties = new Dictionary<Type, Dictionary<string, PropertyInfo>>();
 
         /// <summary>
-        /// Valid class item modifiers.
+        /// Valid access control modifiers ranked from least to most restrictive.
         /// </summary>
-        private static string[] modifiers = { "private", "protected", "public", "readonly", "static" };
+        private static string[] accessControlModifiers = { "public", "protected", "private" };
+
+
+        /// <summary>
+        /// All valid class item modifiers.
+        /// </summary>
+        private static string[] modifiers = accessControlModifiers.Concat(new [] { "readonly", "static" }).ToArray();
 
         /// <summary>
         /// Creates an IValue from an object.
@@ -826,7 +832,7 @@ namespace Broccoli {
                 }
 
                 var ctor = typeBuilder.DefineConstructor(
-                    MethodAttrsFromMods(ctorParamTuple.Item2),
+                    MethodAttrsFromMods(ctorParamTuple.Item2 ?? new List<string>()),
                     CallingConventions.Standard,
                     ctorParams
                 );
@@ -855,7 +861,7 @@ namespace Broccoli {
                 void CreateNewScope(ILGenerator gen) {
                     LoadInterpreterReference(gen); // Load to store in scope
                     LoadScopeReference(gen); // Load to get scope value
-                    gen.Emit(OpCodes.Newobj, typeof(Scope).GetConstructor()); // Create new scope
+                    gen.Emit(OpCodes.Newobj, typeof(Scope).GetConstructor(new [] { typeof(Scope) })); // Create new scope
                     gen.Emit(OpCodes.Stfld, scopeRef); // Store in scope
                 }
                 void ReturnToParentScope(ILGenerator gen) {
@@ -909,9 +915,8 @@ namespace Broccoli {
                                 propName.Value,
                                 PropertyAttributes.None,
                                 typeof(IValue),
-                                null
+                                new Type[] { }
                             );
-                            // Set modifiers
 
                             if (!(sArgs.Values[1] is ValueExpression exp))
                                 throw new ArgumentTypeException(sArgs.Values[1], "expression", 2, "prop");
@@ -919,6 +924,7 @@ namespace Broccoli {
                             var propStatements = CauliflowerInline.GetStatements(exp.Values);
 
                             bool? hasBody = null;
+                            bool? hasModifier = null;
 
                             var backingField = typeBuilder.DefineField(
                                 propName.Value + "(backing)",
@@ -933,9 +939,26 @@ namespace Broccoli {
                                     if (argsEmpty == hasBody.Value)
                                         throw new Exception("Property definitions cannot have both auto-accessors and accessor bodies");
                                 } else {
-                                    if (argsEmpty)
-                                        hasBody = false;
+                                    hasBody = !argsEmpty;
                                 }
+
+                                // Make sure there aren't access modifiers on both accessors
+                                var accessModifier = aModifiers.FirstOrDefault(accessControlModifiers.Contains);
+                                if (hasModifier.HasValue) {
+                                    if (accessModifier != null && hasModifier.Value)
+                                        throw new Exception($"Cannot specify access modifiers for both accessors of property '{propName.Value}'");
+                                } else {
+                                    hasModifier = accessModifier != null;
+                                }
+
+                                // Make sure that the accessor modifiers are more restrictive than the property modifier
+                                if (accessModifier != null &&
+                                    Array.IndexOf(accessControlModifiers, accessModifier) <=
+                                    Array.IndexOf(accessControlModifiers,
+                                        sModifiers.FirstOrDefault(accessControlModifiers
+                                            .Contains) ?? "public"))
+                                    throw new Exception(
+                                        $"Access modifier for {aType} accessor of '{propName.Value}' must be more restrictive than modifier for '{propName.Value}'");
 
                                 switch (aType) {
                                     case "get":
@@ -958,17 +981,21 @@ namespace Broccoli {
                             }
 
                             var initPropVal = sArgs.Values.ElementAtOrDefault(2);
-                            if (initPropVal != null)
-                                // Init value inside constructor
 
-                            if (hasBody.HasValue && !hasBody.Value)
-                                // Add backing field to members
+                            // Init value inside constructor
+                            if (initPropVal != null) { }
+
+                            // Add backing field to members
+                            if (hasBody.HasValue && !hasBody.Value) { }
 
                             // Add property to members
                             break;
                         case "fn":
                             if (!(sArgs.Values[0] is BAtom fnName))
                                 throw new ArgumentTypeException(sArgs.Values[0], "atom", 1, "fn");
+
+                            if (!(sArgs.Values[1] is ValueExpression vexp2))
+                                throw new ArgumentTypeException(sArgs.Values[1], "expression", 2, "fn");
 
                             if (fnName.Value == "init") continue;
                             var newMethod = typeBuilder.DefineMethod(
@@ -977,10 +1004,6 @@ namespace Broccoli {
                                 typeof(IValue),
                                 CauliflowerInline.GetParameterTypes(vexp2)
                             );
-
-                            if (!(sArgs.Values[1] is ValueExpression vexp2))
-                                throw new ArgumentTypeException(sArgs.Values[1], "expression", 2, "fn");
-
                             // Add new function scope
 
                             // Invoke interpreter, back out of scope, return
@@ -1445,8 +1468,13 @@ namespace Broccoli {
                     var m = new List<string>();
                     if (e.Values[0] is BAtom mod && modifiers.Contains(mod.Value)) {
                         m.Add(mod.Value);
-                        while ((e.Values[++i] is BAtom atom) && modifiers.Contains(atom.Value))
+                        while ((e.Values[++i] is BAtom atom) && modifiers.Contains(atom.Value)) {
+                            if (accessControlModifiers.Contains(mod.Value) &&
+                                accessControlModifiers.Contains(atom.Value))
+                                throw new Exception("Only one access control modifier is allowed per class member");
                             m.Add(atom.Value);
+                        }
+
                         if (!(e.Values[i] is ValueExpression e2)) {
                             if (!(e.Values[i] is BAtom a2))
                                 throw new ArgumentTypeException(arg, "expression or atom",
@@ -1493,8 +1521,8 @@ namespace Broccoli {
                             if (!(v.Values[0] is ListVar rest))
                                 throw new ArgumentTypeException(v.Values[0], "rest arguments list variable", index + 1, "fn parameters");
 
-                            var restDecl = null; // Declare param
-                            // TODO: Make it varargs (somehow?)
+                            // var restDecl = null; // Declare param
+                            // TODO: Make it varargs, probably with ParamArrayAttribute
                             results[index] = typeof(IValue[]);
                             // TODO: Add variable to scope
                             break;
@@ -1527,7 +1555,7 @@ namespace Broccoli {
             return self;
         }
 
-        /// <summary>
+        /// <summary>/
         /// Removes all the keys given from the dictionary.
         /// </summary>
         /// <param name="self">The current dictionary.</param>
