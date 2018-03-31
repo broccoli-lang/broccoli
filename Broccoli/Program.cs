@@ -59,6 +59,7 @@ namespace Broccoli {
                     try {
                         parsed = interpreter.Parse(ReadOrDie() + '\n');
                     } catch (Exception e) {
+                        WriteLine(e);
                         WriteLine($"{e.GetType().ToString().Split('.').Last()}: {e.Message}");
                         continue;
                     }
@@ -70,6 +71,7 @@ namespace Broccoli {
                         try {
                             parsed = interpreter.Parse(ReadOrDie() + '\n', parsed);
                         } catch (Exception e) {
+                            WriteLine(e);
                             WriteLine($"{e.GetType().ToString().Split('.').Last()}: {e.Message}");
                         }
                     }
@@ -79,6 +81,7 @@ namespace Broccoli {
                         if (result != null)
                             WriteLine(result.Inspect());
                     } catch (Exception e) {
+                        WriteLine(e);
                         WriteLine($"{e.GetType().ToString().Split('.').Last()}: {e.Message}");
                     }
                 }
