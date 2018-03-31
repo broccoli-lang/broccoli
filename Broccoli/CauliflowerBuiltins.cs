@@ -782,28 +782,60 @@ namespace Broccoli {
                         ctorParams.Concat(CauliflowerInline.GetParameterTypes(vexp)).ToArray();
                 }
 
-                MethodAttributes MethodAttrsFromMods(IEnumerable<string> modifiers) {
-                    return modifiers.Aggregate(MethodAttributes.Public, (attr, modifier) => {
-                        MethodAttributes newAttr;
-                        switch (modifier) {
-                            case "public":
-                                newAttr = MethodAttributes.Public;
-                                break;
-                            case "private":
-                                newAttr = MethodAttributes.Private;
-                                break;
-                            case "protected":
-                                newAttr = MethodAttributes.Family;
-                                break;
-                            case "static":
-                                newAttr = MethodAttributes.Static;
-                                break;
-                            default:
-                                throw new Exception($"Unrecognized access modifier '{modifier}'");
-                        }
+                // Interface implementations
+                var toCSharp = typeBuilder.DefineMethod(
+                    "ToCSharp",
+                    MethodAttributes.Public | MethodAttributes.Virtual,
+                    typeof(object),
+                    Type.EmptyTypes
+                );
+                var toCSharpIL = toCSharp.GetILGenerator();
+                toCSharpIL.Emit(OpCodes.Ldarg_0);
+                toCSharpIL.Emit(OpCodes.Ret);
+                typeBuilder.DefineMethodOverride(toCSharp, typeof(IValue).GetMethod("ToCSharp"));
 
-                        return attr | newAttr;
-                    });
+                var type = typeBuilder.DefineMethod(
+                    "Type",
+                    MethodAttributes.Public | MethodAttributes.Virtual,
+                    typeof(Type),
+                    Type.EmptyTypes
+                );
+                var typeIL = type.GetILGenerator();
+                typeIL.Emit(OpCodes.Ldarg_0);
+                typeIL.Emit(OpCodes.Call, typeof(object).GetMethod("GetType"));
+                typeIL.Emit(OpCodes.Ret);
+                typeBuilder.DefineMethodOverride(type, typeof(IValue).GetMethod("Type"));
+
+                var inspect = typeBuilder.DefineMethod(
+                    "Inspect",
+                    MethodAttributes.Virtual,
+                    typeof(string),
+                    Type.EmptyTypes
+                );
+                var inspectIL = inspect.GetILGenerator();
+                inspectIL.Emit(OpCodes.Ldstr, $"<{name.Value}>");
+                inspectIL.Emit(OpCodes.Ret);
+                typeBuilder.DefineMethodOverride(inspect, typeof(IValueExpressible).GetMethod("Inspect"));
+
+                Console.WriteLine("after impl");
+
+                MethodAttributes MethodAttrFromMod(string modifier) {
+                    switch (modifier) {
+                        case "public":
+                            return MethodAttributes.Public;
+                        case "private":
+                            return MethodAttributes.Private;
+                        case "protected":
+                            return MethodAttributes.Family;
+                        case "static":
+                            return MethodAttributes.Static;
+                        default:
+                            throw new Exception($"Unrecognized access modifier '{modifier}'");
+                    }
+                }
+
+                MethodAttributes MethodAttrsFromAllMods(IEnumerable<string> modifiers, MethodAttributes defaultAttr = MethodAttributes.Public) {
+                    return modifiers.Aggregate(defaultAttr, (a, m) => a | MethodAttrFromMod(m));
                 }
 
                 FieldAttributes FieldAttrsFromMods(IEnumerable<string> modifiers) {
@@ -832,7 +864,7 @@ namespace Broccoli {
                 }
 
                 var ctor = typeBuilder.DefineConstructor(
-                    MethodAttrsFromMods(ctorParamTuple.Item2 ?? new List<string>()),
+                    MethodAttrsFromAllMods(ctorParamTuple.Item2 ?? new List<string>()),
                     CallingConventions.Standard,
                     ctorParams
                 );
@@ -853,26 +885,25 @@ namespace Broccoli {
                     gen.Emit(OpCodes.Ldfld, interpreterField);
                 }
 
-                var scopeRef = typeof(CauliflowerInterpreter).GetField("Scope");
-                void LoadScopeReference(ILGenerator gen) {
+                void LoadScope(ILGenerator gen) {
                     LoadInterpreterReference(gen);
-                    gen.Emit(OpCodes.Ldfld, scopeRef);
+                    gen.Emit(OpCodes.Call, typeof(CauliflowerInterpreter).GetMethod("get_Scope"));
                 }
                 void CreateNewScope(ILGenerator gen) {
                     LoadInterpreterReference(gen); // Load to store in scope
-                    LoadScopeReference(gen); // Load to get scope value
+                    LoadScope(gen); // Load to get scope value
                     gen.Emit(OpCodes.Newobj, typeof(Scope).GetConstructor(new [] { typeof(Scope) })); // Create new scope
-                    gen.Emit(OpCodes.Stfld, scopeRef); // Store in scope
+                    gen.Emit(OpCodes.Call, typeof(CauliflowerInterpreter).GetMethod("set_Scope"));
                 }
                 void ReturnToParentScope(ILGenerator gen) {
                     LoadInterpreterReference(gen);
-                    LoadScopeReference(gen);
-                    gen.Emit(OpCodes.Ldfld, typeof(Scope).GetField("Parent"));
-                    gen.Emit(OpCodes.Stfld, scopeRef);
+                    LoadScope(gen);
+                    gen.Emit(OpCodes.Call, typeof(Scope).GetMethod("get_Parent"));
+                    gen.Emit(OpCodes.Call, typeof(CauliflowerInterpreter).GetMethod("set_Scope"));
                 }
                 void AddThisToScope(ILGenerator gen) {
-                    LoadScopeReference(gen);
-                    gen.Emit(OpCodes.Ldfld, typeof(Scope).GetField("Scalars"));
+                    LoadScope(gen);
+                    gen.Emit(OpCodes.Call, typeof(Scope).GetMethod("get_Scalars"));
                     gen.Emit(OpCodes.Ldstr, "this");
                     gen.Emit(OpCodes.Ldarg_0);
                     gen.Emit(OpCodes.Callvirt, typeof(Dictionary<string, IScalar>).GetMethod("set_Item"));
@@ -889,8 +920,8 @@ namespace Broccoli {
 
                     switch (sName) {
                         case "field":
-                            if (!(sArgs.Values[0] is BAtom fieldName))
-                                throw new ArgumentTypeException(sArgs.Values[0], "atom", 1, "field");
+                            if (!(sArgs.Values.ElementAtOrDefault(0) is BAtom fieldName))
+                                throw new ArgumentTypeException(sArgs.Values.ElementAtOrDefault(0), "atom", 1, "field");
 
                             var newField = typeBuilder.DefineField(
                                 fieldName.Value,
@@ -908,29 +939,33 @@ namespace Broccoli {
 
                             break;
                         case "prop":
-                            if (!(sArgs.Values[0] is BAtom propName))
-                                throw new ArgumentTypeException(sArgs.Values[0], "atom", 1, "prop");
+                            if (!(sArgs.Values.ElementAtOrDefault(0) is BAtom propName))
+                                throw new ArgumentTypeException(sArgs.Values.ElementAtOrDefault(0), "atom", 1, "prop");
 
                             var newProp = typeBuilder.DefineProperty(
                                 propName.Value,
                                 PropertyAttributes.None,
                                 typeof(IValue),
-                                new Type[] { }
+                                Type.EmptyTypes
                             );
 
-                            if (!(sArgs.Values[1] is ValueExpression exp))
-                                throw new ArgumentTypeException(sArgs.Values[1], "expression", 2, "prop");
+                            if (!(sArgs.Values.ElementAtOrDefault(1) is ValueExpression exp))
+                                throw new ArgumentTypeException(sArgs.Values.ElementAtOrDefault(1), "expression", 2, "prop");
 
                             var propStatements = CauliflowerInline.GetStatements(exp.Values);
 
+                            var propModifier =
+                                MethodAttrFromMod(sModifiers.FirstOrDefault(accessControlModifiers.Contains) ?? "public");
                             bool? hasBody = null;
-                            bool? hasModifier = null;
 
                             var backingField = typeBuilder.DefineField(
                                 propName.Value + "(backing)",
                                 typeof(IValue),
                                 FieldAttrsFromMods(sModifiers)
                             );
+
+                            if (propStatements.Any(a => a.Item2.FirstOrDefault(accessControlModifiers.Contains) != null) && propStatements.All(a => a.Item2 != null))
+                                throw new Exception($"Cannot specify access modifiers for all accessors of property '{propName.Value}'");
 
                             foreach (var (aType, aModifiers, aArgs) in propStatements) {
                                 // Make sure nobody's trying to combine auto-properties and bodies
@@ -942,14 +977,8 @@ namespace Broccoli {
                                     hasBody = !argsEmpty;
                                 }
 
-                                // Make sure there aren't access modifiers on both accessors
-                                var accessModifier = aModifiers.FirstOrDefault(accessControlModifiers.Contains);
-                                if (hasModifier.HasValue) {
-                                    if (accessModifier != null && hasModifier.Value)
-                                        throw new Exception($"Cannot specify access modifiers for both accessors of property '{propName.Value}'");
-                                } else {
-                                    hasModifier = accessModifier != null;
-                                }
+                                var accessModifier =
+                                    aModifiers.FirstOrDefault(accessControlModifiers.Contains);
 
                                 // Make sure that the accessor modifiers are more restrictive than the property modifier
                                 if (accessModifier != null &&
@@ -962,18 +991,49 @@ namespace Broccoli {
 
                                 switch (aType) {
                                     case "get":
+                                        var getter = typeBuilder.DefineMethod(
+                                            "get_" + propName.Value,
+                                            MethodAttrsFromAllMods(aModifiers, propModifier | MethodAttributes.SpecialName | MethodAttributes.HideBySig),
+                                            typeof(IValue),
+                                            Type.EmptyTypes
+                                        );
+
+                                        var getterIL = getter.GetILGenerator();
                                         if (argsEmpty) {
-                                            // Auto-property
+                                            getterIL.Emit(OpCodes.Ldarg_0);
+                                            getterIL.Emit(OpCodes.Ldfld, backingField);
                                         } else {
-                                            // Invoke interpreter
+                                            CreateNewScope(getterIL);
+                                            AddThisToScope(getterIL);
+                                            LoadInterpreterInvocation(getterIL, aArgs);
+                                            ReturnToParentScope(getterIL);
                                         }
+                                        getterIL.Emit(OpCodes.Ret);
+
+                                        newProp.SetGetMethod(getter);
                                         break;
                                     case "set":
+                                        var setter = typeBuilder.DefineMethod(
+                                            "set_" + propName.Value,
+                                            MethodAttrsFromAllMods(aModifiers, propModifier | MethodAttributes.SpecialName | MethodAttributes.HideBySig),
+                                            null,
+                                            new [] { typeof(IValue) }
+                                        );
+
+                                        var setterIL = setter.GetILGenerator();
                                         if (argsEmpty) {
-                                            // Auto-property
+                                            setterIL.Emit(OpCodes.Ldarg_0);
+                                            setterIL.Emit(OpCodes.Ldarg_1);
+                                            setterIL.Emit(OpCodes.Stfld, backingField);
                                         } else {
-                                            // Invoke interpreter
+                                            CreateNewScope(setterIL);
+                                            AddThisToScope(setterIL);
+                                            LoadInterpreterInvocation(setterIL, aArgs);
+                                            ReturnToParentScope(setterIL);
                                         }
+                                        setterIL.Emit(OpCodes.Ret);
+
+                                        newProp.SetSetMethod(setter);
                                         break;
                                     default:
                                         throw new Exception($"Unrecognized property accessor '{aType}'");
@@ -983,24 +1043,28 @@ namespace Broccoli {
                             var initPropVal = sArgs.Values.ElementAtOrDefault(2);
 
                             // Init value inside constructor
-                            if (initPropVal != null) { }
+                            if (initPropVal != null) {
+                                if (propStatements.Any(a => a.Item3.Values.Length <= 0))
+                                    throw new Exception($"Only auto-properties can have initial values ('{propName.Value}')");
 
-                            // Add backing field to members
-                            if (hasBody.HasValue && !hasBody.Value) { }
-
-                            // Add property to members
+                                ctorIL.Emit(OpCodes.Ldarg_0);
+                                CreateNewScope(ctorIL);
+                                LoadInterpreterInvocation(ctorIL, initPropVal);
+                                ReturnToParentScope(ctorIL);
+                                ctorIL.Emit(OpCodes.Stfld, backingField);
+                            }
                             break;
                         case "fn":
-                            if (!(sArgs.Values[0] is BAtom fnName))
-                                throw new ArgumentTypeException(sArgs.Values[0], "atom", 1, "fn");
+                            if (!(sArgs.Values.ElementAtOrDefault(0) is BAtom fnName))
+                                throw new ArgumentTypeException(sArgs.Values.ElementAtOrDefault(0), "atom", 1, "fn");
 
-                            if (!(sArgs.Values[1] is ValueExpression vexp2))
-                                throw new ArgumentTypeException(sArgs.Values[1], "expression", 2, "fn");
+                            if (!(sArgs.Values.ElementAtOrDefault(1) is ValueExpression vexp2))
+                                throw new ArgumentTypeException(sArgs.Values.ElementAtOrDefault(1), "expression", 2, "fn");
 
                             if (fnName.Value == "init") continue;
                             var newMethod = typeBuilder.DefineMethod(
                                 fnName.Value,
-                                MethodAttrsFromMods(sModifiers),
+                                MethodAttrsFromAllMods(sModifiers),
                                 typeof(IValue),
                                 CauliflowerInline.GetParameterTypes(vexp2)
                             );
@@ -1014,6 +1078,8 @@ namespace Broccoli {
                 }
 
                 // Custom constructor implementation (after initial values)
+
+                var test = typeBuilder.CreateType();
 
                 return null;
             })},
@@ -1518,8 +1584,8 @@ namespace Broccoli {
                             break;
                         // Rest args
                         case ValueExpression v:
-                            if (!(v.Values[0] is ListVar rest))
-                                throw new ArgumentTypeException(v.Values[0], "rest arguments list variable", index + 1, "fn parameters");
+                            if (!(v.Values.ElementAtOrDefault(0) is ListVar rest))
+                                throw new ArgumentTypeException(v.Values.ElementAtOrDefault(0), "rest arguments list variable", index + 1, "fn parameters");
 
                             // var restDecl = null; // Declare param
                             // TODO: Make it varargs, probably with ParamArrayAttribute

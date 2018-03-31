@@ -17,7 +17,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BroccoliTest", "BroccoliTes
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Modules", "Modules", "{C9037E37-C049-4529-A799-6F627763F8A0}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "regex", "Modules\Regex\regex.csproj", "{E94CCD24-481E-4B08-A77E-1BD5F87E2247}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "regex", "Modules\regex\regex.csproj", "{E94CCD24-481E-4B08-A77E-1BD5F87E2247}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "fs", "Modules\fs\fs.csproj", "{87F625DE-3DCC-4833-861C-AFADADBF09D4}"
 EndProject
