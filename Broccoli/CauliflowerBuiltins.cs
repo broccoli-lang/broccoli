@@ -822,8 +822,6 @@ namespace Broccoli {
                 inspectIL.Emit(OpCodes.Ret);
                 typeBuilder.DefineMethodOverride(inspect, typeof(IValueExpressible).GetMethod("Inspect"));
 
-                Console.WriteLine("after impl");
-
                 MethodAttributes MethodAttrFromMod(string modifier) {
                     switch (modifier) {
                         case "public":
@@ -1069,6 +1067,8 @@ namespace Broccoli {
 
                 // TODO: place in scope somewhere?
                 var classType = typeBuilder.CreateType();
+
+                Console.WriteLine(string.Join<Type>(", ", ctorParams));
 
                 // FIXME
                 var testInstance = classType.GetConstructor(ctorParams)
@@ -1567,15 +1567,12 @@ namespace Broccoli {
                     switch (param) {
                         case ScalarVar s:
                             results[index] = typeof(IScalar);
-                            // TODO: Add variable to scope
                             break;
                         case ListVar l:
                             results[index] = typeof(BList);
-                            // TODO: Add variable to scope
                             break;
                         case DictVar d:
                             results[index] = typeof(BDictionary);
-                            // TODO: Add variable to scope
                             break;
                         // Rest args
                         case ValueExpression v:
