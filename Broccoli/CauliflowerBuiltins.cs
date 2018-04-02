@@ -762,7 +762,7 @@ namespace Broccoli {
                 // Generate initial class
                 var asmName = new AssemblyName("CauliflowerGenerated-" + name.Value);
                 var asmBuilder = AssemblyBuilder.DefineDynamicAssembly(asmName, AssemblyBuilderAccess.Run);
-                var modBuilder = asmBuilder.DefineDynamicModule(asmName.Name, asmName.Name + ".dll");
+                var modBuilder = asmBuilder.DefineDynamicModule(asmName.Name);
                 var typeBuilder = modBuilder.DefineType(
                     name.Value,
                     TypeAttributes.Public | TypeAttributes.Class,
