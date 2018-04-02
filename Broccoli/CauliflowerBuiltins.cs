@@ -762,7 +762,7 @@ namespace Broccoli {
                 // Generate initial class
                 var asmName = new AssemblyName("CauliflowerGenerated-" + name.Value);
                 var asmBuilder = AssemblyBuilder.DefineDynamicAssembly(asmName, AssemblyBuilderAccess.Run);
-                var modBuilder = asmBuilder.DefineDynamicModule(asmName.Name + "-Module");
+                var modBuilder = asmBuilder.DefineDynamicModule(asmName.Name, asmName.Name + ".dll");
                 var typeBuilder = modBuilder.DefineType(
                     name.Value,
                     TypeAttributes.Public | TypeAttributes.Class,
@@ -873,8 +873,6 @@ namespace Broccoli {
                     ctorParams
                 );
                 var ctorIL = ctor.GetILGenerator();
-                ctorIL.Emit(OpCodes.Ldarg_0);
-                ctorIL.Emit(OpCodes.Call, typeof(object).GetConstructor(Type.EmptyTypes));
 
                 // Add (interpreter) field
                 var interpreterField = typeBuilder.DefineField(
@@ -1058,7 +1056,7 @@ namespace Broccoli {
 
                 // Custom constructor implementation (after initial values)
                 if (isCustomCtor) {
-                    CauliflowerInline.AddParametersToScope(ctorIL, interpreterField, ctorParamDecl);
+                    CauliflowerInline.AddParametersToScope(ctorIL, interpreterField, ctorParamDecl, true);
                     CauliflowerInline.CreateNewScope(ctorIL, interpreterField);
                     CauliflowerInline.LoadInterpreterInvocation(ctorIL, interpreterField, new ValueExpression(ctorParamTuple.Item3.Values.Skip(2)));
                     CauliflowerInline.ReturnToParentScope(ctorIL, interpreterField);
@@ -1639,10 +1637,12 @@ namespace Broccoli {
             /// <param name="methILGen">The <see cref="ILGenerator"/> for the method.</param>
             /// <param name="interpreterField">The <see cref="FieldInfo"/> that represents the interpreter field in the class.</param>
             /// <param name="paramExp">The parameter expression.</param>
+            /// <param name="inConstructor">Whether the parameters are for a Cauliflower class constructor. </param>
             /// <exception cref="ArgumentTypeException">Throws when parameter types are invalid.</exception>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static void AddParametersToScope(ILGenerator methILGen, FieldInfo interpreterField, ValueExpression paramExp) {
-                foreach (var (param, index) in paramExp.Values.WithIndex()) {
+            public static void AddParametersToScope(ILGenerator methILGen, FieldInfo interpreterField, ValueExpression paramExp, bool inConstructor = false) {
+                foreach (var (param, _index) in paramExp.Values.WithIndex()) {
+                    var index = inConstructor ? _index + 2 : _index + 1;
                     LoadScopeReference(methILGen, interpreterField);
                     switch (param) {
                         case ScalarVar s:
