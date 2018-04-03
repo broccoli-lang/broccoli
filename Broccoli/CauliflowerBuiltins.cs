@@ -873,6 +873,8 @@ namespace Broccoli {
                     ctorParams
                 );
                 var ctorIL = ctor.GetILGenerator();
+                ctorIL.Emit(OpCodes.Ldarg_0);
+                ctorIL.Emit(OpCodes.Call, typeof(object).GetConstructor(Type.EmptyTypes));
 
                 // Add (interpreter) field
                 var interpreterField = typeBuilder.DefineField(
@@ -1059,6 +1061,7 @@ namespace Broccoli {
                     CauliflowerInline.AddParametersToScope(ctorIL, interpreterField, ctorParamDecl, true);
                     CauliflowerInline.CreateNewScope(ctorIL, interpreterField);
                     CauliflowerInline.LoadInterpreterInvocation(ctorIL, interpreterField, new ValueExpression(ctorParamTuple.Item3.Values.Skip(2)));
+                    ctorIL.Emit(OpCodes.Pop);
                     CauliflowerInline.ReturnToParentScope(ctorIL, interpreterField);
                     ctorIL.Emit(OpCodes.Ret);
                 }
