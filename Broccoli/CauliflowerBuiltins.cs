@@ -838,32 +838,26 @@ namespace Broccoli {
                 }
 
                 MethodAttributes MethodAttrsFromAllMods(IEnumerable<string> modifiers, MethodAttributes defaultAttr = MethodAttributes.Public) {
-                    return modifiers.Aggregate(defaultAttr, (a, m) => a | MethodAttrFromMod(m));
+                    return !modifiers.Any() ? defaultAttr : modifiers.Select(MethodAttrFromMod).Aggregate((a, m) => a | m);
+                }
+
+                FieldAttributes FieldAttrFromMod(string modifier) {
+                    switch (modifier) {
+                        case "public":
+                            return FieldAttributes.Public;
+                        case "private":
+                            return FieldAttributes.Private;
+                        case "protected":
+                            return FieldAttributes.Family;
+                        case "static":
+                            return FieldAttributes.Static;
+                        default:
+                            throw new Exception($"Unrecognized access modifier '{modifier}'");
+                    }
                 }
 
                 FieldAttributes FieldAttrsFromMods(IEnumerable<string> modifiers) {
-                    return modifiers.Aggregate(FieldAttributes.Private, (attr, modifier) => {
-                        FieldAttributes newAttr;
-
-                        switch (modifier) {
-                            case "public":
-                                newAttr = FieldAttributes.Public;
-                                break;
-                            case "private":
-                                newAttr = FieldAttributes.Private;
-                                break;
-                            case "protected":
-                                newAttr = FieldAttributes.Family;
-                                break;
-                            case "static":
-                                newAttr = FieldAttributes.Static;
-                                break;
-                            default:
-                                throw new Exception($"Unrecognized access modifier '{modifier}'");
-                        }
-
-                        return attr | newAttr;
-                    });
+                    return !modifiers.Any() ? FieldAttributes.Private : modifiers.Select(FieldAttrFromMod).Aggregate((a, m) => a | m);
                 }
 
                 // Generate constructor
