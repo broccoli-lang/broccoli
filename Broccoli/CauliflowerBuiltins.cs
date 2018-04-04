@@ -869,7 +869,7 @@ namespace Broccoli {
                 // Generate constructor
                 var ctor = typeBuilder.DefineConstructor(
                     MethodAttrsFromAllMods(ctorParamTuple.Item2 ?? new List<string>()),
-                    CallingConventions.Standard,
+                    CallingConventions.HasThis,
                     ctorParams
                 );
                 var ctorIL = ctor.GetILGenerator();
@@ -935,7 +935,7 @@ namespace Broccoli {
                                 FieldAttrsFromMods(sModifiers)
                             );
 
-                            if (propStatements.Any(a => a.Item2.FirstOrDefault(accessControlModifiers.Contains) != null) && propStatements.All(a => a.Item2 != null))
+                            if (propStatements.All(a => a.Item2 != null && a.Item2.FirstOrDefault(accessControlModifiers.Contains) != null))
                                 throw new Exception($"Cannot specify access modifiers for all accessors of property '{propName.Value}'");
 
                             foreach (var (aType, aModifiers, aArgs) in propStatements) {
@@ -976,7 +976,7 @@ namespace Broccoli {
                                         } else {
                                             CauliflowerInline.CreateNewScope(getterIL, interpreterField);
                                             CauliflowerInline.AddThisToScope(getterIL, interpreterField);
-                                            CauliflowerInline.LoadInterpreterInvocation(getterIL, interpreterField, aArgs);
+                                            CauliflowerInline.LoadInterpreterInvocation(getterIL, interpreterField, aArgs.Values);
                                             CauliflowerInline.ReturnToParentScope(getterIL, interpreterField);
                                         }
                                         getterIL.Emit(OpCodes.Ret);
@@ -999,7 +999,7 @@ namespace Broccoli {
                                         } else {
                                             CauliflowerInline.CreateNewScope(setterIL, interpreterField);
                                             CauliflowerInline.AddThisToScope(setterIL, interpreterField);
-                                            CauliflowerInline.LoadInterpreterInvocation(setterIL, interpreterField, aArgs);
+                                            CauliflowerInline.LoadInterpreterInvocation(setterIL, interpreterField, aArgs.Values);
                                             CauliflowerInline.ReturnToParentScope(setterIL, interpreterField);
                                         }
                                         setterIL.Emit(OpCodes.Ret);
@@ -1015,7 +1015,7 @@ namespace Broccoli {
 
                             // Init value inside constructor
                             if (initPropVal != null) {
-                                if (propStatements.Any(a => a.Item3.Values.Length <= 0))
+                                if (propStatements.Any(a => a.Item3.Values.Length > 0))
                                     throw new Exception($"Only auto-properties can have initial values ('{propName.Value}')");
 
                                 ctorIL.Emit(OpCodes.Ldarg_0);
@@ -1044,10 +1044,10 @@ namespace Broccoli {
                             // Add new function scope + populate
                             CauliflowerInline.CreateNewScope(methodIL, interpreterField);
                             CauliflowerInline.AddThisToScope(methodIL, interpreterField);
-                            CauliflowerInline.AddParametersToScope(methodIL, interpreterField, vexp2);
+                            CauliflowerInline.AddParametersToScope(methodIL, interpreterField, vexp2, isStatic: sModifiers.Contains("static"));
 
                             // Invoke interpreter, back out of scope, return
-                            CauliflowerInline.LoadInterpreterInvocation(methodIL, interpreterField, new ValueExpression(sArgs.Values.Skip(2)));
+                            CauliflowerInline.LoadInterpreterInvocation(methodIL, interpreterField, sArgs.Values.Skip(2));
                             CauliflowerInline.ReturnToParentScope(methodIL, interpreterField);
                             methodIL.Emit(OpCodes.Ret);
                             break;
@@ -1060,7 +1060,7 @@ namespace Broccoli {
                 if (isCustomCtor) {
                     CauliflowerInline.AddParametersToScope(ctorIL, interpreterField, ctorParamDecl, true);
                     CauliflowerInline.CreateNewScope(ctorIL, interpreterField);
-                    CauliflowerInline.LoadInterpreterInvocation(ctorIL, interpreterField, new ValueExpression(ctorParamTuple.Item3.Values.Skip(2)));
+                    CauliflowerInline.LoadInterpreterInvocation(ctorIL, interpreterField, ctorParamTuple.Item3.Values.Skip(2));
                     ctorIL.Emit(OpCodes.Pop);
                     CauliflowerInline.ReturnToParentScope(ctorIL, interpreterField);
                     ctorIL.Emit(OpCodes.Ret);
@@ -1068,14 +1068,6 @@ namespace Broccoli {
 
                 // TODO: place in scope somewhere?
                 var classType = typeBuilder.CreateType();
-
-                Console.WriteLine(string.Join<Type>(", ", ctorParams));
-
-                // FIXME
-                var testInstance = classType.GetConstructor(ctorParams)
-                    .Invoke(new object[] {cauliflower, new BInteger(1)});
-                classType.InvokeMember("foo", BindingFlags.InvokeMethod, null, testInstance,
-                    Array.Empty<object>());
 
                 return null;
             })},
@@ -1624,14 +1616,21 @@ namespace Broccoli {
                 gen.Emit(OpCodes.Ldfld, typeof(Scope).GetField("Scalars"));
                 gen.Emit(OpCodes.Ldstr, "this");
                 gen.Emit(OpCodes.Ldarg_0);
-                gen.Emit(OpCodes.Callvirt, typeof(Dictionary<string, IValue>).GetMethod("set_Item"));
+                gen.Emit(OpCodes.Call, typeof(Dictionary<string, IValue>).GetMethod("set_Item"));
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static void LoadInterpreterInvocation(ILGenerator gen, FieldInfo interpreterField, IValueExpressible expr) {
                 LoadInterpreterReference(gen, interpreterField);
                 gen.Emit(OpCodes.Ldstr, expr.Inspect());
-                gen.Emit(OpCodes.Callvirt, typeof(CauliflowerInterpreter).GetMethod("Run", new [] {typeof(string)}));
+                gen.Emit(OpCodes.Call, typeof(CauliflowerInterpreter).GetMethod("Run", new [] {typeof(string)}));
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static void LoadInterpreterInvocation(ILGenerator gen, FieldInfo interpreterField, IEnumerable<IValueExpressible> exprs) {
+                LoadInterpreterReference(gen, interpreterField);
+                gen.Emit(OpCodes.Ldstr, string.Join(' ', exprs.Select(e => e.Inspect())));
+                gen.Emit(OpCodes.Call, typeof(CauliflowerInterpreter).GetMethod("Run", new [] {typeof(string)}));
             }
 
             /// <summary>
@@ -1640,31 +1639,32 @@ namespace Broccoli {
             /// <param name="methILGen">The <see cref="ILGenerator"/> for the method.</param>
             /// <param name="interpreterField">The <see cref="FieldInfo"/> that represents the interpreter field in the class.</param>
             /// <param name="paramExp">The parameter expression.</param>
-            /// <param name="inConstructor">Whether the parameters are for a Cauliflower class constructor. </param>
+            /// <param name="inConstructor">Whether the parameters are for a Cauliflower class constructor.</param>
+            /// <param name="isStatic">Whether the parameters are for a Cauliflower static class function.</param>
             /// <exception cref="ArgumentTypeException">Throws when parameter types are invalid.</exception>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static void AddParametersToScope(ILGenerator methILGen, FieldInfo interpreterField, ValueExpression paramExp, bool inConstructor = false) {
+            public static void AddParametersToScope(ILGenerator methILGen, FieldInfo interpreterField, ValueExpression paramExp, bool inConstructor = false, bool isStatic = false) {
                 foreach (var (param, _index) in paramExp.Values.WithIndex()) {
-                    var index = inConstructor ? _index + 2 : _index + 1;
+                    var index = isStatic ? _index : inConstructor ? _index + 2 : _index + 1;
                     LoadScopeReference(methILGen, interpreterField);
                     switch (param) {
                         case ScalarVar s:
                             methILGen.Emit(OpCodes.Ldfld, typeof(Scope).GetField("Scalars"));
                             methILGen.Emit(OpCodes.Ldstr, s.Value);
                             methILGen.Emit(OpCodes.Ldarg_S, index);
-                            methILGen.Emit(OpCodes.Callvirt, typeof(Dictionary<string, IValue>).GetMethod("set_Item"));
+                            methILGen.Emit(OpCodes.Call, typeof(Dictionary<string, IValue>).GetMethod("set_Item"));
                             break;
                         case ListVar l:
                             methILGen.Emit(OpCodes.Ldfld, typeof(Scope).GetField("Lists"));
                             methILGen.Emit(OpCodes.Ldstr, l.Value);
                             methILGen.Emit(OpCodes.Ldarg_S, index);
-                            methILGen.Emit(OpCodes.Callvirt, typeof(Dictionary<string, BList>).GetMethod("set_Item"));
+                            methILGen.Emit(OpCodes.Call, typeof(Dictionary<string, BList>).GetMethod("set_Item"));
                             break;
                         case DictVar d:
                             methILGen.Emit(OpCodes.Ldfld, typeof(Scope).GetField("Dictionaries"));
                             methILGen.Emit(OpCodes.Ldstr, d.Value);
                             methILGen.Emit(OpCodes.Ldarg_S, index);
-                            methILGen.Emit(OpCodes.Callvirt, typeof(Dictionary<string, BDictionary>).GetMethod("set_Item"));
+                            methILGen.Emit(OpCodes.Call, typeof(Dictionary<string, BDictionary>).GetMethod("set_Item"));
                             break;
                         // Rest args
                         case ValueExpression v:
@@ -1674,7 +1674,7 @@ namespace Broccoli {
                             methILGen.Emit(OpCodes.Ldfld, typeof(Scope).GetField("Lists"));
                             methILGen.Emit(OpCodes.Ldstr, rest.Value);
                             methILGen.Emit(OpCodes.Ldarg_S, index);
-                            methILGen.Emit(OpCodes.Callvirt, typeof(Dictionary<string, BList>).GetMethod("set_Item"));
+                            methILGen.Emit(OpCodes.Call, typeof(Dictionary<string, BList>).GetMethod("set_Item"));
                             break;
                         default:
                             throw new ArgumentTypeException(param, "variable name", index + 1, "fn parameters");
