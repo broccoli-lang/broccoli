@@ -1610,21 +1610,21 @@ namespace Broccoli {
                 gen.Emit(OpCodes.Ldfld, typeof(Scope).GetField("Scalars"));
                 gen.Emit(OpCodes.Ldstr, "this");
                 gen.Emit(OpCodes.Ldarg_0);
-                gen.Emit(OpCodes.Call, typeof(Dictionary<string, IValue>).GetMethod("set_Item"));
+                gen.Emit(OpCodes.Callvirt, typeof(Dictionary<string, IValue>).GetMethod("set_Item"));
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static void LoadInterpreterInvocation(ILGenerator gen, FieldInfo interpreterField, IValueExpressible expr) {
                 LoadInterpreterReference(gen, interpreterField);
                 gen.Emit(OpCodes.Ldstr, expr.Inspect());
-                gen.Emit(OpCodes.Call, typeof(CauliflowerInterpreter).GetMethod("Run", new [] {typeof(string)}));
+                gen.Emit(OpCodes.Callvirt, typeof(CauliflowerInterpreter).GetMethod("Run", new [] {typeof(string)}));
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static void LoadInterpreterInvocation(ILGenerator gen, FieldInfo interpreterField, IEnumerable<IValueExpressible> exprs) {
                 LoadInterpreterReference(gen, interpreterField);
                 gen.Emit(OpCodes.Ldstr, string.Join(' ', exprs.Select(e => e.Inspect())));
-                gen.Emit(OpCodes.Call, typeof(CauliflowerInterpreter).GetMethod("Run", new [] {typeof(string)}));
+                gen.Emit(OpCodes.Callvirt, typeof(CauliflowerInterpreter).GetMethod("Run", new [] {typeof(string)}));
             }
 
             /// <summary>
@@ -1646,19 +1646,19 @@ namespace Broccoli {
                             methILGen.Emit(OpCodes.Ldfld, typeof(Scope).GetField("Scalars"));
                             methILGen.Emit(OpCodes.Ldstr, s.Value);
                             methILGen.Emit(OpCodes.Ldarg_S, index);
-                            methILGen.Emit(OpCodes.Call, typeof(Dictionary<string, IValue>).GetMethod("set_Item"));
+                            methILGen.Emit(OpCodes.Callvirt, typeof(Dictionary<string, IValue>).GetMethod("set_Item"));
                             break;
                         case ListVar l:
                             methILGen.Emit(OpCodes.Ldfld, typeof(Scope).GetField("Lists"));
                             methILGen.Emit(OpCodes.Ldstr, l.Value);
                             methILGen.Emit(OpCodes.Ldarg_S, index);
-                            methILGen.Emit(OpCodes.Call, typeof(Dictionary<string, BList>).GetMethod("set_Item"));
+                            methILGen.Emit(OpCodes.Callvirt, typeof(Dictionary<string, BList>).GetMethod("set_Item"));
                             break;
                         case DictVar d:
                             methILGen.Emit(OpCodes.Ldfld, typeof(Scope).GetField("Dictionaries"));
                             methILGen.Emit(OpCodes.Ldstr, d.Value);
                             methILGen.Emit(OpCodes.Ldarg_S, index);
-                            methILGen.Emit(OpCodes.Call, typeof(Dictionary<string, BDictionary>).GetMethod("set_Item"));
+                            methILGen.Emit(OpCodes.Callvirt, typeof(Dictionary<string, BDictionary>).GetMethod("set_Item"));
                             break;
                         // Rest args
                         case ValueExpression v:
@@ -1668,7 +1668,7 @@ namespace Broccoli {
                             methILGen.Emit(OpCodes.Ldfld, typeof(Scope).GetField("Lists"));
                             methILGen.Emit(OpCodes.Ldstr, rest.Value);
                             methILGen.Emit(OpCodes.Ldarg_S, index);
-                            methILGen.Emit(OpCodes.Call, typeof(Dictionary<string, BList>).GetMethod("set_Item"));
+                            methILGen.Emit(OpCodes.Callvirt, typeof(Dictionary<string, BList>).GetMethod("set_Item"));
                             break;
                         default:
                             throw new ArgumentTypeException(param, "variable name", index + 1, "fn parameters");
