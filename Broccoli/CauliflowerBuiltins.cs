@@ -777,13 +777,12 @@ namespace Broccoli {
                 var ctorParamTuple = statements.FirstOrDefault(s => s.Item1 == "fn" && s.Item3.Values.ElementAtOrDefault(0) is BAtom fnName && fnName.Value == "init");
                 var isCustomCtor =
                     !ctorParamTuple.Equals(default((string, List<string>, ValueExpression)));
-                var ctorParams = new[] {typeof(CauliflowerInterpreter)};
+                var ctorParams = Type.EmptyTypes;
                 var ctorParamDecl = new ValueExpression();
                 if (isCustomCtor) {
                     if (!(ctorParamTuple.Item3.Values.ElementAtOrDefault(1) is ValueExpression vexp))
                         throw new ArgumentTypeException(ctorParamTuple.Item3.Values.ElementAtOrDefault(1), "expression", 2, "fn");
-                    ctorParams =
-                        ctorParams.Concat(CauliflowerInline.GetParameterTypes(vexp)).ToArray();
+                    ctorParams = CauliflowerInline.GetParameterTypes(vexp);
                     ctorParamDecl = vexp;
                 }
 
@@ -838,7 +837,10 @@ namespace Broccoli {
                 }
 
                 MethodAttributes MethodAttrsFromAllMods(IEnumerable<string> modifiers, MethodAttributes defaultAttr = MethodAttributes.Public) {
-                    return !modifiers.Any() ? defaultAttr : modifiers.Select(MethodAttrFromMod).Aggregate((a, m) => a | m);
+                    var attrs = modifiers.Select(MethodAttrFromMod).Aggregate((a, m) => a | m);
+                    return modifiers.Any(accessControlModifiers.Contains)
+                        ? defaultAttr | attrs
+                        : defaultAttr;
                 }
 
                 FieldAttributes FieldAttrFromMod(string modifier) {
@@ -856,9 +858,15 @@ namespace Broccoli {
                     }
                 }
 
-                FieldAttributes FieldAttrsFromMods(IEnumerable<string> modifiers) {
-                    return !modifiers.Any() ? FieldAttributes.Private : modifiers.Select(FieldAttrFromMod).Aggregate((a, m) => a | m);
+                FieldAttributes FieldAttrsFromAllMods(IEnumerable<string> modifiers) {
+                    var attrs = modifiers.Select(FieldAttrFromMod).Aggregate((a, m) => a | m);
+                    return modifiers.Any(accessControlModifiers.Contains)
+                        ? FieldAttributes.Private | attrs
+                        : FieldAttributes.Private;
                 }
+
+                if (ctorParamTuple.Item2 != null && ctorParamTuple.Item2.Contains("static"))
+                    throw new Exception($"Custom static constructors currently not allowed (in class '{name.Value}')");
 
                 // Generate constructor
                 var ctor = typeBuilder.DefineConstructor(
@@ -870,15 +878,20 @@ namespace Broccoli {
                 ctorIL.Emit(OpCodes.Ldarg_0);
                 ctorIL.Emit(OpCodes.Call, typeof(object).GetConstructor(Type.EmptyTypes));
 
+                // Generate static constructor
+                var staticCtor = typeBuilder.DefineConstructor(
+                    MethodAttributes.Static,
+                    CallingConventions.HasThis,
+                    Type.EmptyTypes
+                );
+                var staticCtorIL = staticCtor.GetILGenerator();
+
                 // Add (interpreter) field
                 var interpreterField = typeBuilder.DefineField(
                     "(interpreter)",
                     typeof(CauliflowerInterpreter),
-                    FieldAttributes.Private
+                    FieldAttributes.Private | FieldAttributes.Static
                 );
-                ctorIL.Emit(OpCodes.Ldarg_0); // Load to set interpreter
-                ctorIL.Emit(OpCodes.Ldarg_1); // Interpreter param
-                ctorIL.Emit(OpCodes.Stfld, interpreterField);
 
                 foreach (var (sName, sModifiers, sArgs) in statements) {
                     Console.WriteLine(string.Join(", ", sName, $"[{string.Join(", ", sModifiers)}]", sArgs));
@@ -891,15 +904,18 @@ namespace Broccoli {
                             var newField = typeBuilder.DefineField(
                                 fieldName.Value,
                                 typeof(IValue),
-                                FieldAttrsFromMods(sModifiers)
+                                FieldAttrsFromAllMods(sModifiers)
                             );
 
                             var initFieldVal = sArgs.Values.ElementAtOrDefault(1);
                             if (initFieldVal != null) {
                                 // Init value inside constructor
-                                ctorIL.Emit(OpCodes.Ldarg_0);
-                                CauliflowerInline.LoadInterpreterInvocation(ctorIL, interpreterField, initFieldVal);
-                                ctorIL.Emit(OpCodes.Stfld, newField);
+                                var initCtorIL = sModifiers.Contains("static")
+                                    ? staticCtorIL
+                                    : ctorIL;
+                                initCtorIL.Emit(OpCodes.Ldarg_0);
+                                CauliflowerInline.LoadInterpreterInvocation(initCtorIL, interpreterField, initFieldVal);
+                                initCtorIL.Emit(OpCodes.Stfld, newField);
                             }
 
                             break;
@@ -926,7 +942,7 @@ namespace Broccoli {
                             var backingField = typeBuilder.DefineField(
                                 propName.Value + "(backing)",
                                 typeof(IValue),
-                                FieldAttrsFromMods(sModifiers)
+                                FieldAttrsFromAllMods(sModifiers)
                             );
 
                             if (propStatements.All(a => a.Item2 != null && a.Item2.FirstOrDefault(accessControlModifiers.Contains) != null))
@@ -1012,11 +1028,14 @@ namespace Broccoli {
                                 if (propStatements.Any(a => a.Item3.Values.Length > 0))
                                     throw new Exception($"Only auto-properties can have initial values ('{propName.Value}')");
 
-                                ctorIL.Emit(OpCodes.Ldarg_0);
-                                CauliflowerInline.CreateNewScope(ctorIL, interpreterField);
-                                CauliflowerInline.LoadInterpreterInvocation(ctorIL, interpreterField, initPropVal);
-                                CauliflowerInline.ReturnToParentScope(ctorIL, interpreterField);
-                                ctorIL.Emit(OpCodes.Stfld, backingField);
+                                var initCtorIL = sModifiers.Contains("static")
+                                    ? staticCtorIL
+                                    : ctorIL;
+                                initCtorIL.Emit(OpCodes.Ldarg_0);
+                                CauliflowerInline.CreateNewScope(initCtorIL, interpreterField);
+                                CauliflowerInline.LoadInterpreterInvocation(initCtorIL, interpreterField, initPropVal);
+                                CauliflowerInline.ReturnToParentScope(initCtorIL, interpreterField);
+                                initCtorIL.Emit(OpCodes.Stfld, backingField);
                             }
                             break;
                         case "fn":
@@ -1038,7 +1057,7 @@ namespace Broccoli {
                             // Add new function scope + populate
                             CauliflowerInline.CreateNewScope(methodIL, interpreterField);
                             CauliflowerInline.AddThisToScope(methodIL, interpreterField);
-                            CauliflowerInline.AddParametersToScope(methodIL, interpreterField, vexp2, isStatic: sModifiers.Contains("static"));
+                            CauliflowerInline.AddParametersToScope(methodIL, interpreterField, vexp2, sModifiers.Contains("static"));
 
                             // Invoke interpreter, back out of scope, return
                             CauliflowerInline.LoadInterpreterInvocation(methodIL, interpreterField, sArgs.Values.Skip(2));
@@ -1052,7 +1071,7 @@ namespace Broccoli {
 
                 // Custom constructor implementation (after initial values)
                 if (isCustomCtor) {
-                    CauliflowerInline.AddParametersToScope(ctorIL, interpreterField, ctorParamDecl, true);
+                    CauliflowerInline.AddParametersToScope(ctorIL, interpreterField, ctorParamDecl);
                     CauliflowerInline.CreateNewScope(ctorIL, interpreterField);
                     CauliflowerInline.LoadInterpreterInvocation(ctorIL, interpreterField, ctorParamTuple.Item3.Values.Skip(2));
                     ctorIL.Emit(OpCodes.Pop);
@@ -1062,6 +1081,8 @@ namespace Broccoli {
 
                 // TODO: place in scope somewhere?
                 var classType = typeBuilder.CreateType();
+
+                classType.GetField("(interpreter)", BindingFlags.NonPublic | BindingFlags.Static).SetValue(null, cauliflower);
 
                 return null;
             })},
@@ -1578,8 +1599,7 @@ namespace Broccoli {
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static void LoadInterpreterReference(ILGenerator gen, FieldInfo interpreterField) {
-                gen.Emit(OpCodes.Ldarg_0);
-                gen.Emit(OpCodes.Ldfld, interpreterField);
+                gen.Emit(OpCodes.Ldsfld, interpreterField);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1633,13 +1653,12 @@ namespace Broccoli {
             /// <param name="methILGen">The <see cref="ILGenerator"/> for the method.</param>
             /// <param name="interpreterField">The <see cref="FieldInfo"/> that represents the interpreter field in the class.</param>
             /// <param name="paramExp">The parameter expression.</param>
-            /// <param name="inConstructor">Whether the parameters are for a Cauliflower class constructor.</param>
             /// <param name="isStatic">Whether the parameters are for a Cauliflower static class function.</param>
             /// <exception cref="ArgumentTypeException">Throws when parameter types are invalid.</exception>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static void AddParametersToScope(ILGenerator methILGen, FieldInfo interpreterField, ValueExpression paramExp, bool inConstructor = false, bool isStatic = false) {
+            public static void AddParametersToScope(ILGenerator methILGen, FieldInfo interpreterField, ValueExpression paramExp, bool isStatic = false) {
                 foreach (var (param, _index) in paramExp.Values.WithIndex()) {
-                    var index = isStatic ? _index : inConstructor ? _index + 2 : _index + 1;
+                    var index = isStatic ? _index : _index + 1;
                     LoadScopeReference(methILGen, interpreterField);
                     switch (param) {
                         case ScalarVar s:
