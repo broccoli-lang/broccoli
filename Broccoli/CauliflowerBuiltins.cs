@@ -837,10 +837,11 @@ namespace Broccoli {
                 }
 
                 MethodAttributes MethodAttrsFromAllMods(IEnumerable<string> modifiers, MethodAttributes defaultAttr = MethodAttributes.Public) {
+                    if (!modifiers.Any()) return defaultAttr;
                     var attrs = modifiers.Select(MethodAttrFromMod).Aggregate((a, m) => a | m);
                     return modifiers.Any(accessControlModifiers.Contains)
-                        ? defaultAttr | attrs
-                        : defaultAttr;
+                        ? attrs
+                        : defaultAttr | attrs;
                 }
 
                 FieldAttributes FieldAttrFromMod(string modifier) {
@@ -859,10 +860,11 @@ namespace Broccoli {
                 }
 
                 FieldAttributes FieldAttrsFromAllMods(IEnumerable<string> modifiers) {
+                    if (!modifiers.Any()) return FieldAttributes.Private;
                     var attrs = modifiers.Select(FieldAttrFromMod).Aggregate((a, m) => a | m);
                     return modifiers.Any(accessControlModifiers.Contains)
-                        ? FieldAttributes.Private | attrs
-                        : FieldAttributes.Private;
+                        ? attrs
+                        : FieldAttributes.Private | attrs;
                 }
 
                 if (ctorParamTuple.Item2 != null && ctorParamTuple.Item2.Contains("static"))
@@ -879,11 +881,7 @@ namespace Broccoli {
                 ctorIL.Emit(OpCodes.Call, typeof(object).GetConstructor(Type.EmptyTypes));
 
                 // Generate static constructor
-                var staticCtor = typeBuilder.DefineConstructor(
-                    MethodAttributes.Static,
-                    CallingConventions.HasThis,
-                    Type.EmptyTypes
-                );
+                var staticCtor = typeBuilder.DefineTypeInitializer();
                 var staticCtorIL = staticCtor.GetILGenerator();
 
                 // Add (interpreter) field
