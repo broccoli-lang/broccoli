@@ -894,6 +894,8 @@ namespace Broccoli {
                 foreach (var (sName, sModifiers, sArgs) in statements) {
                     Console.WriteLine(string.Join(", ", sName, $"[{string.Join(", ", sModifiers)}]", sArgs));
 
+                    var isStatic = sModifiers.Contains("static");
+
                     switch (sName) {
                         case "field":
                             if (!(sArgs.Values.ElementAtOrDefault(0) is BAtom fieldName))
@@ -907,8 +909,6 @@ namespace Broccoli {
 
                             var initFieldVal = sArgs.Values.ElementAtOrDefault(1);
                             if (initFieldVal != null) {
-                                var isStatic = sModifiers.Contains("static");
-
                                 // Init value inside constructor
                                 var initCtorIL = isStatic ? staticCtorIL : ctorIL;
 
@@ -916,6 +916,8 @@ namespace Broccoli {
                                 CauliflowerInline.LoadInterpreterInvocation(initCtorIL, interpreterField, initFieldVal);
                                 initCtorIL.Emit(isStatic ? OpCodes.Stsfld : OpCodes.Stfld, newField);
                             }
+
+                            Console.WriteLine($"field {fieldName.Value} attrs: {newField.Attributes}");
 
                             break;
                         case "prop":
@@ -980,17 +982,19 @@ namespace Broccoli {
 
                                         var getterIL = getter.GetILGenerator();
                                         if (argsEmpty) {
-                                            getterIL.Emit(OpCodes.Ldarg_0);
-                                            getterIL.Emit(OpCodes.Ldfld, backingField);
+                                            if (!isStatic) getterIL.Emit(OpCodes.Ldarg_0);
+                                            getterIL.Emit(isStatic ? OpCodes.Ldsfld : OpCodes.Ldfld, backingField);
                                         } else {
                                             CauliflowerInline.CreateNewScope(getterIL, interpreterField);
-                                            CauliflowerInline.AddThisToScope(getterIL, interpreterField);
+                                            if (!isStatic) CauliflowerInline.AddThisToScope(getterIL, interpreterField);
                                             CauliflowerInline.LoadInterpreterInvocation(getterIL, interpreterField, aArgs.Values);
                                             CauliflowerInline.ReturnToParentScope(getterIL, interpreterField);
                                         }
                                         getterIL.Emit(OpCodes.Ret);
 
                                         newProp.SetGetMethod(getter);
+
+                                        Console.WriteLine($"{propName.Value} getter attrs: {getter.Attributes}");
                                         break;
                                     case "set":
                                         var setter = typeBuilder.DefineMethod(
@@ -1002,18 +1006,20 @@ namespace Broccoli {
 
                                         var setterIL = setter.GetILGenerator();
                                         if (argsEmpty) {
-                                            setterIL.Emit(OpCodes.Ldarg_0);
-                                            setterIL.Emit(OpCodes.Ldarg_1);
-                                            setterIL.Emit(OpCodes.Stfld, backingField);
+                                            setterIL.Emit(OpCodes.Ldarg_0); // Arg 0 is this for instance, value for static
+                                            if (!isStatic) setterIL.Emit(OpCodes.Ldarg_1); // Arg 1 is value for instance, undefined for static
+                                            setterIL.Emit(isStatic ? OpCodes.Stsfld : OpCodes.Stfld, backingField);
                                         } else {
                                             CauliflowerInline.CreateNewScope(setterIL, interpreterField);
-                                            CauliflowerInline.AddThisToScope(setterIL, interpreterField);
+                                            if (!isStatic) CauliflowerInline.AddThisToScope(setterIL, interpreterField);
                                             CauliflowerInline.LoadInterpreterInvocation(setterIL, interpreterField, aArgs.Values);
                                             CauliflowerInline.ReturnToParentScope(setterIL, interpreterField);
                                         }
                                         setterIL.Emit(OpCodes.Ret);
 
                                         newProp.SetSetMethod(setter);
+
+                                        Console.WriteLine($"{propName.Value} setter attrs: {setter.Attributes}");
                                         break;
                                     default:
                                         throw new Exception($"Unrecognized property accessor '{aType}'");
@@ -1026,8 +1032,6 @@ namespace Broccoli {
                             if (initPropVal != null) {
                                 if (propStatements.Any(a => a.Item3.Values.Length > 0))
                                     throw new Exception($"Only auto-properties can have initial values ('{propName.Value}')");
-
-                                var isStatic = sModifiers.Contains("static");
 
                                 var initCtorIL = isStatic ? staticCtorIL : ctorIL;
 
@@ -1056,13 +1060,15 @@ namespace Broccoli {
 
                             // Add new function scope + populate
                             CauliflowerInline.CreateNewScope(methodIL, interpreterField);
-                            CauliflowerInline.AddThisToScope(methodIL, interpreterField);
-                            CauliflowerInline.AddParametersToScope(methodIL, interpreterField, vexp2, sModifiers.Contains("static"));
+                            if (!isStatic) CauliflowerInline.AddThisToScope(methodIL, interpreterField);
+                            CauliflowerInline.AddParametersToScope(methodIL, interpreterField, vexp2, isStatic);
 
                             // Invoke interpreter, back out of scope, return
                             CauliflowerInline.LoadInterpreterInvocation(methodIL, interpreterField, sArgs.Values.Skip(2));
                             CauliflowerInline.ReturnToParentScope(methodIL, interpreterField);
                             methodIL.Emit(OpCodes.Ret);
+
+                            Console.WriteLine($"method {fnName.Value} attrs: {newMethod.Attributes}");
                             break;
                         default:
                             throw new Exception($"Unrecognized class definition statement '{sName}'");
