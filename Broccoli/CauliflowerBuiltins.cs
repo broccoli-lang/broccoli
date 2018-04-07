@@ -907,13 +907,14 @@ namespace Broccoli {
 
                             var initFieldVal = sArgs.Values.ElementAtOrDefault(1);
                             if (initFieldVal != null) {
+                                var isStatic = sModifiers.Contains("static");
+
                                 // Init value inside constructor
-                                var initCtorIL = sModifiers.Contains("static")
-                                    ? staticCtorIL
-                                    : ctorIL;
-                                initCtorIL.Emit(OpCodes.Ldarg_0);
+                                var initCtorIL = isStatic ? staticCtorIL : ctorIL;
+
+                                if (!isStatic) initCtorIL.Emit(OpCodes.Ldarg_0);
                                 CauliflowerInline.LoadInterpreterInvocation(initCtorIL, interpreterField, initFieldVal);
-                                initCtorIL.Emit(OpCodes.Stfld, newField);
+                                initCtorIL.Emit(isStatic ? OpCodes.Stsfld : OpCodes.Stfld, newField);
                             }
 
                             break;
@@ -1026,14 +1027,15 @@ namespace Broccoli {
                                 if (propStatements.Any(a => a.Item3.Values.Length > 0))
                                     throw new Exception($"Only auto-properties can have initial values ('{propName.Value}')");
 
-                                var initCtorIL = sModifiers.Contains("static")
-                                    ? staticCtorIL
-                                    : ctorIL;
-                                initCtorIL.Emit(OpCodes.Ldarg_0);
+                                var isStatic = sModifiers.Contains("static");
+
+                                var initCtorIL = isStatic ? staticCtorIL : ctorIL;
+
+                                if (!isStatic) initCtorIL.Emit(OpCodes.Ldarg_0);
                                 CauliflowerInline.CreateNewScope(initCtorIL, interpreterField);
                                 CauliflowerInline.LoadInterpreterInvocation(initCtorIL, interpreterField, initPropVal);
                                 CauliflowerInline.ReturnToParentScope(initCtorIL, interpreterField);
-                                initCtorIL.Emit(OpCodes.Stfld, backingField);
+                                initCtorIL.Emit(isStatic ? OpCodes.Stsfld : OpCodes.Stfld, backingField);
                             }
                             break;
                         case "fn":
@@ -1080,7 +1082,10 @@ namespace Broccoli {
                 // TODO: place in scope somewhere?
                 var classType = typeBuilder.CreateType();
 
-                classType.GetField("(interpreter)", BindingFlags.NonPublic | BindingFlags.Static).SetValue(null, cauliflower);
+                // FIXME
+                var runtimeField = classType.GetField("(interpreter)",
+                    BindingFlags.NonPublic | BindingFlags.Static);
+                runtimeField.SetValue(null, cauliflower);
 
                 return null;
             })},
