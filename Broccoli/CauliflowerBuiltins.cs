@@ -1013,6 +1013,7 @@ namespace Broccoli {
                                             CauliflowerInline.CreateNewScope(setterIL, interpreterField);
                                             if (!isStatic) CauliflowerInline.AddThisToScope(setterIL, interpreterField);
                                             CauliflowerInline.LoadInterpreterInvocation(setterIL, interpreterField, aArgs.Values);
+                                            setterIL.Emit(OpCodes.Pop);
                                             CauliflowerInline.ReturnToParentScope(setterIL, interpreterField);
                                         }
                                         setterIL.Emit(OpCodes.Ret);
@@ -1082,8 +1083,11 @@ namespace Broccoli {
                     CauliflowerInline.LoadInterpreterInvocation(ctorIL, interpreterField, ctorParamTuple.Item3.Values.Skip(2));
                     ctorIL.Emit(OpCodes.Pop);
                     CauliflowerInline.ReturnToParentScope(ctorIL, interpreterField);
-                    ctorIL.Emit(OpCodes.Ret);
                 }
+
+                ctorIL.Emit(OpCodes.Ret);
+
+                staticCtorIL.Emit(OpCodes.Ret);
 
                 // TODO: place in scope somewhere?
                 var classType = typeBuilder.CreateType();
