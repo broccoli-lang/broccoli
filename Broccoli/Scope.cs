@@ -39,13 +39,14 @@ namespace Broccoli {
 
             set {
                 var current = this;
-                while (current == null) {
+                do {
                     if (current.Scalars.ContainsKey(s.Value)) {
                         current.Scalars[s.Value] = value;
                         return;
                     }
+
                     current = current.Parent;
-                }
+                } while (current != null);
                 Scalars[s.Value] = value;
             }
         }
@@ -59,13 +60,14 @@ namespace Broccoli {
 
             set {
                 var current = this;
-                while (current == null) {
+                do {
                     if (current.Lists.ContainsKey(l.Value)) {
                         current.Lists[l.Value] = value;
                         return;
                     }
+
                     current = current.Parent;
-                }
+                } while (current != null);
                 Lists[l.Value] = value;
             }
         }
@@ -79,13 +81,14 @@ namespace Broccoli {
 
             set {
                 var current = this;
-                while (current == null) {
+                do {
                     if (current.Dictionaries.ContainsKey(d.Value)) {
                         current.Dictionaries[d.Value] = value;
                         return;
                     }
+
                     current = current.Parent;
-                }
+                } while (current != null);
                 Dictionaries[d.Value] = value;
             }
         }
@@ -99,13 +102,14 @@ namespace Broccoli {
 
             set {
                 var current = this;
-                while (current == null) {
+                do {
                     if (current.Functions.ContainsKey(f)) {
                         current.Functions[f] = value;
                         return;
                     }
+
                     current = current.Parent;
-                }
+                } while (current != null);
                 Functions[f] = value;
             }
         }
