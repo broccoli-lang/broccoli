@@ -14,7 +14,15 @@ namespace Broccoli {
         /// </summary>
         /// <param name="s">The scalar variable to access.</param>
         public override IScalar this[ScalarVar s] {
-            get => Scalars.ContainsKey(s.Value) ? Scalars[s.Value] : Parent?[s] ?? this[new ListVar(s.Value)]?.ScalarContext() ?? this[new DictVar(s.Value)].ScalarContext();
+            get => Scalars.ContainsKey(s.Value) ?
+                Scalars[s.Value] :
+                Parent?[s] ?? (Lists.ContainsKey(s.Value) ?
+                    Lists[s.Value].ScalarContext() :
+                    Parent?[new ListVar(s)]?.ScalarContext() ?? (Dictionaries.ContainsKey(s.Value) ?
+                        Dictionaries[s.Value].ScalarContext() :
+                        Parent?[new DictVar(s)]?.ScalarContext()
+                    )
+                );
 
             set {
                 Scope current = this;
@@ -35,7 +43,15 @@ namespace Broccoli {
         /// </summary>
         /// <param name="l">The list variable to access.</param>
         public override IList this[ListVar l] {
-            get => Lists.ContainsKey(l.Value) ? Lists[l.Value] : Parent?[l] ?? this[new ScalarVar(l.Value)]?.ListContext() ?? this[new DictVar(l.Value)].ListContext();
+            get => Lists.ContainsKey(l.Value) ?
+                Lists[l.Value] :
+                Parent?[l] ?? (Scalars.ContainsKey(l.Value) ?
+                    Scalars[l.Value].ListContext() :
+                    Parent?[new ScalarVar(l)]?.ListContext() ?? (Dictionaries.ContainsKey(l.Value) ?
+                        Dictionaries[l.Value].ListContext() :
+                        Parent?[new DictVar(l)]?.ListContext()
+                    )
+                );
 
             set {
                 Scope current = this;
@@ -56,7 +72,15 @@ namespace Broccoli {
         /// </summary>
         /// <param name="d">The dictionary variable to access.</param>
         public override IDictionary this[DictVar d] {
-            get => Dictionaries.ContainsKey(d.Value) ? Dictionaries[d.Value] : Parent?[d] ?? this[new ScalarVar(d.Value)]?.DictionaryContext() ?? this[new ListVar(d.Value)].DictionaryContext();
+            get => Dictionaries.ContainsKey(d.Value) ?
+                Dictionaries[d.Value] :
+                Parent?[d] ?? (Scalars.ContainsKey(d.Value) ?
+                    Scalars[d.Value].DictionaryContext() :
+                    Parent?[new ScalarVar(d)]?.DictionaryContext() ?? (Lists.ContainsKey(d.Value) ?
+                        Lists[d.Value].DictionaryContext() :
+                        Parent?[new ListVar(d)]?.DictionaryContext()
+                    )
+                );
 
             set {
                 Scope current = this;

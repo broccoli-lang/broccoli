@@ -494,7 +494,7 @@ namespace Broccoli {
             {"@", new Function("@", 1, (cauliflower, args) => {
                 if (args[0] is IList)
                     return args[0];
-                if (args[0] is IValue)
+                if (!(args[0] is BCSharpValue))
                     return args[0].ListContext();
                 var value = args[0].ToCSharp();
                 if (value.GetType().GetInterface("IEnumerable") != null) {
@@ -508,7 +508,7 @@ namespace Broccoli {
             {"%", new Function("%", 1, (cauliflower, args) => {
                 if (args[0] is IDictionary)
                     return args[0];
-                if (args[0] is IValue)
+                if (!(args[0] is BCSharpValue))
                     return args[0].DictionaryContext();
                 var value = args[0].ToCSharp();
                 if (value.GetType().GetInterface("IDictionary") != null)
@@ -716,7 +716,7 @@ namespace Broccoli {
             {"help", new ShortCircuitFunction("help", 0, (cauliflower, args) => {
                 return new BList(cauliflower.Builtins.Keys.Skip(1).Select(key => (IValue) new BString(key)));
             })},
-            {"import", new Function("import", -2, (cauliflower, args) => {
+            {"import", new Function("import", ~1, (cauliflower, args) => {
                 if (args[0] is BAtom) {
                     CauliflowerInline.Import(cauliflower, args);
                     return null;
@@ -731,7 +731,7 @@ namespace Broccoli {
                     cauliflower.Scope[key] = value;
                 return null;
             })},
-            {"import-static", new Function("import-static", -2, (cauliflower, args) => {
+            {"import-static", new Function("import-static", ~1, (cauliflower, args) => {
                 if (!(args[0] is BAtom))
                     throw new ArgumentTypeException(args[0], "atom", 1, "import-static");
                 CauliflowerInline.Import(cauliflower, args, true);
