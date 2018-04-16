@@ -1,12 +1,12 @@
 ﻿using System;
 using System.Text.RegularExpressions;
-using System.Linq;
 using Broccoli;
 
 #pragma warning disable IDE1006
 
 namespace cauliflower.core {
     public class regex : IScalar {
+        public static Interpreter interpreter;
         private static IValue[] ctorArgs = new[] { (ScalarVar) "pattern" };
         public Regex Value { get; }
 
@@ -17,20 +17,28 @@ namespace cauliflower.core {
             Value = new Regex(pattern.Value);
         }
 
-        public IValue match(Interpreter interpreter, IValue[] args) {
-            if (args.Length == 0 || args.Length > 3)
-                throw new Exception($"Function 'regex#match' requires from 1 to 3 arguments, {args.Length} provided");
-            if (!(args[0] is BString input))
-                throw new ArgumentTypeException(args[0], "string", 1, "match");
-            if (args.Count() == 1)
-                return CauliflowerInterpreter.CreateValue(Value.Match(input.Value));
-            if (!(args[1] is BInteger beginning))
-                throw new ArgumentTypeException(args[1], "integer", 2, "match");
-            if (args.Count() == 2)
-                return CauliflowerInterpreter.CreateValue(Value.Match(input.Value, (int) beginning.Value));
-            if (!(args[2] is BInteger length))
-                throw new ArgumentTypeException(args[2], "integer", 3, "match");
-            return CauliflowerInterpreter.CreateValue(Value.Match(input.Value, (int) beginning.Value, (int) length.Value));
+        public IValue match(IValue input) {
+            if (!(input is BString inputS))
+                throw new ArgumentTypeException(input, "string", 1, "match");
+            return CauliflowerInterpreter.CreateValue(Value.Match(inputS.Value));
+        }
+
+        public IValue match(IValue input, IValue beginning) {
+            if (!(input is BString inputS))
+                throw new ArgumentTypeException(input, "string", 1, "match");
+            if (!(beginning is BInteger beginningI))
+                throw new ArgumentTypeException(beginning, "integer", 1, "match");
+            return CauliflowerInterpreter.CreateValue(Value.Match(inputS.Value, (int) beginningI.Value));
+        }
+
+        public IValue match(IValue input, IValue beginning, IValue length) {
+            if (!(input is BString inputS))
+                throw new ArgumentTypeException(input, "string", 1, "match");
+            if (!(beginning is BInteger beginningI))
+                throw new ArgumentTypeException(beginning, "integer", 1, "match");
+            if (!(length is BInteger lengthI))
+                throw new ArgumentTypeException(length, "integer", 1, "match");
+            return CauliflowerInterpreter.CreateValue(Value.Match(inputS.Value, (int) beginningI.Value, (int) lengthI.Value));
         }
 
         public override string ToString() => Value.ToString();

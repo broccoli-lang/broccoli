@@ -268,8 +268,9 @@ namespace Broccoli {
         /// <param name="type">Type of value to create.</param>
         /// <param name="parameters">Parameters to feed to the constructor.</param>
         /// <returns>The created value.</returns>
-        private static IValue CauliflowerCreate(BCauliflowerType type, IEnumerable<IValue> parameters) => (IValue) (
-            type.Value.GetConstructor(new[] { typeof(IValue[]) }).Invoke(new[] { parameters.ToArray() })
+        private static IValue CauliflowerCreate(BCauliflowerType type, IEnumerable<IValue> parameters) => (IValue)(
+            type.Value.GetConstructor(parameters.Select(p => p.Type()).ToArray())
+                .Invoke(parameters.ToArray())
         );
 
         /// <summary>
@@ -294,7 +295,8 @@ namespace Broccoli {
         /// <param name="args">Arguments to pass to method.</param>
         /// <returns>Return value of method.</returns>
         private static IValue CauliflowerMethod(BCSharpType type, BAtom name, IValue instance, IEnumerable<IValue> args) => (IValue) (
-            type.Value.GetMethod(name.Value).Invoke(instance?.ToCSharp(), new[] { args.ToArray() })
+            type.Value.GetMethod(name.Value, args.Select(arg => arg.GetType()).ToArray())
+                .Invoke(instance?.ToCSharp(), args.ToArray())
         );
 
         /// <summary>
@@ -346,15 +348,19 @@ namespace Broccoli {
         /// </summary>
         /// <param name="type">Type containing wanted types.</param>
         /// <param name="space">Namespace to set value on.</param>
-        private static void AddTypes(Type type, Scope.Tree<string, Scope> space) {
+        private static void AddTypes(Interpreter cauliflower, Type type, Scope.Tree<string, Scope> space) {
             var name = type.Name.Replace('_', '-');
             if (!(space.ContainsKey(name))) {
                 space[name] = new Scope.Tree<string, Scope> { Value = new Scope() };
             }
             foreach (var nested in type.GetNestedTypes(BindingFlags.Public).Where(t => !t.Name.Contains("<"))) {
-                AddTypes(nested, space[name]);
-                if (nested.GetInterface("IValue") != null)
-                    space.Value.Scalars[nested.Name.Replace('_', '-')] = (BCauliflowerType) nested;
+                AddTypes(cauliflower, nested, space[name]);
+                if (nested.GetInterface("IValue") != null) {
+                    var property = nested.GetProperty("interpreter", BindingFlags.Static);
+                    if (property?.PropertyType == typeof(Interpreter))
+                        property.SetValue(null, cauliflower);
+                    space.Value.Scalars[nested.Name.Replace('_', '-')] = (BCauliflowerType)nested;
+                }
             }
             foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.Static))
                 space[name].Value.Functions[method.Name.Replace('_', '-')] = new Function(
@@ -440,7 +446,7 @@ namespace Broccoli {
                                         methods[type][name] = type.GetMethod(name);
                                     var method = methods[type][name];
                                     var obj = result;
-                                    result = new Function(name, -1, (_, innerArgs) => (IValue) method.Invoke(obj, new object[] { cauliflower, innerArgs }));
+                                    result = new Function(name, -1, (_, innerArgs) => (IValue) method.Invoke(obj, innerArgs));
                                     type = null;
                                     break;
                                 case MemberTypes.Field:
@@ -1100,10 +1106,7 @@ namespace Broccoli {
                 classType.GetMethod("(init)", BindingFlags.NonPublic | BindingFlags.Static)
                     .Invoke(null, new [] {cauliflower});
 
-                // Test stuff
-                var testInstance = classType.GetConstructor(new[] {typeof(IScalar)})
-                    .Invoke(new [] {new BInteger(6)});
-
+                cauliflower.Scope.Scalars[((BAtom) args[0]).Value] = new BCauliflowerType(classType);
 
                 return null;
             })},
@@ -1188,7 +1191,7 @@ namespace Broccoli {
                     }
                 }
 
-                return args.Aggregate((IValue) new BInteger(1), (m, v) => {
+                return args.Aggregate((IValue) new BInteger(0), (m, v) => {
                     if (m is BInteger im && v is BInteger iv)
                         return new BInteger(im.Value + iv.Value);
                     double fm, fv;
@@ -1204,12 +1207,12 @@ namespace Broccoli {
                 });
             })},
 
-            {"not", new Function("not", 1, (cauliflower, args) => Boolean(CauliflowerInline.Truthy(args[0]).Equals(BAtom.Nil)))},
+            {"not", new Function("not", 1, (cauliflower, args) => Boolean(!CauliflowerInline.Truthy(args[0])))},
             {"and", new ShortCircuitFunction("and", ~0, (cauliflower, args) =>
-                Boolean(!args.Any(arg => CauliflowerInline.Truthy(cauliflower.Run(arg))))
+                Boolean(!args.Any(arg => !CauliflowerInline.Truthy(cauliflower.Run(arg))))
             )},
             {"or", new ShortCircuitFunction("or", ~0, (cauliflower, args) =>
-                Boolean(args.Any(arg => !CauliflowerInline.Truthy(cauliflower.Run(arg))))
+                Boolean(args.Any(arg => CauliflowerInline.Truthy(cauliflower.Run(arg))))
             )},
 
             {"\\", new ShortCircuitFunction("\\", ~1, (cauliflower, args) => {
@@ -1520,7 +1523,7 @@ namespace Broccoli {
                 }
                 if (module != null && typeName == null) {
                     foreach (var nested in module.GetExportedTypes().Where(t => !t.Name.Contains("<"))) {
-                        AddTypes(nested, cauliflower.Scope.Namespaces);
+                        AddTypes(cauliflower, nested, cauliflower.Scope.Namespaces);
                         if (isStatic)
                             foreach (var method in nested.GetMethods(BindingFlags.Public | BindingFlags.Static)) {
                                 var name = method.Name.Replace('_', '-');
@@ -1528,9 +1531,12 @@ namespace Broccoli {
                                     name, ~0, (_, innerArgs) => CauliflowerMethod(nested, method.Name, null, innerArgs)
                                 );
                             }
-                        else
-                            if (nested.GetInterface("IValue") != null)
-                                cauliflower.Scope.Namespaces.Value.Scalars[nested.Name.Replace('_', '-')] = (BCauliflowerType) nested;
+                        else if (nested.GetInterface("IValue") != null) {
+                            var property = nested.GetProperty("interpreter", BindingFlags.Static);
+                            if (property?.PropertyType == typeof(Interpreter))
+                                property.SetValue(null, cauliflower);
+                            cauliflower.Scope.Namespaces.Value.Scalars[nested.Name.Replace('_', '-')] = (BCauliflowerType) nested;
+                        }
                     }
                 }
             }
