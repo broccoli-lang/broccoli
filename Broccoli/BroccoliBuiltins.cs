@@ -50,9 +50,9 @@ namespace Broccoli {
                         var toAssign = innerArgs[i];
                         switch (argNames[i]) {
                             case ScalarVar s:
-                                if (toAssign is BList)
+                                if (!(toAssign is IScalar scalar))
                                     throw new Exception("Only scalars can be assigned to scalar ($) variables");
-                                broccoli.Scope[s] = toAssign;
+                                broccoli.Scope[s] = scalar;
                                 break;
                             case ListVar l:
                                 if (!(toAssign is BList list))
@@ -234,7 +234,7 @@ namespace Broccoli {
                     case ScalarVar s:
                         if (!(toAssign is IScalar scalar))
                             throw new Exception("Only scalars can be assigned to scalar ($) variables");
-                        broccoli.Scope[s] = toAssign;
+                        broccoli.Scope[s] = scalar;
                         break;
                     case ListVar l:
                         if (!(toAssign is BList list))
@@ -495,14 +495,14 @@ namespace Broccoli {
                 foreach (var value in valueList) {
                     switch (args[0]) {
                         case ScalarVar s:
-                                if (value.GetType().In(typeof(BList), typeof(BDictionary)))
-                                    throw new Exception("Only Scalars can be assigned to scalar ($) variables");
-                                broccoli.Scope[s] = value;
-                                break;
+                            if (!(value is IScalar scalar))
+                                throw new Exception("Only Scalars can be assigned to scalar ($) variables");
+                            broccoli.Scope[s] = scalar;
+                            break;
                         case ListVar l:
-                            if (!(value is BList vList))
+                            if (!(value is IList list))
                                 throw new Exception("Only Lists can be assigned to list (@) variables");
-                            broccoli.Scope[l] = vList;
+                            broccoli.Scope[l] = list;
                             break;
                     }
                     foreach (var statement in statements)

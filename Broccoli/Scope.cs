@@ -17,9 +17,9 @@ namespace Broccoli {
             }
         }
 
-        public readonly Dictionary<string, IValue> Scalars = new Dictionary<string, IValue>();
-        public readonly Dictionary<string, BList> Lists = new Dictionary<string, BList>();
-        public readonly Dictionary<string, BDictionary> Dictionaries = new Dictionary<string, BDictionary>();
+        public readonly Dictionary<string, IScalar> Scalars = new Dictionary<string, IScalar>();
+        public readonly Dictionary<string, IList> Lists = new Dictionary<string, IList>();
+        public readonly Dictionary<string, IDictionary> Dictionaries = new Dictionary<string, IDictionary>();
         public readonly Dictionary<string, IFunction> Functions = new Dictionary<string, IFunction>();
         public readonly Tree<string, Scope> Namespaces = new Tree<string, Scope>();
         public readonly Scope Parent;
@@ -34,7 +34,7 @@ namespace Broccoli {
         /// Gets or sets the value of the given scalar variable.
         /// </summary>
         /// <param name="s">The scalar variable to access.</param>
-        public IValue this[ScalarVar s] {
+        public virtual IScalar this[ScalarVar s] {
             get => Scalars.ContainsKey(s.Value) ? Scalars[s.Value] : Parent?[s];
 
             set {
@@ -55,7 +55,7 @@ namespace Broccoli {
         /// Gets or sets the value of the given list variable.
         /// </summary>
         /// <param name="l">The list variable to access.</param>
-        public BList this[ListVar l] {
+        public virtual IList this[ListVar l] {
             get => Lists.ContainsKey(l.Value) ? Lists[l.Value] : Parent?[l];
 
             set {
@@ -76,7 +76,7 @@ namespace Broccoli {
         /// Gets or sets the value of the given dictionary variable.
         /// </summary>
         /// <param name="d">The dictionary variable to access.</param>
-        public BDictionary this[DictVar d] {
+        public virtual IDictionary this[DictVar d] {
             get => Dictionaries.ContainsKey(d.Value) ? Dictionaries[d.Value] : Parent?[d];
 
             set {
@@ -97,7 +97,7 @@ namespace Broccoli {
         /// Gets or sets the value of the given function.
         /// </summary>
         /// <param name="f">The name of the function to access.</param>
-        public IFunction this[string f] {
+        public virtual IFunction this[string f] {
             get => Functions.ContainsKey(f) ? Functions[f] : Parent?[f];
 
             set {

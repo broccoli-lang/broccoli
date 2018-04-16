@@ -5,6 +5,8 @@ using Broccoli;
 using System.Text;
 
 // TODO: test range/slice overloads
+// TODO: tests for contexts
+// TODO: allow user-defined classes to specify default context - make them automatically extend IEnumerable<IValue> or IDictionary<IValue, IValue> as needed
 
 namespace BroccoliTest {
     [TestClass]

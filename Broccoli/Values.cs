@@ -11,9 +11,17 @@ namespace Broccoli {
     public interface IValue : IValueExpressible {
         object ToCSharp();
         Type Type();
+
+        IScalar ScalarContext();
+        IList ListContext();
+        IDictionary DictionaryContext();
     }
 
     public interface IScalar : IValue { }
+
+    public interface IList : IValue, IEnumerable<IValue> { }
+
+    public interface IDictionary : IValue, IDictionary<IValue, IValue> { }
 
     /// <summary>
     /// Represents a 64-bit signed integer.
@@ -66,6 +74,12 @@ namespace Broccoli {
         public object ToCSharp() => Value;
 
         public Type Type() => typeof(long);
+
+        public IScalar ScalarContext() => this;
+
+        public IList ListContext() => throw new NoListContextException(this);
+
+        public IDictionary DictionaryContext() => throw new NoDictionaryContextException(this);
     }
 
     /// <summary>
@@ -119,6 +133,12 @@ namespace Broccoli {
         public object ToCSharp() => Value;
 
         public Type Type() => typeof(double);
+
+        public IScalar ScalarContext() => this;
+
+        public IList ListContext() => throw new NoListContextException(this);
+
+        public IDictionary DictionaryContext() => throw new NoDictionaryContextException(this);
     }
 
     /// <summary>
@@ -148,6 +168,12 @@ namespace Broccoli {
         public object ToCSharp() => Value;
 
         public Type Type() => typeof(string);
+
+        public IScalar ScalarContext() => this;
+
+        public IList ListContext() => throw new NoListContextException(this);
+
+        public IDictionary DictionaryContext() => throw new NoDictionaryContextException(this);
     }
 
     /// <summary>
@@ -191,6 +217,12 @@ namespace Broccoli {
         }
 
         public Type Type() => typeof(string);
+
+        public IScalar ScalarContext() => this;
+
+        public IList ListContext() => throw new NoListContextException(this);
+
+        public IDictionary DictionaryContext() => throw new NoDictionaryContextException(this);
     }
 
     /// <summary>
@@ -214,6 +246,12 @@ namespace Broccoli {
         public object ToCSharp() => Value;
 
         public Type Type() => typeof(string);
+
+        public IScalar ScalarContext() => this;
+
+        public IList ListContext() => throw new NoListContextException(this);
+
+        public IDictionary DictionaryContext() => throw new NoDictionaryContextException(this);
     }
 
     /// <summary>
@@ -237,6 +275,12 @@ namespace Broccoli {
         public object ToCSharp() => Value;
 
         public Type Type() => typeof(string);
+
+        public IScalar ScalarContext() => this;
+
+        public IList ListContext() => throw new NoListContextException(this);
+
+        public IDictionary DictionaryContext() => throw new NoDictionaryContextException(this);
     }
 
     /// <summary>
@@ -260,12 +304,18 @@ namespace Broccoli {
         public object ToCSharp() => Value;
 
         public Type Type() => typeof(string);
+
+        public IScalar ScalarContext() => this;
+
+        public IList ListContext() => throw new NoListContextException(this);
+
+        public IDictionary DictionaryContext() => throw new NoDictionaryContextException(this);
     }
 
     /// <summary>
     /// Represents a list of values.
     /// </summary>
-    public class BList : List<IValue>, IValue {
+    public class BList : List<IValue>, IList {
         public BList Value { get; }
 
         public BList() : base() => Value = this;
@@ -298,6 +348,12 @@ namespace Broccoli {
         public object ToCSharp() => new BCSharpList(Value.Select(item => item.ToCSharp()));
 
         public Type Type() => typeof(List<object>);
+
+        public IScalar ScalarContext() => (BInteger) Count;
+
+        public IList ListContext() => this;
+
+        public IDictionary DictionaryContext() => new BDictionary(this.WithIndex().ToDictionary(item => (IValue) (BInteger) item.index, item => item.value));
     }
 
     public class BCSharpList : List<object>, IValue {
@@ -331,12 +387,18 @@ namespace Broccoli {
         public object ToCSharp() => Value;
 
         public Type Type() => typeof(List<object>);
+
+        public IScalar ScalarContext() => (BInteger) Count;
+
+        public IList ListContext() => new BList(this.Select(item => new CauliflowerInterpreter.BCSharpValue(item)));
+
+        public IDictionary DictionaryContext() => new BDictionary(this.WithIndex().ToDictionary(item => (IValue) (BInteger) item.index, item => (IValue) new CauliflowerInterpreter.BCSharpValue(item.value)));
     }
 
     /// <summary>
     /// Represents a dictionary of values paired with other values.
     /// </summary>
-    public class BDictionary : Dictionary<IValue, IValue>, IValue {
+    public class BDictionary : Dictionary<IValue, IValue>, IDictionary {
         public BDictionary Value { get; }
 
         public BDictionary() : base() => Value = this;
@@ -375,6 +437,12 @@ namespace Broccoli {
         public object ToCSharp() => new BCSharpDictionary(Value.ToDictionary(item => item.Key.ToCSharp(), item => item.Value.ToCSharp()));
 
         public Type Type() => typeof(Dictionary<IValue, IValue>);
+
+        public IScalar ScalarContext() => (BInteger) Count;
+
+        public IList ListContext() => new BList(this.Select(kvp => new BList(kvp.Key, kvp.Value)));
+
+        public IDictionary DictionaryContext() => this;
     }
 
     public class BCSharpDictionary : Dictionary<object, object>, IValue {
@@ -416,5 +484,11 @@ namespace Broccoli {
         public object ToCSharp() => Value;
 
         public Type Type() => typeof(Dictionary<object, object>);
+
+        public IScalar ScalarContext() => (BInteger) Count;
+
+        public IList ListContext() => new BList(this.Select(kvp => new BList(new CauliflowerInterpreter.BCSharpValue(kvp.Key), new CauliflowerInterpreter.BCSharpValue(kvp.Value))));
+
+        public IDictionary DictionaryContext() => new BDictionary(this.ToDictionary(kvp => (IValue) new CauliflowerInterpreter.BCSharpValue(kvp.Key), kvp => (IValue) new CauliflowerInterpreter.BCSharpValue(kvp.Value)));
     }
 }

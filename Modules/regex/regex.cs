@@ -48,5 +48,11 @@ namespace cauliflower.core {
         public object ToCSharp() => Value;
 
         public Type Type() => typeof(Regex);
+
+        public IScalar ScalarContext() => this;
+
+        public IList ListContext() => throw new NoListContextException(this);
+
+        public IDictionary DictionaryContext() => throw new NoDictionaryContextException(this);
     }
 }

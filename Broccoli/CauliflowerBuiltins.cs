@@ -128,7 +128,7 @@ namespace Broccoli {
         /// <summary>
         /// IScalar wrapper for C# objects.
         /// </summary>
-        private class BCSharpValue : IScalar {
+        public class BCSharpValue : IScalar {
             public object Value { get; }
 
             public BCSharpValue(object value) {
@@ -142,6 +142,12 @@ namespace Broccoli {
             public object ToCSharp() => Value;
 
             public Type Type() => Value.GetType();
+
+            public IScalar ScalarContext() => this;
+
+            public IList ListContext() => throw new NoListContextException(this);
+
+            public IDictionary DictionaryContext() => throw new NoDictionaryContextException(this);
         }
 
         /// <summary>
@@ -165,6 +171,12 @@ namespace Broccoli {
             public object ToCSharp() => Value;
 
             public Type Type() => typeof(Type);
+
+            public IScalar ScalarContext() => this;
+
+            public IList ListContext() => throw new NoListContextException(this);
+
+            public IDictionary DictionaryContext() => throw new NoDictionaryContextException(this);
         }
 
         /// <summary>
@@ -198,6 +210,12 @@ namespace Broccoli {
             public object ToCSharp() => Value;
 
             public Type Type() => typeof(Tuple<Type, string>);
+
+            public IScalar ScalarContext() => this;
+
+            public IList ListContext() => throw new NoListContextException(this);
+
+            public IDictionary DictionaryContext() => throw new NoDictionaryContextException(this);
         }
 
 
@@ -472,10 +490,12 @@ namespace Broccoli {
                         throw new ArgumentTypeException(item, "atom", index + 1, ".");
                 return result;
             })},
-            {"$", new Function("$", 1, (cauliflower, args) => args[0] is IScalar ? args[0] : new BCSharpValue(args[0]))},
+            {"$", new Function("$", 1, (cauliflower, args) => args[0] is IScalar ? args[0] : args[0].ScalarContext())},
             {"@", new Function("@", 1, (cauliflower, args) => {
-                if (args[0] is BList)
+                if (args[0] is IList)
                     return args[0];
+                if (args[0] is IValue)
+                    return args[0].ListContext();
                 var value = args[0].ToCSharp();
                 if (value.GetType().GetInterface("IEnumerable") != null) {
                     var result = new BList();
@@ -483,19 +503,16 @@ namespace Broccoli {
                         result.Add(CreateValue(item));
                     return result;
                 }
-                throw new ArgumentTypeException(args[0], "list", 1, "@");
+                return args[0].ListContext();
             })},
             {"%", new Function("%", 1, (cauliflower, args) => {
-                if (args[0] is BDictionary)
+                if (args[0] is IDictionary)
                     return args[0];
+                if (args[0] is IValue)
+                    return args[0].DictionaryContext();
                 var value = args[0].ToCSharp();
-                if (value.GetType().GetInterface("IDictionary") != null) {
-                    var result = new BDictionary();
-                    var source = ((IDictionary) value);
-                    foreach (var key in source.Keys)
-                        result[CreateValue(key)] = CreateValue(source[key]);
-                    return result;
-                }
+                if (value.GetType().GetInterface("IDictionary") != null)
+                    return new BDictionary(((IDictionary) value).ToDictionary(kvp => CreateValue(kvp.Key), kvp => CreateValue(kvp.Value)));
                 throw new ArgumentTypeException(args[0], "list", 1, "%");
             })},
             {"fn", new ShortCircuitFunction("fn", -3, (cauliflower, args) => {
@@ -537,17 +554,17 @@ namespace Broccoli {
                         var toAssign = innerArgs[i];
                         switch (argNames[i]) {
                             case ScalarVar s:
-                                if (!(toAssign is IScalar))
+                                if (!(toAssign is IScalar scalar))
                                     throw new Exception("Only scalars can be assigned to scalar ($) variables");
-                                cauliflower.Scope[s] = toAssign;
+                                cauliflower.Scope[s] = scalar;
                                 break;
                             case ListVar l:
-                                if (!(toAssign is BList list))
+                                if (!(toAssign is IList list))
                                     throw new Exception("Only lists can be assigned to list (@) variables");
                                 cauliflower.Scope[l] = list;
                                 break;
                             case DictVar d:
-                                if (!(toAssign is BDictionary dict))
+                                if (!(toAssign is IDictionary dict))
                                     throw new Exception("Only dictionaries can be assigned to dictionary (%) variables");
                                 cauliflower.Scope[d] = dict;
                                 break;
@@ -725,17 +742,17 @@ namespace Broccoli {
                 var toAssign = broccoli.Run(args[1]);
                 switch (args[0]) {
                     case ScalarVar s:
-                        if (toAssign is BList || toAssign is BDictionary)
+                        if (!(toAssign is IScalar scalar))
                             throw new Exception("Only scalars can be assigned to scalar ($) variables");
-                        broccoli.Scope[s] = toAssign;
+                        broccoli.Scope[s] = scalar;
                         break;
                     case ListVar l:
-                        if (!(toAssign is BList list))
+                        if (!(toAssign is IList list))
                             throw new Exception("Only lists can be assigned to list (@) variables");
                         broccoli.Scope[l] = list;
                         break;
                     case DictVar d:
-                        if (!(toAssign is BDictionary dict))
+                        if (!(toAssign is IDictionary dict))
                             throw new Exception("Only dicts can be assigned to dict (%) variables");
                         broccoli.Scope[d] = dict;
                         break;
@@ -764,6 +781,8 @@ namespace Broccoli {
             {"class", new ShortCircuitFunction("class", ~0, (cauliflower, args) => {
                 if (!(args[0] is BAtom name))
                     throw new ArgumentTypeException(args[0], "atom", 1, "class");
+
+                bool hasCustomScalarContext = false, hasCustomListContext = false, hasCustomDictionaryContext = false, isScalar = true, isList = false, isDictionary = false;
 
                 // Generate initial class
                 var asmName = new AssemblyName("CauliflowerGenerated-" + name.Value);
@@ -934,6 +953,7 @@ namespace Broccoli {
 
                             break;
                         case "prop":
+                        case "property":
                             if (!(sArgs.Values.ElementAtOrDefault(0) is BAtom propName))
                                 throw new ArgumentTypeException(sArgs.Values.ElementAtOrDefault(0), "atom", 1, "prop");
 
@@ -1056,7 +1076,13 @@ namespace Broccoli {
                                 initCtorIL.Emit(isStatic ? OpCodes.Stsfld : OpCodes.Stfld, backingField);
                             }
                             break;
+                        case "op":
+                        case "operator":
                         case "fn":
+                        case "function":
+                            if (sName[0] == 'o' && sName[1] == 'p') {
+                                // TODO: operator things
+                            }
                             if (!(sArgs.Values.ElementAtOrDefault(0) is BAtom fnName))
                                 throw new ArgumentTypeException(sArgs.Values.ElementAtOrDefault(0), "atom", 1, "fn");
 
@@ -1086,6 +1112,129 @@ namespace Broccoli {
                             break;
                         default:
                             throw new Exception($"Unrecognized class definition statement '{sName}'");
+                    }
+                }
+
+                if (isScalar) {
+                    var defaultContext = typeBuilder.DefineMethod(
+                        "ScalarContext",
+                        MethodAttributes.Public | MethodAttributes.Virtual,
+                        typeof(IScalar),
+                        Type.EmptyTypes
+                    );
+                    var defaultContextIL = defaultContext.GetILGenerator();
+                    defaultContextIL.Emit(OpCodes.Ldarg_0);
+                    defaultContextIL.Emit(OpCodes.Ret);
+                    typeBuilder.DefineMethodOverride(defaultContext, typeof(IValue).GetMethod("ScalarContext"));
+
+                    if (!hasCustomListContext) {
+                        var defaultListContext = typeBuilder.DefineMethod(
+                            "ListContext",
+                            MethodAttributes.Public | MethodAttributes.Virtual,
+                            typeof(IList),
+                            Type.EmptyTypes
+                        );
+                        var defaultListContextIL = defaultListContext.GetILGenerator();
+                        defaultListContextIL.Emit(OpCodes.Ldarg_0);
+                        defaultListContextIL.Emit(OpCodes.Newobj, typeof(NoListContextException).GetConstructor(new[] {typeof(object)}));
+                        defaultListContextIL.Emit(OpCodes.Throw);
+                        typeBuilder.DefineMethodOverride(defaultListContext, typeof(IValue).GetMethod("ListContext"));
+                    }
+
+                    if (!hasCustomDictionaryContext) {
+                        var defaultDictionaryContext = typeBuilder.DefineMethod(
+                            "DictionaryContext",
+                            MethodAttributes.Public | MethodAttributes.Virtual,
+                            typeof(IDictionary),
+                            Type.EmptyTypes
+                        );
+                        var defaultDictionaryContextIL = defaultDictionaryContext.GetILGenerator();
+                        defaultDictionaryContextIL.Emit(OpCodes.Ldarg_0);
+                        defaultDictionaryContextIL.Emit(OpCodes.Newobj, typeof(NoDictionaryContextException).GetConstructor(new[] {typeof(object)}));
+                        defaultDictionaryContextIL.Emit(OpCodes.Throw);
+                        typeBuilder.DefineMethodOverride(defaultDictionaryContext, typeof(IValue).GetMethod("DictionaryContext"));
+                    }
+                }
+
+                if (isList) {
+                    var defaultContext = typeBuilder.DefineMethod(
+                        "ListContext",
+                        MethodAttributes.Public | MethodAttributes.Virtual,
+                        typeof(IList),
+                        Type.EmptyTypes
+                    );
+                    var defaultContextIL = defaultContext.GetILGenerator();
+                    defaultContextIL.Emit(OpCodes.Ldarg_0);
+                    defaultContextIL.Emit(OpCodes.Ret);
+                    typeBuilder.DefineMethodOverride(defaultContext, typeof(IValue).GetMethod("ListContext"));
+
+                    if (!hasCustomScalarContext) {
+                        var defaultScalarContext = typeBuilder.DefineMethod(
+                            "ScalarContext",
+                            MethodAttributes.Public | MethodAttributes.Virtual,
+                            typeof(IScalar),
+                            Type.EmptyTypes
+                        );
+                        var defaultScalarContextIL = defaultScalarContext.GetILGenerator();
+                        defaultScalarContextIL.Emit(OpCodes.Ldarg_0);
+                        defaultScalarContextIL.Emit(OpCodes.Newobj, typeof(NoScalarContextException).GetConstructor(new[] {typeof(object)}));
+                        defaultScalarContextIL.Emit(OpCodes.Throw);
+                        typeBuilder.DefineMethodOverride(defaultScalarContext, typeof(IValue).GetMethod("ScalarContext"));
+                    }
+
+                    if (!hasCustomDictionaryContext) {
+                        var defaultDictionaryContext = typeBuilder.DefineMethod(
+                            "DictionaryContext",
+                            MethodAttributes.Public | MethodAttributes.Virtual,
+                            typeof(IDictionary),
+                            Type.EmptyTypes
+                        );
+                        var defaultDictionaryContextIL = defaultDictionaryContext.GetILGenerator();
+                        defaultDictionaryContextIL.Emit(OpCodes.Ldarg_0);
+                        defaultDictionaryContextIL.Emit(OpCodes.Newobj, typeof(NoDictionaryContextException).GetConstructor(new[] {typeof(object)}));
+                        defaultDictionaryContextIL.Emit(OpCodes.Throw);
+                        typeBuilder.DefineMethodOverride(defaultDictionaryContext, typeof(IValue).GetMethod("DictionaryContext"));
+                    }
+                }
+
+                if (isDictionary) {
+                    var defaultContext = typeBuilder.DefineMethod(
+                        "DictionaryContext",
+                        MethodAttributes.Public | MethodAttributes.Virtual,
+                        typeof(IDictionary),
+                        Type.EmptyTypes
+                    );
+                    var defaultContextIL = defaultContext.GetILGenerator();
+                    defaultContextIL.Emit(OpCodes.Ldarg_0);
+                    defaultContextIL.Emit(OpCodes.Ret);
+                    typeBuilder.DefineMethodOverride(defaultContext, typeof(IValue).GetMethod("DictionaryContext"));
+
+                    if (!hasCustomScalarContext) {
+                        var defaultScalarContext = typeBuilder.DefineMethod(
+                            "ScalarContext",
+                            MethodAttributes.Public | MethodAttributes.Virtual,
+                            typeof(IScalar),
+                            Type.EmptyTypes
+                        );
+                        var defaultScalarContextIL = defaultScalarContext.GetILGenerator();
+                        defaultScalarContextIL.Emit(OpCodes.Ldarg_0);
+                        defaultScalarContextIL.Emit(OpCodes.Newobj, typeof(NoScalarContextException).GetConstructor(new[] {typeof(object)}));
+                        defaultScalarContextIL.Emit(OpCodes.Throw);
+                        typeBuilder.DefineMethodOverride(defaultScalarContext, typeof(IValue).GetMethod("ScalarContext"));
+                    }
+
+                    if (!hasCustomListContext) {
+                        var defaultListContext = typeBuilder.DefineMethod(
+                            "ListContext",
+                            MethodAttributes.Public | MethodAttributes.Virtual,
+                            typeof(IList),
+                            Type.EmptyTypes
+                        );
+                        var defaultListContextIL = defaultListContext.GetILGenerator();
+                        defaultListContextIL.Emit(OpCodes.Ldarg_0);
+                        defaultListContextIL.Emit(OpCodes.Newobj, typeof(NoListContextException).GetConstructor(new[] {typeof(object)}));
+                        defaultListContextIL.Emit(OpCodes.Throw);
+                        typeBuilder.DefineMethodOverride(defaultListContext, typeof(IValue).GetMethod("ListContext"));
                     }
                 }
 
@@ -1252,17 +1401,17 @@ namespace Broccoli {
                         var toAssign = innerArgs[i];
                         switch (argNames[i]) {
                             case ScalarVar s:
-                                if (!(toAssign is IScalar))
+                                if (!(toAssign is IScalar scalar))
                                     throw new Exception("Only scalars can be assigned to scalar ($) variables");
-                                cauliflower.Scope[s] = toAssign;
+                                cauliflower.Scope[s] = scalar;
                                 break;
                             case ListVar l:
-                                if (!(toAssign is BList list))
+                                if (!(toAssign is IList list))
                                     throw new Exception("Only lists can be assigned to list (@) variables");
                                 cauliflower.Scope[l] = list;
                                 break;
                             case DictVar d:
-                                if (!(toAssign is BDictionary dict))
+                                if (!(toAssign is IDictionary dict))
                                     throw new Exception("Only dictionaries can be assigned to dictionary (%) variables");
                                 cauliflower.Scope[d] = dict;
                                 break;

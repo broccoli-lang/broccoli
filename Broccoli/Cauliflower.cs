@@ -6,7 +6,9 @@ namespace Broccoli {
     /// The interpreter for the Broccoli dialect Cauliflower.
     /// </summary>
     public partial class CauliflowerInterpreter : Interpreter {
+
         public CauliflowerInterpreter(BList argv = null) {
+            Scope = new CauliflowerScope();
             Builtins = StaticBuiltins;
             Scope.Lists["ARGV"] = argv ?? new BList();
         }

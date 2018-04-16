@@ -68,6 +68,12 @@ namespace Broccoli {
         public object ToCSharp() => _call;
 
         public Type Type() => typeof(Call);
+
+        public IScalar ScalarContext() => this;
+
+        public IList ListContext() => throw new NoListContextException(this);
+
+        public IDictionary DictionaryContext() => throw new NoDictionaryContextException(this);
     }
 
     /// <summary>
@@ -102,6 +108,12 @@ namespace Broccoli {
         public object ToCSharp() => _call;
 
         public Type Type() => typeof(Call);
+
+        public IScalar ScalarContext() => this;
+
+        public IList ListContext() => throw new NoListContextException(this);
+
+        public IDictionary DictionaryContext() => throw new NoDictionaryContextException(this);
     }
 
     /// <summary>
@@ -133,5 +145,11 @@ namespace Broccoli {
         public object ToCSharp() => _call;
 
         public Type Type() => typeof(Call);
+
+        public IScalar ScalarContext() => this;
+
+        public IList ListContext() => throw new NoListContextException(this);
+
+        public IDictionary DictionaryContext() => throw new NoDictionaryContextException(this);
     }
 }
