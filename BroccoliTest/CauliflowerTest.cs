@@ -332,8 +332,7 @@ namespace BroccoliTest {
         public void TestCat() {
             Assert.AreEqual(_run("(cat '(0 1 2) '(3 4 5))"), ListFrom(0, 1, 2, 3, 4, 5), "Cat does not work correctly");
             Assert.AreEqual(_run("(cat '(0 1) '(2 3) '(4 5))"), ListFrom(0, 1, 2, 3, 4, 5), "Cat does not work correctly with multiple arguments");
-            Assert.ThrowsException<Exception>(() => _run("(cat '(0 1 2))"), "Cat does not fail with one argument");
-            Assert.ThrowsException<ArgumentTypeException>(() => _run("(cat 0 1 2)"), "Cat does not fail with non-lists");
+            Assert.AreEqual(_run("(cat 0 1 2)"), ListFrom(0, 1, 2), "Cat works correctly with non-lists");
         }
 
         [TestMethod]

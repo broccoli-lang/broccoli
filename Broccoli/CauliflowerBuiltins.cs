@@ -1675,6 +1675,15 @@ namespace Broccoli {
                         throw new Exception($"Function range requires 1 to 3 arguments, {args.Length} provided");
                 }
             })},
+            {"cat", new Function("cat", ~0, (broccoli, args) => {
+                var result = new BList();
+                foreach (var item in args)
+                    if (item is BList list)
+                        result.AddRange(list);
+                    else
+                        result.Add(item);
+                return result;
+            })},
             {"map", new Function("map", 2, (cauliflower, args) => {
                 var func = CauliflowerInline.FindFunction("map", cauliflower, args[0]);
 
