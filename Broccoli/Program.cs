@@ -32,7 +32,7 @@ namespace Broccoli {
                 ? new CauliflowerInterpreter(new BList(argv.Skip(1).Select(i => new BString(i))))
                 : new Interpreter();
             var prompt = isCauliflower ? "cauliflower> " : "broccoli> ";
-            var continuationPrompt = isCauliflower ? "           > " : "        > ";
+            var continuationPrompt = new string(' ', prompt.Length - 2) + "> ";
             file = argv.FirstOrDefault();
             if (file is null)
                 useREPL = true;

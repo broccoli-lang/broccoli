@@ -18,26 +18,16 @@ namespace BroccoliTest {
 
             private StringBuilder _lastOutput = new StringBuilder();
 
-            public void Clear() {
-                _lastOutput.Clear();
-            }
+            public void Clear() => _lastOutput.Clear();
 
-            public override void Write(char c) {
-                _lastOutput.Append(c);
-            }
+            public override void Write(char c) => _lastOutput.Append(c);
 
-            public override string ToString() {
-                return _lastOutput.ToString();
-            }
+            public override string ToString() => _lastOutput.ToString();
         }
 
-        private static BList ValueListFrom() {
-            return new BList();
-        }
+        private static BList ValueListFrom() => new BList();
 
-        private static BList ValueListFrom(params int[] a) {
-            return new BList(a.Select(i => (IValue) new BInteger(i)));
-        }
+        private static BList ValueListFrom(params int[] a) => new BList(a.Select(i => (IValue)new BInteger(i)));
 
         private void WriteInput(string input) {
             _input = new System.IO.StringReader(input);
@@ -77,9 +67,7 @@ namespace BroccoliTest {
         }
 
         [TestMethod]
-        public void TestComments() {
-            Assert.AreEqual(_run(";this is a comment. !@#$%^&*()\n\"yey\""), new BString("yey"), "Comment does not work correctly");
-        }
+        public void TestComments() => Assert.AreEqual(_run(";this is a comment. !@#$%^&*()\n\"yey\""), new BString("yey"), "Comment does not work correctly");
 
         // Meta-commands
         [TestMethod]
@@ -261,6 +249,9 @@ namespace BroccoliTest {
             Assert.AreEqual(_run("(if t 2 else 0)"), new BInteger(2), "If else does not work correctly with true");
             Assert.AreEqual(_run("(if nil 2 else 0)"), new BInteger(0), "If else does not work correctly with zero");
         }
+
+        [TestMethod]
+        public void TestFor() => Assert.AreEqual(_run("(:= $a 0) (for $i in (list 1 10 100) (:= $a (+ $a $i))) $a"), new BInteger(111), "For loop does not work correctly");
 
         // List Functions
 

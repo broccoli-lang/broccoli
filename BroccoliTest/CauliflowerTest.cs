@@ -4,7 +4,6 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Broccoli;
 using System.Text;
 
-// TODO: tests for contexts
 // TODO: allow user-defined classes to specify default context - make them automatically extend IEnumerable<IValue> or IDictionary<IValue, IValue> as needed
 
 namespace BroccoliTest {
@@ -20,26 +19,22 @@ namespace BroccoliTest {
 
             private StringBuilder _lastOutput = new StringBuilder();
 
-            public void Clear() {
-                _lastOutput.Clear();
-            }
+            public void Clear() => _lastOutput.Clear();
 
-            public override void Write(char c) {
-                _lastOutput.Append(c);
-            }
+            public override void Write(char c) => _lastOutput.Append(c);
 
-            public override string ToString() {
-                return _lastOutput.ToString();
-            }
+            public override string ToString() => _lastOutput.ToString();
         }
 
-        private static BList ValueListFrom() {
-            return new BList();
-        }
+        private static BList ListFrom() => new BList();
 
-        private static BList ValueListFrom(params int[] a) {
-            return new BList(a.Select(i => (IValue) new BInteger(i)));
-        }
+        private static BList ListFrom(params int[] a) => new BList(a.Select(i => (IValue)new BInteger(i)));
+
+        private static BList ListFrom(params double[] a) => new BList(a.Select(f => (IValue) new BFloat(f)));
+
+        private static BList ListFrom(params IValue[] a) => new BList(a);
+
+        private static BDictionary DictFrom(params (int, int)[] a) => new BDictionary(a.ToDictionary(o => (IValue) (BInteger) o.Item1, o => (IValue) (BInteger) o.Item2));
 
         private void WriteInput(string input) {
             _input = new System.IO.StringReader(input);
@@ -129,9 +124,18 @@ namespace BroccoliTest {
         [TestMethod]
         public void TestAssign() {
             Assert.AreEqual(_run("(:= $e 2) $e"), new BInteger(2), ":= does not work correctly for scalars");
+            Assert.AreEqual(_run("(:= $e 2)"), new BInteger(2), ":= does not work correctly for scalars");
             Assert.AreEqual(_run("(:= $e 2.2) $e"), new BFloat(2.2), ":= does not work correctly for scalars");
             Assert.AreEqual(_run("(:= $e a) $e"), new BAtom("a"), ":= does not work correctly for scalars");
-            Assert.AreEqual(_run("(:= @e '(0 1 2)) @e"), ValueListFrom(0, 1, 2), ":= does not work correctly for lists");
+            Assert.AreEqual(_run("(:= @e '(0 1 2)) @e"), ListFrom(0, 1, 2), ":= does not work correctly for lists");
+            Assert.AreEqual(_run("(:= %e `((0 1) (2 3))) %e"), DictFrom((0, 1), (2, 3)), ":= does not work correctly for dictionaries");
+            Assert.AreEqual(_run("(:= e (\\($a) (+ $a 1))) (e 9)"), new BInteger(10), ":= does not work correctly for functions");
+            Assert.AreEqual(_run("(:= $e 2 $f 3 $g 4)"), new BInteger(4), ":= does not work correctly for multiple assignments");
+            Assert.AreEqual(_run("(:= $e 2 $f 3 $g 4) $e"), new BInteger(2), ":= does not work correctly for multiple assignments");
+            Assert.AreEqual(_run("(:= $e 2 $f 3 $g 4) $g"), new BInteger(4), ":= does not work correctly for multiple assignments");
+            Assert.AreEqual(_run("(:= @a) @a"), ListFrom(), ":= default does not work correctly for lists");
+            Assert.AreEqual(_run("(:= %a) %a"), DictFrom(), ":= default does not work correctly for dictionaries");
+            _run("(:= a) (a)"); // Assert does not throw
         }
 
         [TestMethod]
@@ -239,12 +243,21 @@ namespace BroccoliTest {
             Assert.AreEqual(_run("(if nil 2 else 0)"), new BInteger(0), "If else does not work correctly with zero");
         }
 
+        [TestMethod]
+        public void TestFor() => Assert.AreEqual(_run("(:= $a 0) (for $i in '(1 10 100) (:= $a (+ $a $i))) $a"), new BInteger(111), "For loop does not work correctly");
+
+        [TestMethod]
+        public void TestDo() {
+            Assert.AreEqual(_run("(do (($a 1 (+ $a 1))) ((= $a 5) $a $a))"), new BInteger(5), "Do loop does not work correctly");
+            Assert.AreEqual(_run("(do (($a 1 $b) ($b 1 (+ $a $b))) ((= $a 13) $b))"), new BInteger(21), "Do loop with simultaneous assignment does not work correctly");
+        }
+
         // List Functions
 
         [TestMethod]
         public void TestList() {
-            Assert.AreEqual(_run("'(0 1 2)"), ValueListFrom(0, 1, 2), "List does not work correctly");
-            Assert.AreEqual(_run("'()"), ValueListFrom(), "Zero-length list does not work correctly");
+            Assert.AreEqual(_run("'(0 1 2)"), ListFrom(0, 1, 2), "List does not work correctly");
+            Assert.AreEqual(_run("'()"), ListFrom(), "Zero-length list does not work correctly");
         }
 
         [TestMethod]
@@ -267,29 +280,29 @@ namespace BroccoliTest {
 
         [TestMethod]
         public void TestRest() {
-            Assert.AreEqual(_run("(rest '(0 1 2))"), ValueListFrom(1, 2), "Rest does not work correctly");
-            Assert.AreEqual(_run("(rest '(0))"), ValueListFrom(), "Rest does not work correctly with 1-element list");
-            Assert.AreEqual(_run("(rest '())"), ValueListFrom(), "Rest does not work correctly with 1-element list");
+            Assert.AreEqual(_run("(rest '(0 1 2))"), ListFrom(1, 2), "Rest does not work correctly");
+            Assert.AreEqual(_run("(rest '(0))"), ListFrom(), "Rest does not work correctly with 1-element list");
+            Assert.AreEqual(_run("(rest '())"), ListFrom(), "Rest does not work correctly with 1-element list");
         }
 
         [TestMethod]
         public void TestSlice() {
-            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 0 3)"), ValueListFrom(0, 1, 2), "Slice does not work correctly");
-            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) -5 3)"), ValueListFrom(1, 2), "Slice does not work correctly with negative start");
-            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) -5 -3)"), ValueListFrom(1, 2), "Slice does not work correctly with negative end");
-            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 3 -5)"), ValueListFrom(), "Slice does not work correctly with end less than start");
-            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 4)"), ValueListFrom(4, 5), "Slice does not work correctly with two arguments");
-            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 7)"), ValueListFrom(), "Empty slice does not work correctly with two arguments");
-            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) -2)"), ValueListFrom(4, 5), "Slice does not work correctly with two arguments");
-            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 0 -4)"), ValueListFrom(0, 1), "Slice does not work correctly with three arguments");
-            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 5 2)"), ValueListFrom(), "Empty slice does not work correctly with three arguments");
-            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 3 3)"), ValueListFrom(), "Empty slice does not work correctly with three arguments");
-            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 0 -1 2)"), ValueListFrom(0, 2, 4), "Slice does not work correctly with four arguments");
-            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 0 -2 2)"), ValueListFrom(0, 2), "Slice does not work correctly with four arguments");
-            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 5 1 -2)"), ValueListFrom(5, 3), "Slice does not work correctly with four arguments");
-            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 5 1 2)"), ValueListFrom(), "Empty slice does not work correctly with four arguments");
-            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 1 5 -2)"), ValueListFrom(), "Empty slice does not work correctly with four arguments");
-            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) -1 -3 -1)"), ValueListFrom(5, 4), "Slice does not work correctly with four arguments");
+            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 0 3)"), ListFrom(0, 1, 2), "Slice does not work correctly");
+            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) -5 3)"), ListFrom(1, 2), "Slice does not work correctly with negative start");
+            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) -5 -3)"), ListFrom(1, 2), "Slice does not work correctly with negative end");
+            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 3 -5)"), ListFrom(), "Slice does not work correctly with end less than start");
+            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 4)"), ListFrom(4, 5), "Slice does not work correctly with two arguments");
+            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 7)"), ListFrom(), "Empty slice does not work correctly with two arguments");
+            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) -2)"), ListFrom(4, 5), "Slice does not work correctly with two arguments");
+            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 0 -4)"), ListFrom(0, 1), "Slice does not work correctly with three arguments");
+            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 5 2)"), ListFrom(), "Empty slice does not work correctly with three arguments");
+            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 3 3)"), ListFrom(), "Empty slice does not work correctly with three arguments");
+            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 0 -1 2)"), ListFrom(0, 2, 4), "Slice does not work correctly with four arguments");
+            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 0 -2 2)"), ListFrom(0, 2), "Slice does not work correctly with four arguments");
+            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 5 1 -2)"), ListFrom(5, 3), "Slice does not work correctly with four arguments");
+            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 5 1 2)"), ListFrom(), "Empty slice does not work correctly with four arguments");
+            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 1 5 -2)"), ListFrom(), "Empty slice does not work correctly with four arguments");
+            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) -1 -3 -1)"), ListFrom(5, 4), "Slice does not work correctly with four arguments");
             Assert.ThrowsException<Exception>(() => _run("(slice)"), "Slice does not fail with no arguments");
             Assert.ThrowsException<Exception>(() => _run("(slice '(1 2) 1 2 3 4)"), "Slice does not fail with five arguments");
             Assert.ThrowsException<ArgumentTypeException>(() => _run("(slice '() 1.1 2.1)"), "Range does not fail with non-integers");
@@ -297,19 +310,19 @@ namespace BroccoliTest {
 
         [TestMethod]
         public void TestRange() {
-            Assert.AreEqual(_run("(range 0 5)"), ValueListFrom(0, 1, 2, 3, 4), "Range does not work correctly");
-            Assert.AreEqual(_run("(range 5 0)"), ValueListFrom(), "Empty range does not work correctly");
-            Assert.AreEqual(_run("(range -5 5)"), ValueListFrom(-5, -4, -3, -2, -1, 0, 1, 2, 3, 4), "Negative range does not work correctly");
-            Assert.AreEqual(_run("(range 5 -5)"), ValueListFrom(), "Empty range does not work correctly");
-            Assert.AreEqual(_run("(range -5 -1)"), ValueListFrom(-5, -4, -3, -2), "Negative to negative range does not work correctly");
-            Assert.AreEqual(_run("(range -1 -10)"), ValueListFrom(), "Empty range does not work correctly");
-            Assert.AreEqual(_run("(range 4)"), ValueListFrom(0, 1, 2, 3), "Range does not work correctly with one argument");
-            Assert.AreEqual(_run("(range -4)"), ValueListFrom(), "Empty range does not work correctly with one argument");
-            Assert.AreEqual(_run("(range 0 10 2)"), ValueListFrom(0, 2, 4, 6, 8), "Range does not work correctly with three arguments");
-            Assert.AreEqual(_run("(range 0 10 -2)"), ValueListFrom(), "Empty range does not work correctly with three arguments");
-            Assert.AreEqual(_run("(range 0 9 2)"), ValueListFrom(0, 2, 4, 6, 8), "Range does not work correctly with three arguments");
-            Assert.AreEqual(_run("(range 10 0 -2)"), ValueListFrom(10, 8, 6, 4, 2), "Range does not work correctly with three arguments");
-            Assert.AreEqual(_run("(range 10 0 2)"), ValueListFrom(), "Empty range does not work correctly with three arguments");
+            Assert.AreEqual(_run("(range 0 5)"), ListFrom(0, 1, 2, 3, 4), "Range does not work correctly");
+            Assert.AreEqual(_run("(range 5 0)"), ListFrom(), "Empty range does not work correctly");
+            Assert.AreEqual(_run("(range -5 5)"), ListFrom(-5, -4, -3, -2, -1, 0, 1, 2, 3, 4), "Negative range does not work correctly");
+            Assert.AreEqual(_run("(range 5 -5)"), ListFrom(), "Empty range does not work correctly");
+            Assert.AreEqual(_run("(range -5 -1)"), ListFrom(-5, -4, -3, -2), "Negative to negative range does not work correctly");
+            Assert.AreEqual(_run("(range -1 -10)"), ListFrom(), "Empty range does not work correctly");
+            Assert.AreEqual(_run("(range 4)"), ListFrom(0, 1, 2, 3), "Range does not work correctly with one argument");
+            Assert.AreEqual(_run("(range -4)"), ListFrom(), "Empty range does not work correctly with one argument");
+            Assert.AreEqual(_run("(range 0 10 2)"), ListFrom(0, 2, 4, 6, 8), "Range does not work correctly with three arguments");
+            Assert.AreEqual(_run("(range 0 10 -2)"), ListFrom(), "Empty range does not work correctly with three arguments");
+            Assert.AreEqual(_run("(range 0 9 2)"), ListFrom(0, 2, 4, 6, 8), "Range does not work correctly with three arguments");
+            Assert.AreEqual(_run("(range 10 0 -2)"), ListFrom(10, 8, 6, 4, 2), "Range does not work correctly with three arguments");
+            Assert.AreEqual(_run("(range 10 0 2)"), ListFrom(), "Empty range does not work correctly with three arguments");
             Assert.ThrowsException<Exception>(() => _run("(range)"), "Range does not fail with no arguments");
             Assert.ThrowsException<Exception>(() => _run("(range 1 2 3 4)"), "Range does not fail with four arguments");
             Assert.ThrowsException<ArgumentTypeException>(() => _run("(range 1.1 2.1)"), "Range does not fail with non-integers");
@@ -317,8 +330,8 @@ namespace BroccoliTest {
 
         [TestMethod]
         public void TestCat() {
-            Assert.AreEqual(_run("(cat '(0 1 2) '(3 4 5))"), ValueListFrom(0, 1, 2, 3, 4, 5), "Cat does not work correctly");
-            Assert.AreEqual(_run("(cat '(0 1) '(2 3) '(4 5))"), ValueListFrom(0, 1, 2, 3, 4, 5), "Cat does not work correctly with multiple arguments");
+            Assert.AreEqual(_run("(cat '(0 1 2) '(3 4 5))"), ListFrom(0, 1, 2, 3, 4, 5), "Cat does not work correctly");
+            Assert.AreEqual(_run("(cat '(0 1) '(2 3) '(4 5))"), ListFrom(0, 1, 2, 3, 4, 5), "Cat does not work correctly with multiple arguments");
             Assert.ThrowsException<Exception>(() => _run("(cat '(0 1 2))"), "Cat does not fail with one argument");
             Assert.ThrowsException<ArgumentTypeException>(() => _run("(cat 0 1 2)"), "Cat does not fail with non-lists");
         }
@@ -410,6 +423,16 @@ namespace BroccoliTest {
             Assert.AreEqual(ReadOutput(_run("(print 3.3)")), "3.3", "Print does not work correctly for numbers");
             Assert.AreEqual(ReadOutput(_run("(print '(foo bar))")), "(foo bar)", "Print does not work correctly for lists");
             Assert.AreEqual(ReadOutput(_run("(print `((foo bar)(baz quux))")), "(foo: bar, baz: quux)", "Print does not work correctly for dictionaries");
+        }
+
+        [TestMethod]
+        public void TestContexts() {
+            Assert.ThrowsException<NoListContextException>(() => _run("@1"), "Scalar to list conversion does not fail");
+            Assert.ThrowsException<NoDictionaryContextException>(() => _run("%1"), "Scalar to dictionary conversion does not fail");
+            Assert.AreEqual(_run("$'(1 2 3 4)"), (BInteger) 4, "List to scalar conversion does not work");
+            Assert.AreEqual(_run("%'(1 2 3 4)"), DictFrom((0, 1), (1, 2), (2, 3), (3, 4)), "List to dictionary conversion does not work");
+            Assert.AreEqual(_run("$`((1 2) (3 4))"), (BInteger) 2, "Dictionary to scalar conversion does not work");
+            Assert.AreEqual(_run("@`((1 2) (3 4))"), ListFrom(ListFrom(1, 2), ListFrom(3, 4)), "Dictionary to list conversion does not work");
         }
 
         [TestMethod]

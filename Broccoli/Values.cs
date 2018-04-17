@@ -219,7 +219,7 @@ namespace Broccoli {
 
         public override string ToString() => Value;
 
-        public string Inspect() => Value;
+        public string Inspect() => Value.Length == 2 && char.IsDigit(Value[0]) && char.IsLetter(Value[1]) ? '|' + Value + '|' : Value;
 
         public object ToCSharp() {
             switch (Value) {

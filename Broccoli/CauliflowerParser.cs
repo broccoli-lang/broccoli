@@ -6,7 +6,6 @@ using System.Text.RegularExpressions;
 namespace Broccoli {
     public partial class CauliflowerInterpreter : Interpreter {
         private static Regex _rNewline = new Regex(@"(?<=[\r\n][\s\r\n]*[\r\n]|[\r\n])", RegexOptions.Compiled);
-        // TODO: block comments (and nested block comments)
         private static Regex _rComment = new Regex(@"\G;[\s\S]*$", RegexOptions.Compiled);
         private static Regex _rBlockCommentStart = new Regex(@"\G#\|\s?", RegexOptions.Compiled);
         private static Regex _rBlockCommentContinue = new Regex(@"\G[\s\S]*?(#\||\|#)", RegexOptions.Compiled);
@@ -14,11 +13,11 @@ namespace Broccoli {
         private static Regex _rString = new Regex(@"\G""(?:\\[\s\S]|[^""])*""", RegexOptions.Compiled);
         private static Regex _rStringStart = new Regex(@"\G""(?:\\[\s\S]|[^""])*$", RegexOptions.Compiled);
         private static Regex _rStringEnd = new Regex(@"^(?:\\[\s\S]|[^""])*""", RegexOptions.Compiled);
-        private static Regex _rNumber = new Regex(@"\G-?(?:\d*\.\d+|\d+\.?\d*|\d*)", RegexOptions.Compiled);
+        private static Regex _rNumber = new Regex(@"^\G-?(?:\d*\.\d+|\d+\.?\d*|\d+)$", RegexOptions.Compiled);
         private static Regex _rScalar = new Regex(@"\G\$[^\s()$@%'`]+", RegexOptions.Compiled);
         private static Regex _rList = new Regex(@"\G@[^\s()$@%'`]+", RegexOptions.Compiled);
         private static Regex _rDict = new Regex(@"\G%[^\s()$@%'`]+", RegexOptions.Compiled);
-        private static Regex _rName = new Regex(@"\G[^\s\d()$@%'`][^\s()$@%'`]*", RegexOptions.Compiled);
+        private static Regex _rName = new Regex(@"\G[^\s()$@%'`]+", RegexOptions.Compiled);
 
         /// <summary>
         /// Takes a string and traverses it to create a ParseNode with associated values.
@@ -56,7 +55,7 @@ namespace Broccoli {
                 var column = 0;
                 while (column < line.Length) {
                     var c = line[column];
-                    TokenType type = TokenType.None;
+                    var type = TokenType.None;
                     Match rawMatch = null;
                     string value = null;
                     string match = null;
@@ -120,10 +119,14 @@ namespace Broccoli {
                                 var finished = current;
                                 stack.RemoveAt(stack.Count - 1);
                                 current = stack.Last();
-                                if (current.ExpectsList)
+                                if (current.ExpectsList) {
                                     finished.IsList = true;
-                                if (current.ExpectsDictionary)
+                                    current.ExpectsList = false;
+                                }
+                                if (current.ExpectsDictionary) {
                                     finished.IsDictionary = true;
+                                    current.ExpectsDictionary = false;
+                                }
                                 if (current.Children.Count > 1 && current.Children[current.Children.Count - 2].Token?.Type == TokenType.Cast) {
                                     var castNode = new ParseNode(new[] {
                                         new ParseNode(new Token(TokenType.Atom, current.Children[current.Children.Count - 2].Token.Literal)),
@@ -144,7 +147,11 @@ namespace Broccoli {
                                     type = TokenType.Cast;
                                 } else {
                                     value = match.Substring(1);
-                                    type = TokenType.ScalarName;
+                                    if (_rNumber.Match(value).Success) {
+                                        current.Children.Add(new ParseNode(new Token(TokenType.Cast, "@")));
+                                        type = value.Contains('.') ? TokenType.Float : TokenType.Integer;
+                                    } else
+                                        type = TokenType.ScalarName;
                                 }
                                 break;
                             case '@':
@@ -156,7 +163,11 @@ namespace Broccoli {
                                     type = TokenType.Cast;
                                 } else {
                                     value = match.Substring(1);
-                                    type = TokenType.ListName;
+                                    if (_rNumber.Match(value).Success) {
+                                        current.Children.Add(new ParseNode(new Token(TokenType.Cast, "@")));
+                                        type = value.Contains('.') ? TokenType.Float : TokenType.Integer;
+                                    } else
+                                        type = TokenType.ListName;
                                 }
                                 break;
                             case '%':
@@ -168,7 +179,11 @@ namespace Broccoli {
                                     type = TokenType.Cast;
                                 } else {
                                     value = match.Substring(1);
-                                    type = TokenType.DictionaryName;
+                                    if (_rNumber.Match(value).Success) {
+                                        current.Children.Add(new ParseNode(new Token(TokenType.Cast, "%")));
+                                        type = value.Contains('.') ? TokenType.Float : TokenType.Integer;
+                                    } else
+                                        type = TokenType.DictionaryName;
                                 }
                                 break;
                             // Lists
@@ -192,16 +207,6 @@ namespace Broccoli {
                                 match = rawMatch.ToString();
                                 value = Regex.Unescape(match.Substring(1, match.Length - 2));
                                 type = TokenType.String;
-                                break;
-                            // Numbers
-                            case '-':
-                            case char _ when char.IsDigit(c):
-                                match = value = _rNumber.Match(line, column).ToString();
-                                if (value == "-") {
-                                    match = value = _rName.Match(line, column).ToString();
-                                    type = TokenType.Atom;
-                                } else
-                                    type = value.Contains('.') ? TokenType.Float : TokenType.Integer;
                                 break;
                             // Whitespace
                             case ' ':
@@ -242,6 +247,10 @@ namespace Broccoli {
                             // Identifiers (default)
                             default:
                                 match = value = _rName.Match(line, column).ToString();
+                                if (_rNumber.Match(match).Success) {
+                                    type = value.Contains('.') ? TokenType.Float : TokenType.Integer;
+                                    break;
+                                }
                                 if (match.Contains("|#"))
                                     throw new Exception("Unexpected '|#' outside of comment");
                                 type = TokenType.Atom;

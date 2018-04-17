@@ -46,7 +46,7 @@ namespace Broccoli {
                 var statements = args.Skip(2);
                 broccoli.Scope.Functions[name.Value] = new Function(name.Value, argNames.Length, (_, innerArgs) => {
                     broccoli.Scope = new Scope(broccoli.Scope);
-                    for (int i = 0; i < innerArgs.Length; i++) {
+                    for (var i = 0; i < innerArgs.Length; i++) {
                         var toAssign = innerArgs[i];
                         switch (argNames[i]) {
                             case ScalarVar s:
@@ -466,7 +466,7 @@ namespace Broccoli {
                 if (!condition.Equals(BAtom.True) && !condition.Equals(BAtom.Nil))
                     throw new ArgumentTypeException(args[0], "boolean", 1, "if");
                 var elseIndex = Array.IndexOf(args.ToArray(), new BAtom("else"), 1);
-                IEnumerable<IValueExpressible> statements = elseIndex != -1 ?
+                var statements = elseIndex != -1 ?
                     condition.Equals(BAtom.True) ?
                         args.Skip(1).Take(elseIndex - 1) :
                         args.Skip(elseIndex + 1) :
@@ -503,6 +503,8 @@ namespace Broccoli {
                                 throw new Exception("Only Lists can be assigned to list (@) variables");
                             broccoli.Scope[l] = list;
                             break;
+                        default:
+                            throw new Exception($"Cannot assign to unknown type '{args[0].GetType()}'");
                     }
                     foreach (var statement in statements)
                         broccoli.Run(statement);

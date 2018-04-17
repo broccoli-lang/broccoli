@@ -8,8 +8,6 @@ using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Text;
 
-// TODO: test "import", try catch for cauliflower
-
 namespace Broccoli {
     /// <summary>
     /// Useful variants of type methods.
@@ -91,6 +89,10 @@ namespace Broccoli {
         /// </summary>
         private static string[] modifiers = accessControlModifiers.Concat(new [] { "readonly", "static" }).ToArray();
 
+        public static Function Noop = new Function("", ~0, (interpreter, args) => {
+            return null;
+        });
+
         /// <summary>
         /// Creates an IValue from an object.
         /// </summary>
@@ -129,9 +131,7 @@ namespace Broccoli {
         public class BCSharpValue : IScalar {
             public object Value { get; }
 
-            public BCSharpValue(object value) {
-                Value = value;
-            }
+            public BCSharpValue(object value) => Value = value;
 
             public override string ToString() => Value.ToString();
 
@@ -154,9 +154,7 @@ namespace Broccoli {
         private class BCSharpType : IScalar {
             public Type Value { get; }
 
-            public BCSharpType(Type value) {
-                Value = value;
-            }
+            public BCSharpType(Type value) => Value = value;
 
             public static implicit operator BCSharpType(Type type) => new BCSharpType(type);
 
@@ -197,9 +195,7 @@ namespace Broccoli {
         private class BCSharpMethod : IScalar {
             public (Type type, string name) Value { get; }
 
-            public BCSharpMethod(Type type, string name) {
-                Value = (type, name);
-            }
+            public BCSharpMethod(Type type, string name) => Value = (type, name);
 
             public override string ToString() => $"{Value.type.FullName}.{Value.name}";
 
@@ -333,9 +329,7 @@ namespace Broccoli {
         /// <param name="name">Name of property.</param>
         /// <param name="instance">Object to set property on.</param>
         /// <param name="value">New value of property.</param>
-        private static void AssignCSharpProperty(BCSharpType type, BAtom name, IValue instance, IValue value) {
-            type.Value.TryGetProperty(name.Value).SetValue(instance?.ToCSharp(), value.ToCSharp());
-        }
+        private static void AssignCSharpProperty(BCSharpType type, BAtom name, IValue instance, IValue value) => type.Value.TryGetProperty(name.Value).SetValue(instance?.ToCSharp(), value.ToCSharp());
 
         /// <summary>
         /// Get the value of a C# field.
@@ -355,9 +349,7 @@ namespace Broccoli {
         /// <param name="name">Name of field.</param>
         /// <param name="instance">Object to set field on.</param>
         /// <param name="value">New value of field.</param>
-        private static void AssignCSharpField(BCSharpType type, BAtom name, IValue instance, IValue value) {
-            type.Value.TryGetField(name.Value).SetValue(instance?.ToCSharp(), value.ToCSharp());
-        }
+        private static void AssignCSharpField(BCSharpType type, BAtom name, IValue instance, IValue value) => type.Value.TryGetField(name.Value).SetValue(instance?.ToCSharp(), value.ToCSharp());
 
         /// <summary>
         /// Add Cauliflower native types to interpreter.
@@ -438,8 +430,8 @@ namespace Broccoli {
                         return scope.Value[l];
                     case DictVar d:
                         return scope.Value[d];
-                    case BAtom s:
-                        return scope.Value[s.Value] ?? (IValue) scope[s.Value].Value;
+                    case BAtom a:
+                        return scope.Value[a.Value] ?? (IValue) scope[a.Value].Value;
                     default:
                         throw new ArgumentTypeException(args.Last(), "variable", args.Length, ".");
                 }
@@ -527,13 +519,14 @@ namespace Broccoli {
                 foreach (var argExpression in argNames.Take(argNames.Count - 1))
                     if (argExpression is ValueExpression)
                         throw new ArgumentTypeException($"Received expression instead of variable name in argument list for 'fn'");
-                int length = argNames.Count;
+                var length = argNames.Count;
                 IValue varargs = null;
                 if (argNames.Count != 0) {
                     switch (argNames.Last()) {
                         case ListVar l:
                         case ScalarVar s:
                         case DictVar d:
+                        case BAtom b:
                             break;
                         case ValueExpression expr when expr.Values.Length == 1 && expr.Values[0] is ListVar l:
                             length = -length - 1;
@@ -548,7 +541,7 @@ namespace Broccoli {
                 var statements = args.Skip(2);
                 cauliflower.Scope.Functions[name.Value] = new Function(name.Value, length, (_, innerArgs) => {
                     cauliflower.Scope = new Scope(cauliflower.Scope);
-                    for (int i = 0; i < argNames.Count; i++) {
+                    for (var i = 0; i < argNames.Count; i++) {
                         var toAssign = innerArgs[i];
                         switch (argNames[i]) {
                             case ScalarVar s:
@@ -565,6 +558,11 @@ namespace Broccoli {
                                 if (!(toAssign is IDictionary dict))
                                     throw new Exception("Only dictionaries can be assigned to dictionary (%) variables");
                                 cauliflower.Scope[d] = dict;
+                                break;
+                            case BAtom a:
+                                if (!(toAssign is IFunction fn))
+                                    throw new Exception("Only Functions can be assigned to atom variables");
+                                cauliflower.Scope[a] = fn;
                                 break;
                             default:
                                 throw new Exception("Values can only be assigned to scalar ($), list (@), or dictionary (%) variables");
@@ -736,28 +734,66 @@ namespace Broccoli {
                 return null;
             })},
 
-            {":=", new ShortCircuitFunction(":=", 2, (broccoli, args) => {
-                var toAssign = broccoli.Run(args[1]);
-                switch (args[0]) {
-                    case ScalarVar s:
-                        if (!(toAssign is IScalar scalar))
-                            throw new Exception("Only scalars can be assigned to scalar ($) variables");
-                        broccoli.Scope[s] = scalar;
-                        break;
-                    case ListVar l:
-                        if (!(toAssign is IList list))
-                            throw new Exception("Only lists can be assigned to list (@) variables");
-                        broccoli.Scope[l] = list;
-                        break;
-                    case DictVar d:
-                        if (!(toAssign is IDictionary dict))
-                            throw new Exception("Only dicts can be assigned to dict (%) variables");
-                        broccoli.Scope[d] = dict;
-                        break;
-                    default:
-                        throw new Exception("Values can only be assigned to scalar ($), list (@) or dictionary (%) variables");
+            {":=", new ShortCircuitFunction(":=", ~1, (cauliflower, args) => {
+                IValue result = null;
+                for (var i = 0; i < args.Length; i += 2) {
+                    result = i + 1 < args.Length ? cauliflower.Run(args[i + 1]) : null;
+                    switch (args[i]) {
+                        case ScalarVar s:
+                            if (result == null)
+                                throw new Exception("Scalar has no default value to be assigned");
+                            if (!(result is IScalar scalar))
+                                throw new Exception("Only scalars can be assigned to scalar ($) variables");
+                            args[i + 1] = scalar;
+                            break;
+                        case ListVar l:
+                            if (result == null) {
+                                args = args.Concat(new[] { result = new BList()}).ToArray();
+                                break;
+                            }
+                            if (!(result is IList list))
+                                throw new Exception("Only lists can be assigned to list (@) variables");
+                            args[i + 1] = list;
+                            break;
+                        case DictVar d:
+                            if (result == null) {
+                                args = args.Concat(new[] { result = new BDictionary()}).ToArray();
+                                break;
+                            }
+                            if (!(result is IDictionary dict))
+                                throw new Exception("Only dicts can be assigned to dict (%) variables");
+                            args[i + 1] = dict;
+                            break;
+                        case BAtom a:
+                            if (result == null) {
+                                args = args.Concat(new[] { result = Noop }).ToArray();
+                                break;
+                            }
+                            if (!(result is IFunction fn))
+                                throw new Exception("Only functions can be assigned to atom variables");
+                            args[i + 1] = fn;
+                            break;
+                        default:
+                            throw new Exception("Values can only be assigned to scalar ($), list (@), dictionary (%) or atom variables");
+                    }
                 }
-                return toAssign;
+                for (var i = 0; i < args.Length; i += 2) {
+                    switch (args[i]) {
+                        case ScalarVar s:
+                            cauliflower.Scope[s] = (IScalar) args[i + 1];
+                            break;
+                        case ListVar l:
+                            cauliflower.Scope[l] = (IList) args[i + 1];
+                            break;
+                        case DictVar d:
+                            cauliflower.Scope[d] = (IDictionary) args[i + 1];
+                            break;
+                        case BAtom a:
+                            cauliflower.Scope[a] = (IFunction) args[i + 1];
+                            break;
+                    }
+                }
+                return result;
             })},
 
             // OOP
@@ -1176,7 +1212,7 @@ namespace Broccoli {
                             Type.EmptyTypes
                         );
                         var defaultScalarContextIL = defaultScalarContext.GetILGenerator();
-                        defaultScalarContextIL.Emit(OpCodes.Ldfld, "Count");
+                        defaultScalarContextIL.Emit(OpCodes.Ldfld, typeBuilder.UnderlyingSystemType.GetField("Count"));
                         defaultScalarContextIL.Emit(OpCodes.Newobj, typeof(BInteger).GetConstructor(new[] { typeof(int) }));
                         defaultScalarContextIL.Emit(OpCodes.Ret);
                         typeBuilder.DefineMethodOverride(defaultScalarContext, typeof(IValue).GetMethod("ScalarContext"));
@@ -1198,7 +1234,7 @@ namespace Broccoli {
                         defaultDictionaryContextIL.Emit(OpCodes.Stloc_1);
                         defaultDictionaryContextIL.MarkLabel(loopStart);
                         defaultDictionaryContextIL.Emit(OpCodes.Ldloc_0);
-                        defaultDictionaryContextIL.Emit(OpCodes.Ldfld, "Count");
+                        defaultDictionaryContextIL.Emit(OpCodes.Ldfld, typeBuilder.UnderlyingSystemType.GetField("Count"));
                         defaultDictionaryContextIL.Emit(OpCodes.Ceq);
                         defaultDictionaryContextIL.Emit(OpCodes.Brtrue, loopEnd);
                         defaultDictionaryContextIL.Emit(OpCodes.Ldloc_0);
@@ -1239,7 +1275,7 @@ namespace Broccoli {
                             Type.EmptyTypes
                         );
                         var defaultScalarContextIL = defaultScalarContext.GetILGenerator();
-                        defaultScalarContextIL.Emit(OpCodes.Ldfld, "Count");
+                        defaultScalarContextIL.Emit(OpCodes.Ldfld, typeBuilder.UnderlyingSystemType.GetField("Count"));
                         defaultScalarContextIL.Emit(OpCodes.Newobj, typeof(BInteger).GetConstructor(new[] { typeof(int) }));
                         defaultScalarContextIL.Emit(OpCodes.Ret);
                         typeBuilder.DefineMethodOverride(defaultScalarContext, typeof(IValue).GetMethod("ScalarContext"));
@@ -1261,16 +1297,16 @@ namespace Broccoli {
                         defaultListContextIL.Emit(OpCodes.Stloc_1);
                         defaultListContextIL.MarkLabel(loopStart);
                         defaultListContextIL.Emit(OpCodes.Ldloc_0);
-                        defaultListContextIL.Emit(OpCodes.Ldfld, "Count");
+                        defaultListContextIL.Emit(OpCodes.Ldfld, typeBuilder.UnderlyingSystemType.GetField("Count"));
                         defaultListContextIL.Emit(OpCodes.Ceq);
                         defaultListContextIL.Emit(OpCodes.Brtrue, loopEnd);
                         defaultListContextIL.Emit(OpCodes.Ldloc_0);
                         defaultListContextIL.Emit(OpCodes.Ldloc_0);
-                        defaultListContextIL.Emit(OpCodes.Ldfld, "Values");
+                        defaultListContextIL.Emit(OpCodes.Ldfld, typeBuilder.UnderlyingSystemType.GetField("Values"));
                         defaultListContextIL.Emit(OpCodes.Ldarg_0);
                         defaultListContextIL.Emit(OpCodes.Callvirt, typeof(Dictionary<IValue, IValue>.ValueCollection).GetMethod("get_Item"));
                         defaultListContextIL.Emit(OpCodes.Ldloc_0);
-                        defaultListContextIL.Emit(OpCodes.Ldfld, "Keys");
+                        defaultListContextIL.Emit(OpCodes.Ldfld, typeBuilder.UnderlyingSystemType.GetField("Keys"));
                         defaultListContextIL.Emit(OpCodes.Ldarg_0);
                         defaultListContextIL.Emit(OpCodes.Callvirt, typeof(Dictionary<IValue, IValue>.KeyCollection).GetMethod("get_Item"));
                         defaultListContextIL.Emit(OpCodes.Newobj, typeof(BList).GetConstructor(new[] { typeof(IValue), typeof(IValue) }));
@@ -1353,7 +1389,7 @@ namespace Broccoli {
             })},
 
             // Basic math
-            {"+", new Function("+", ~0, (broccoli, args) => {
+            {"+", new Function("+", ~0, (cauliflower, args) => {
                 if (args.Length == 0 || args[0] is BInteger || args[0] is BFloat)
                     foreach (var (value, index) in args.WithIndex()) {
                         if (!(value is BInteger || value is BFloat))
@@ -1361,11 +1397,11 @@ namespace Broccoli {
                     }
                 else {
                     var type = args[0].GetType();
-                    string typeString = new Dictionary<Type, string>{
+                    var typeString = new Dictionary<Type, string>{
                         {typeof(BString), "string"},
                         {typeof(BAtom), "atom"},
                         {typeof(BList), "list"},
-                        {typeof(BDictionary), "dictioanry"}
+                        {typeof(BDictionary), "dictionary"}
                     }.GetValueOrDefault(type, "C# value");
                     foreach (var (value, index) in args.WithIndex())
                         if (value.GetType() != type)
@@ -1425,13 +1461,14 @@ namespace Broccoli {
                 foreach (var argExpression in argNames.Take(argNames.Count - 1))
                     if (argExpression is ValueExpression)
                         throw new ArgumentTypeException($"Received expression instead of variable name in argument list for '\\'");
-                int length = argNames.Count;
+                var length = argNames.Count;
                 IValue varargs = null;
                 if (argNames.Count != 0) {
                     switch (argNames.Last()) {
                         case ListVar l:
                         case ScalarVar s:
                         case DictVar d:
+                        case BAtom a:
                             break;
                         case ValueExpression expr when expr.Values.Length == 1 && expr.Values[0] is ListVar l:
                             length = -length - 1;
@@ -1446,7 +1483,7 @@ namespace Broccoli {
                 var statements = args.Skip(1);
                 return new AnonymousFunction(length, innerArgs => {
                     cauliflower.Scope = new Scope(cauliflower.Scope);
-                    for (int i = 0; i < argNames.Count; i++) {
+                    for (var i = 0; i < argNames.Count; i++) {
                         var toAssign = innerArgs[i];
                         switch (argNames[i]) {
                             case ScalarVar s:
@@ -1463,6 +1500,11 @@ namespace Broccoli {
                                 if (!(toAssign is IDictionary dict))
                                     throw new Exception("Only dictionaries can be assigned to dictionary (%) variables");
                                 cauliflower.Scope[d] = dict;
+                                break;
+                            case BAtom a:
+                                if (!(toAssign is IFunction fn))
+                                    throw new Exception("Only Functions can be assigned to atom variables");
+                                cauliflower.Scope[a] = fn;
                                 break;
                             default:
                                 throw new Exception("Values can only be assigned to scalar ($), list (@), or dictionary (%) variables");
@@ -1481,7 +1523,7 @@ namespace Broccoli {
             {"if", new ShortCircuitFunction("if", ~2, (cauliflower, args) => {
                 var condition = CauliflowerInline.Truthy(cauliflower.Run(args[0]));
                 var elseIndex = Array.IndexOf(args.ToArray(), new BAtom("else"), 1);
-                IEnumerable<IValueExpressible> statements = elseIndex != -1 ?
+                var statements = elseIndex != -1 ?
                     condition ? args.Skip(1).Take(elseIndex - 1) : args.Skip(elseIndex + 1) :
                     condition ? args.Skip(1) : args.Skip(args.Length);
                 IValue result = null;
@@ -1489,8 +1531,89 @@ namespace Broccoli {
                     result = cauliflower.Run(statement);
                 return result;
             })},
+            {"for", new ShortCircuitFunction("for", ~2, (cauliflower, args) => {
+                var inValue = cauliflower.Run(args[1]);
+                if (!(inValue is BAtom inAtom))
+                    throw new ArgumentTypeException(inValue, "atom", 2, "for");
+                if (inAtom.Value != "in")
+                    throw new ArgumentTypeException($"Received atom '{inAtom.Value}' instead of atom 'in' in argument 2 for 'for'");
 
-            {"len", new Function("len", 1, (broccoli, args) => {
+                var iterable = cauliflower.Run(args[2]);
+                if (!(iterable is BList valueList))
+                    throw new ArgumentTypeException(iterable, "list", 3, "for");
+
+                cauliflower.Scope = new Scope(cauliflower.Scope);
+                var statements = args.Skip(3).ToList();
+                foreach (var value in valueList) {
+                    switch (args[0]) {
+                        case ScalarVar s:
+                            if (!(value is IScalar scalar))
+                                throw new Exception("Only Scalars can be assigned to scalar ($) variables");
+                            cauliflower.Scope[s] = scalar;
+                            break;
+                        case ListVar l:
+                            if (!(value is IList list))
+                                throw new Exception("Only Lists can be assigned to list (@) variables");
+                            cauliflower.Scope[l] = list;
+                            break;
+                        case DictVar d:
+                            if (!(value is IDictionary dict))
+                                throw new Exception("Only Dictionaries can be assigned to dictionary (%) variables");
+                            cauliflower.Scope[d] = dict;
+                            break;
+                        case BAtom a:
+                            if (!(value is IFunction fn))
+                                throw new Exception("Only Functions can be assigned to atom variables");
+                            cauliflower.Scope[a] = fn;
+                            break;
+                        default:
+                            throw new Exception($"Cannot assign to unknown type '{args[0].GetType()}'");
+                    }
+                    foreach (var statement in statements)
+                        cauliflower.Run(statement);
+                }
+
+                cauliflower.Scope = cauliflower.Scope.Parent;
+                return null;
+            })},
+            {"do", new ShortCircuitFunction("do", ~2, (cauliflower, args) => {
+                cauliflower.Scope = new CauliflowerScope(cauliflower.Scope);
+                var assignments = args[0] as ValueExpression;
+                if (assignments == null)
+                    throw new Exception();
+                var returnSpec = args[1] as ValueExpression ?? new ValueExpression(args[1]);
+                var condition = returnSpec.Values.Length == 0 ? BAtom.Nil : returnSpec.Values[0];
+                var resultForm = returnSpec.Values.Skip(1).ToArray();
+                var assignmentBase = new IValueExpressible[] { new BAtom(":=") };
+                var body = args.Skip(2);
+                var values = new List<IValueExpressible>();
+                foreach (ValueExpression assignment in assignments.Values) {
+                    if (assignment.Values.Length != 3)
+                        throw new Exception("Do binding must have variable name, initial value, and next value");
+                    values.Add(assignment.Values[0]);
+                    values.Add(assignment.Values[1]);
+                }
+                cauliflower.Run(new ValueExpression(assignmentBase.Concat(values)));
+                while (true) {
+                    foreach (var expression in body)
+                        cauliflower.Run(expression);
+                    if (CauliflowerInline.Truthy(cauliflower.Run(condition)))
+                        break;
+                    values = new List<IValueExpressible>();
+                    foreach (ValueExpression assignment in assignments.Values) {
+                        values.Add(assignment.Values[0]);
+                        values.Add(assignment.Values[2]);
+                    }
+                    cauliflower.Run(new ValueExpression(assignmentBase.Concat(values)));
+                }
+                IValue result = null;
+                foreach (var item in resultForm)
+                    result = cauliflower.Run(item);
+                cauliflower.Scope = cauliflower.Scope.Parent;
+                return result;
+            })},
+
+            {"len", new Function("len", 1, (cauliflower, args) => {
                 switch (args[0]) {
                     case BList l:
                         return new BInteger(l.Count);
@@ -1616,13 +1739,13 @@ namespace Broccoli {
                 }
                 throw new Exception("First argument to rmkey must be a Dict.");
             })},
-            {"keys", new Function("keys", 1, (broccoli, args) => {
+            {"keys", new Function("keys", 1, (cauliflower, args) => {
                 if (args[0] is BDictionary dict) {
                     return new BList(dict.Keys);
                 }
                 throw new Exception("First argument to listkeys must be a Dict.");
             })},
-            {"values", new Function("values", 1, (broccoli, args) => {
+            {"values", new Function("values", 1, (cauliflower, args) => {
                 if (args[0] is BDictionary dict) {
                     return new BList(dict.Values);
                 }
@@ -1710,8 +1833,8 @@ namespace Broccoli {
                 }
                 var directory = basePath + pathSeparator + "modules";
                 Assembly module = null;
-                StringBuilder fullModuleName = new StringBuilder("cauliflower.");
-                StringBuilder fullTypeName = new StringBuilder();
+                var fullModuleName = new StringBuilder("cauliflower.");
+                var fullTypeName = new StringBuilder();
                 string typeName = null;
                 foreach (var (item, index) in path.WithIndex()) {
                     if (!(item is BAtom a))
@@ -1770,7 +1893,7 @@ namespace Broccoli {
 
                     if (e.Values.Length == 0)
                         throw new Exception($"Found empty expression in statement {index + 1} of 'class'");
-                    int i = 0;
+                    var i = 0;
                     var m = new List<string>();
                     if (e.Values[0] is BAtom mod && modifiers.Contains(mod.Value)) {
                         m.Add(mod.Value);
@@ -1814,10 +1937,13 @@ namespace Broccoli {
                             results[index] = typeof(IScalar);
                             break;
                         case ListVar l:
-                            results[index] = typeof(BList);
+                            results[index] = typeof(IList);
                             break;
                         case DictVar d:
-                            results[index] = typeof(BDictionary);
+                            results[index] = typeof(IDictionary);
+                            break;
+                        case BAtom a:
+                            results[index] = typeof(IFunction);
                             break;
                         // Rest args
                         case ValueExpression v:
@@ -1835,9 +1961,7 @@ namespace Broccoli {
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static void LoadInterpreterReference(ILGenerator gen, FieldInfo interpreterField) {
-                gen.Emit(OpCodes.Ldsfld, interpreterField);
-            }
+            public static void LoadInterpreterReference(ILGenerator gen, FieldInfo interpreterField) => gen.Emit(OpCodes.Ldsfld, interpreterField);
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static void LoadScopeReference(ILGenerator gen, FieldInfo interpreterField) {
@@ -1908,13 +2032,19 @@ namespace Broccoli {
                             methILGen.Emit(OpCodes.Ldfld, typeof(Scope).GetField("Lists"));
                             methILGen.Emit(OpCodes.Ldstr, l.Value);
                             methILGen.Emit(OpCodes.Ldarg_S, index);
-                            methILGen.Emit(OpCodes.Callvirt, typeof(Dictionary<string, BList>).GetMethod("set_Item"));
+                            methILGen.Emit(OpCodes.Callvirt, typeof(Dictionary<string, IList>).GetMethod("set_Item"));
                             break;
                         case DictVar d:
                             methILGen.Emit(OpCodes.Ldfld, typeof(Scope).GetField("Dictionaries"));
                             methILGen.Emit(OpCodes.Ldstr, d.Value);
                             methILGen.Emit(OpCodes.Ldarg_S, index);
-                            methILGen.Emit(OpCodes.Callvirt, typeof(Dictionary<string, BDictionary>).GetMethod("set_Item"));
+                            methILGen.Emit(OpCodes.Callvirt, typeof(Dictionary<string, IDictionary>).GetMethod("set_Item"));
+                            break;
+                        case BAtom a:
+                            methILGen.Emit(OpCodes.Ldfld, typeof(Scope).GetField("Functions"));
+                            methILGen.Emit(OpCodes.Ldstr, a.Value);
+                            methILGen.Emit(OpCodes.Ldarg_S, index);
+                            methILGen.Emit(OpCodes.Callvirt, typeof(Dictionary<string, IFunction>).GetMethod("set_Item"));
                             break;
                         // Rest args
                         case ValueExpression v:
