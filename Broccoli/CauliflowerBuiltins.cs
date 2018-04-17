@@ -359,7 +359,7 @@ namespace Broccoli {
         private static void AddTypes(Interpreter cauliflower, Type type, Scope.Tree<string, Scope> space) {
             var name = type.Name.Replace('_', '-');
             if (!(space.ContainsKey(name))) {
-                space[name] = new Scope.Tree<string, Scope> { Value = new Scope() };
+                space[name] = new CauliflowerScope.Tree<string, Scope> { Value = new CauliflowerScope() };
             }
             foreach (var nested in type.GetNestedTypes(BindingFlags.Public).Where(t => !t.Name.Contains("<"))) {
                 AddTypes(cauliflower, nested, space[name]);
@@ -529,7 +529,7 @@ namespace Broccoli {
                         case BAtom b:
                             break;
                         case ValueExpression expr when expr.Values.Length == 1 && expr.Values[0] is ListVar l:
-                            length = -length - 1;
+                            length = -length;
                             varargs = l;
                             break;
                         default:
@@ -540,7 +540,7 @@ namespace Broccoli {
                     argNames.RemoveAt(argNames.Count - 1);
                 var statements = args.Skip(2);
                 cauliflower.Scope.Functions[name.Value] = new Function(name.Value, length, (_, innerArgs) => {
-                    cauliflower.Scope = new Scope(cauliflower.Scope);
+                    cauliflower.Scope = new CauliflowerScope(cauliflower.Scope);
                     for (var i = 0; i < argNames.Count; i++) {
                         var toAssign = innerArgs[i];
                         switch (argNames[i]) {
@@ -578,6 +578,13 @@ namespace Broccoli {
                     return result;
                 }, argExpressions.Values);
                 return null;
+            })},
+            {"call", new Function("call", 2, (cauliflower, args) => {
+                if (!(args[0] is BAtom))
+                    throw new ArgumentTypeException(args[0], "atom", 1, "call");
+                if (!(args[1] is IList l))
+                    throw new ArgumentTypeException(args[0], "list", 2, "call");
+                return StaticBuiltins[""].Invoke(cauliflower, new ValueExpression(new List<IValueExpressible>{ args[0] }.Concat(l)));
             })},
 
             // Meta-commands
@@ -807,7 +814,7 @@ namespace Broccoli {
                     cauliflower.Scope.Namespaces[a.Value].Add(tempCauliflower.Scope.Namespaces);
                 else
                     cauliflower.Scope.Namespaces[a.Value] = tempCauliflower.Scope.Namespaces;
-                var scope = cauliflower.Scope.Namespaces[a.Value].Value = (cauliflower.Scope.Namespaces[a.Value].Value ?? new Scope());
+                var scope = cauliflower.Scope.Namespaces[a.Value].Value = (cauliflower.Scope.Namespaces[a.Value].Value ?? new CauliflowerScope());
                 foreach (var (key, value) in tempCauliflower.Scope.Functions)
                     scope[key] = value;
                 return null;
@@ -1471,7 +1478,7 @@ namespace Broccoli {
                         case BAtom a:
                             break;
                         case ValueExpression expr when expr.Values.Length == 1 && expr.Values[0] is ListVar l:
-                            length = -length - 1;
+                            length = -length;
                             varargs = l;
                             break;
                         default:
@@ -1481,8 +1488,10 @@ namespace Broccoli {
                 if (varargs != null)
                     argNames.RemoveAt(argNames.Count - 1);
                 var statements = args.Skip(1);
+                var scope = new CauliflowerScope(cauliflower.Scope);
                 return new AnonymousFunction(length, innerArgs => {
-                    cauliflower.Scope = new Scope(cauliflower.Scope);
+                    var oldScope = cauliflower.Scope;
+                    cauliflower.Scope = scope;
                     for (var i = 0; i < argNames.Count; i++) {
                         var toAssign = innerArgs[i];
                         switch (argNames[i]) {
@@ -1507,7 +1516,7 @@ namespace Broccoli {
                                 cauliflower.Scope[a] = fn;
                                 break;
                             default:
-                                throw new Exception("Values can only be assigned to scalar ($), list (@), or dictionary (%) variables");
+                                throw new Exception("Values can only be assigned to scalar ($), list (@), dictionary (%) or atom variables");
                         }
                     }
                     if (varargs != null)
@@ -1515,7 +1524,7 @@ namespace Broccoli {
                     IValue result = null;
                     foreach (var statement in statements)
                         result = cauliflower.Run(statement);
-                    cauliflower.Scope = cauliflower.Scope.Parent;
+                    cauliflower.Scope = oldScope;
                     return result;
                 });
             })},
@@ -1542,7 +1551,7 @@ namespace Broccoli {
                 if (!(iterable is BList valueList))
                     throw new ArgumentTypeException(iterable, "list", 3, "for");
 
-                cauliflower.Scope = new Scope(cauliflower.Scope);
+                cauliflower.Scope = new CauliflowerScope(cauliflower.Scope);
                 var statements = args.Skip(3).ToList();
                 foreach (var value in valueList) {
                     switch (args[0]) {
@@ -1678,7 +1687,7 @@ namespace Broccoli {
             {"cat", new Function("cat", ~0, (broccoli, args) => {
                 var result = new BList();
                 foreach (var item in args)
-                    if (item is BList list)
+                    if (item is IList list)
                         result.AddRange(list);
                     else
                         result.Add(item);
@@ -1760,7 +1769,7 @@ namespace Broccoli {
                 }
                 throw new Exception("First argument to listkeys must be a Dict.");
             })},
-        }.Extend(Interpreter.StaticBuiltins).FluentRemove("call");
+        }.Extend(Interpreter.StaticBuiltins);
 
         /// <summary>
         /// Helper functions for Cauliflower that can be inlined.
@@ -1823,7 +1832,7 @@ namespace Broccoli {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static void Import(Interpreter cauliflower, IValue[] path, bool isStatic = false) {
                 if (cauliflower.Scope.Namespaces.Value == null)
-                    cauliflower.Scope.Namespaces.Value = new Scope();
+                    cauliflower.Scope.Namespaces.Value = new CauliflowerScope();
                 if (basePath == null) {
                     var linux = System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Linux);
                     pathSeparator = linux ? "/" : "\\";
@@ -2089,20 +2098,6 @@ namespace Broccoli {
             foreach (var (key, value) in other)
                 if (!self.ContainsKey(key))
                     self[key] = value;
-            return self;
-        }
-
-        /// <summary>/
-        /// Removes all the keys given from the dictionary.
-        /// </summary>
-        /// <param name="self">The current dictionary.</param>
-        /// <param name="keys">The keys to remove.</param>
-        /// <typeparam name="K">The key type.</typeparam>
-        /// <typeparam name="V">The value type.</typeparam>
-        /// <returns>The current dictionary.</returns>
-        public static Dictionary<K, V> FluentRemove<K, V>(this Dictionary<K, V> self, params K[] keys) {
-            foreach (var key in keys)
-                self.Remove(key);
             return self;
         }
     }
