@@ -276,7 +276,6 @@ namespace Broccoli {
                     return BAtom.Nil;
                 return Boolean(args.Skip(1).All(element => !args[0].Equals(element)));
             })},
-            // TODO: make this shorter
             {"<", new Function("<", ~2, (broccoli, args) => {
                 foreach (var (value, index) in args.WithIndex())
                     if (!(value is BInteger || value is BFloat))

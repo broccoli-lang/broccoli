@@ -29,9 +29,17 @@ namespace Broccoli {
     public class BInteger : IScalar {
         public long Value { get; }
 
-        public BInteger(long i) {
-            Value = i;
-        }
+        public BInteger(short i) => Value = i;
+
+        public BInteger(char i) => Value = i;
+
+        public BInteger(int i) => Value = i;
+
+        public BInteger(long i) => Value = i;
+
+        public BInteger(float f) => Value = (long) f;
+
+        public BInteger(double f) => Value = (long) f;
 
         public static implicit operator BInteger(char i) => new BInteger(i);
 
@@ -88,9 +96,17 @@ namespace Broccoli {
     public class BFloat : IScalar {
         public double Value { get; }
 
-        public BFloat(double f) {
-            Value = f;
-        }
+        public BFloat(short i) => Value = i;
+
+        public BFloat(char i) => Value = i;
+
+        public BFloat(int i) => Value = i;
+
+        public BFloat(long i) => Value = i;
+
+        public BFloat(float f) => Value = f;
+
+        public BFloat(double f) => Value = f;
 
         public static implicit operator BFloat(char i) => new BFloat(i);
 

@@ -8,9 +8,7 @@ using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Text;
 
-// TODO: test "." and "->" and "import"
-// TODO: finish "namespace" function & maybe various OOP things
-// TODO: try catch
+// TODO: test "import", try catch for cauliflower
 
 namespace Broccoli {
     /// <summary>
@@ -1079,6 +1077,8 @@ namespace Broccoli {
                         case "op":
                         case "operator":
                         case "fn":
+                        case "fun":
+                        case "func":
                         case "function":
                             if (sName[0] == 'o' && sName[1] == 'p') {
                                 // TODO: operator things
@@ -1176,9 +1176,9 @@ namespace Broccoli {
                             Type.EmptyTypes
                         );
                         var defaultScalarContextIL = defaultScalarContext.GetILGenerator();
-                        defaultScalarContextIL.Emit(OpCodes.Ldarg_0);
-                        defaultScalarContextIL.Emit(OpCodes.Newobj, typeof(NoScalarContextException).GetConstructor(new[] {typeof(object)}));
-                        defaultScalarContextIL.Emit(OpCodes.Throw);
+                        defaultScalarContextIL.Emit(OpCodes.Ldfld, "Count");
+                        defaultScalarContextIL.Emit(OpCodes.Newobj, typeof(BInteger).GetConstructor(new[] { typeof(int) }));
+                        defaultScalarContextIL.Emit(OpCodes.Ret);
                         typeBuilder.DefineMethodOverride(defaultScalarContext, typeof(IValue).GetMethod("ScalarContext"));
                     }
 
@@ -1190,9 +1190,31 @@ namespace Broccoli {
                             Type.EmptyTypes
                         );
                         var defaultDictionaryContextIL = defaultDictionaryContext.GetILGenerator();
+                        var loopStart = defaultDictionaryContextIL.DefineLabel();
+                        var loopEnd = defaultDictionaryContextIL.DefineLabel();
+                        defaultDictionaryContextIL.Emit(OpCodes.Ldc_I4_0);
+                        defaultDictionaryContextIL.Emit(OpCodes.Stloc_0);
+                        defaultDictionaryContextIL.Emit(OpCodes.Newobj, typeof(BDictionary).GetConstructor(Type.EmptyTypes));
+                        defaultDictionaryContextIL.Emit(OpCodes.Stloc_1);
+                        defaultDictionaryContextIL.MarkLabel(loopStart);
+                        defaultDictionaryContextIL.Emit(OpCodes.Ldloc_0);
+                        defaultDictionaryContextIL.Emit(OpCodes.Ldfld, "Count");
+                        defaultDictionaryContextIL.Emit(OpCodes.Ceq);
+                        defaultDictionaryContextIL.Emit(OpCodes.Brtrue, loopEnd);
+                        defaultDictionaryContextIL.Emit(OpCodes.Ldloc_0);
+                        defaultDictionaryContextIL.Emit(OpCodes.Ldloc_0);
                         defaultDictionaryContextIL.Emit(OpCodes.Ldarg_0);
-                        defaultDictionaryContextIL.Emit(OpCodes.Newobj, typeof(NoDictionaryContextException).GetConstructor(new[] {typeof(object)}));
-                        defaultDictionaryContextIL.Emit(OpCodes.Throw);
+                        defaultDictionaryContextIL.Emit(OpCodes.Callvirt, typeBuilder.UnderlyingSystemType.GetMethod("get_Item"));
+                        defaultDictionaryContextIL.Emit(OpCodes.Ldloc_1);
+                        defaultDictionaryContextIL.Emit(OpCodes.Callvirt, typeof(BDictionary).GetMethod("set_Item"));
+                        defaultDictionaryContextIL.Emit(OpCodes.Ldloc_0);
+                        defaultDictionaryContextIL.Emit(OpCodes.Ldc_I4_1);
+                        defaultDictionaryContextIL.Emit(OpCodes.Add);
+                        defaultDictionaryContextIL.Emit(OpCodes.Stloc_0);
+                        defaultDictionaryContextIL.Emit(OpCodes.Jmp, loopStart);
+                        defaultDictionaryContextIL.MarkLabel(loopEnd);
+                        defaultDictionaryContextIL.Emit(OpCodes.Ldloc_1);
+                        defaultDictionaryContextIL.Emit(OpCodes.Ret);
                         typeBuilder.DefineMethodOverride(defaultDictionaryContext, typeof(IValue).GetMethod("DictionaryContext"));
                     }
                 }
@@ -1217,9 +1239,9 @@ namespace Broccoli {
                             Type.EmptyTypes
                         );
                         var defaultScalarContextIL = defaultScalarContext.GetILGenerator();
-                        defaultScalarContextIL.Emit(OpCodes.Ldarg_0);
-                        defaultScalarContextIL.Emit(OpCodes.Newobj, typeof(NoScalarContextException).GetConstructor(new[] {typeof(object)}));
-                        defaultScalarContextIL.Emit(OpCodes.Throw);
+                        defaultScalarContextIL.Emit(OpCodes.Ldfld, "Count");
+                        defaultScalarContextIL.Emit(OpCodes.Newobj, typeof(BInteger).GetConstructor(new[] { typeof(int) }));
+                        defaultScalarContextIL.Emit(OpCodes.Ret);
                         typeBuilder.DefineMethodOverride(defaultScalarContext, typeof(IValue).GetMethod("ScalarContext"));
                     }
 
@@ -1231,9 +1253,37 @@ namespace Broccoli {
                             Type.EmptyTypes
                         );
                         var defaultListContextIL = defaultListContext.GetILGenerator();
+                        var loopStart = defaultListContextIL.DefineLabel();
+                        var loopEnd = defaultListContextIL.DefineLabel();
+                        defaultListContextIL.Emit(OpCodes.Ldc_I4_0);
+                        defaultListContextIL.Emit(OpCodes.Stloc_0);
+                        defaultListContextIL.Emit(OpCodes.Newobj, typeof(BList).GetConstructor(Type.EmptyTypes));
+                        defaultListContextIL.Emit(OpCodes.Stloc_1);
+                        defaultListContextIL.MarkLabel(loopStart);
+                        defaultListContextIL.Emit(OpCodes.Ldloc_0);
+                        defaultListContextIL.Emit(OpCodes.Ldfld, "Count");
+                        defaultListContextIL.Emit(OpCodes.Ceq);
+                        defaultListContextIL.Emit(OpCodes.Brtrue, loopEnd);
+                        defaultListContextIL.Emit(OpCodes.Ldloc_0);
+                        defaultListContextIL.Emit(OpCodes.Ldloc_0);
+                        defaultListContextIL.Emit(OpCodes.Ldfld, "Values");
                         defaultListContextIL.Emit(OpCodes.Ldarg_0);
-                        defaultListContextIL.Emit(OpCodes.Newobj, typeof(NoListContextException).GetConstructor(new[] {typeof(object)}));
-                        defaultListContextIL.Emit(OpCodes.Throw);
+                        defaultListContextIL.Emit(OpCodes.Callvirt, typeof(Dictionary<IValue, IValue>.ValueCollection).GetMethod("get_Item"));
+                        defaultListContextIL.Emit(OpCodes.Ldloc_0);
+                        defaultListContextIL.Emit(OpCodes.Ldfld, "Keys");
+                        defaultListContextIL.Emit(OpCodes.Ldarg_0);
+                        defaultListContextIL.Emit(OpCodes.Callvirt, typeof(Dictionary<IValue, IValue>.KeyCollection).GetMethod("get_Item"));
+                        defaultListContextIL.Emit(OpCodes.Newobj, typeof(BList).GetConstructor(new[] { typeof(IValue), typeof(IValue) }));
+                        defaultListContextIL.Emit(OpCodes.Ldloc_1);
+                        defaultListContextIL.Emit(OpCodes.Callvirt, typeof(BList).GetMethod("Add"));
+                        defaultListContextIL.Emit(OpCodes.Ldloc_0);
+                        defaultListContextIL.Emit(OpCodes.Ldc_I4_1);
+                        defaultListContextIL.Emit(OpCodes.Add);
+                        defaultListContextIL.Emit(OpCodes.Stloc_0);
+                        defaultListContextIL.Emit(OpCodes.Jmp, loopStart);
+                        defaultListContextIL.MarkLabel(loopEnd);
+                        defaultListContextIL.Emit(OpCodes.Ldloc_1);
+                        defaultListContextIL.Emit(OpCodes.Ret);
                         typeBuilder.DefineMethodOverride(defaultListContext, typeof(IValue).GetMethod("ListContext"));
                     }
                 }
@@ -1250,7 +1300,6 @@ namespace Broccoli {
                 ctorIL.Emit(OpCodes.Ret);
                 staticInitIL.Emit(OpCodes.Ret);
 
-                // TODO: place in scope somewhere?
                 var classType = typeBuilder.CreateType();
                 classType.GetMethod("(init)", BindingFlags.NonPublic | BindingFlags.Static)
                     .Invoke(null, new [] {cauliflower});
@@ -1460,6 +1509,18 @@ namespace Broccoli {
                     if (!(arg is BInteger i))
                         throw new ArgumentTypeException(arg, "integer", index + 2, "slice");
                 var ints = args.Skip(1).Select(arg => (int) ((BInteger) arg).Value).ToArray();
+                if (ints.Length > 0) {
+                    if (ints[0] < 0)
+                        ints[0] = Math.Max(0, ints[0] + list.Count);
+                    else
+                        ints[0] = Math.Min(list.Count, ints[0]);
+                }
+                if (ints.Length > 1) {
+                    if (ints[1] < 0)
+                        ints[1] = Math.Max(0, ints[1] + list.Count);
+                    else
+                        ints[1] = Math.Min(list.Count, ints[1]);
+                }
 
                 switch (ints.Length) {
                     case 0:
@@ -1469,7 +1530,7 @@ namespace Broccoli {
                     case 2:
                         return new BList(list.Skip(ints[0]).Take(ints[1] - Math.Max(0, ints[0])));
                     case 3:
-                        return new BList(Enumerable.Range(ints[0], ints[1] == ints[0] ? 0 : (ints[1] - ints[0] - 1) / ints[2] + 1).Select(i => list[ints[0] + i * ints[2]]));
+                        return new BList(Enumerable.Range(0, Math.Max(0, (Math.Sign(ints[2]) * (ints[1] - ints[0]) - 1) / Math.Abs(ints[2]) + 1)).Select(i => list[ints[0] + i * ints[2]]));
                     default:
                         throw new Exception($"Function slice requires 1 to 4 arguments, {args.Length} provided");
                 }
@@ -1482,11 +1543,11 @@ namespace Broccoli {
 
                 switch (ints.Length) {
                     case 1:
-                        return new BList(Enumerable.Range(0, ints[0] + 1).Select(i => (IValue) new BInteger(i)));
+                        return new BList(Enumerable.Range(0, Math.Max(0, ints[0])).Select(i => (IValue) new BInteger(i)));
                     case 2:
-                        return new BList(Enumerable.Range(ints[0], ints[1] - ints[0]).Select(i => (IValue) new BInteger(i)));
+                        return new BList(Enumerable.Range(ints[0], Math.Max(0, ints[1] - ints[0])).Select(i => (IValue) new BInteger(i)));
                     case 3:
-                        return new BList(Enumerable.Range(ints[0], ints[1] == ints[0] ? 0 : (ints[1] - ints[0] - 1) / ints[2] + 1).Select(i => (IValue) new BInteger(ints[0] + i * ints[2])));
+                        return new BList(Enumerable.Range(0, Math.Max(0, (Math.Sign(ints[2]) * (ints[1] - ints[0]) - 1) / Math.Abs(ints[2]) + 1)).Select(i => (IValue) new BInteger(ints[0] + i * ints[2])));
                     default:
                         throw new Exception($"Function range requires 1 to 3 arguments, {args.Length} provided");
                 }

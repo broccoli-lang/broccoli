@@ -4,7 +4,6 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Broccoli;
 using System.Text;
 
-// TODO: test range/slice overloads
 // TODO: tests for contexts
 // TODO: allow user-defined classes to specify default context - make them automatically extend IEnumerable<IValue> or IDictionary<IValue, IValue> as needed
 
@@ -276,19 +275,43 @@ namespace BroccoliTest {
         [TestMethod]
         public void TestSlice() {
             Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 0 3)"), ValueListFrom(0, 1, 2), "Slice does not work correctly");
-            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) -5 3)"), ValueListFrom(0, 1, 2), "Slice does not work correctly with negative start");
-            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) -5 -3)"), ValueListFrom(), "Slice does not work correctly with negative end");
+            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) -5 3)"), ValueListFrom(1, 2), "Slice does not work correctly with negative start");
+            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) -5 -3)"), ValueListFrom(1, 2), "Slice does not work correctly with negative end");
             Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 3 -5)"), ValueListFrom(), "Slice does not work correctly with end less than start");
-            // Assert.ThrowsException<Exception>(() => _run("(slice '(1 2) 1)"), "Slice does not fail with two arguments");
+            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 4)"), ValueListFrom(4, 5), "Slice does not work correctly with two arguments");
+            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 7)"), ValueListFrom(), "Empty slice does not work correctly with two arguments");
+            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) -2)"), ValueListFrom(4, 5), "Slice does not work correctly with two arguments");
+            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 0 -4)"), ValueListFrom(0, 1), "Slice does not work correctly with three arguments");
+            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 5 2)"), ValueListFrom(), "Empty slice does not work correctly with three arguments");
+            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 3 3)"), ValueListFrom(), "Empty slice does not work correctly with three arguments");
+            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 0 -1 2)"), ValueListFrom(0, 2, 4), "Slice does not work correctly with four arguments");
+            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 0 -2 2)"), ValueListFrom(0, 2), "Slice does not work correctly with four arguments");
+            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 5 1 -2)"), ValueListFrom(5, 3), "Slice does not work correctly with four arguments");
+            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 5 1 2)"), ValueListFrom(), "Empty slice does not work correctly with four arguments");
+            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) 1 5 -2)"), ValueListFrom(), "Empty slice does not work correctly with four arguments");
+            Assert.AreEqual(_run("(slice '(0 1 2 3 4 5) -1 -3 -1)"), ValueListFrom(5, 4), "Slice does not work correctly with four arguments");
+            Assert.ThrowsException<Exception>(() => _run("(slice)"), "Slice does not fail with no arguments");
+            Assert.ThrowsException<Exception>(() => _run("(slice '(1 2) 1 2 3 4)"), "Slice does not fail with five arguments");
             Assert.ThrowsException<ArgumentTypeException>(() => _run("(slice '() 1.1 2.1)"), "Range does not fail with non-integers");
         }
 
         [TestMethod]
         public void TestRange() {
             Assert.AreEqual(_run("(range 0 5)"), ValueListFrom(0, 1, 2, 3, 4), "Range does not work correctly");
+            Assert.AreEqual(_run("(range 5 0)"), ValueListFrom(), "Empty range does not work correctly");
             Assert.AreEqual(_run("(range -5 5)"), ValueListFrom(-5, -4, -3, -2, -1, 0, 1, 2, 3, 4), "Negative range does not work correctly");
+            Assert.AreEqual(_run("(range 5 -5)"), ValueListFrom(), "Empty range does not work correctly");
             Assert.AreEqual(_run("(range -5 -1)"), ValueListFrom(-5, -4, -3, -2), "Negative to negative range does not work correctly");
-            // Assert.ThrowsException<Exception>(() => _run("(range 1)"), "Range does not fail with one argument");
+            Assert.AreEqual(_run("(range -1 -10)"), ValueListFrom(), "Empty range does not work correctly");
+            Assert.AreEqual(_run("(range 4)"), ValueListFrom(0, 1, 2, 3), "Range does not work correctly with one argument");
+            Assert.AreEqual(_run("(range -4)"), ValueListFrom(), "Empty range does not work correctly with one argument");
+            Assert.AreEqual(_run("(range 0 10 2)"), ValueListFrom(0, 2, 4, 6, 8), "Range does not work correctly with three arguments");
+            Assert.AreEqual(_run("(range 0 10 -2)"), ValueListFrom(), "Empty range does not work correctly with three arguments");
+            Assert.AreEqual(_run("(range 0 9 2)"), ValueListFrom(0, 2, 4, 6, 8), "Range does not work correctly with three arguments");
+            Assert.AreEqual(_run("(range 10 0 -2)"), ValueListFrom(10, 8, 6, 4, 2), "Range does not work correctly with three arguments");
+            Assert.AreEqual(_run("(range 10 0 2)"), ValueListFrom(), "Empty range does not work correctly with three arguments");
+            Assert.ThrowsException<Exception>(() => _run("(range)"), "Range does not fail with no arguments");
+            Assert.ThrowsException<Exception>(() => _run("(range 1 2 3 4)"), "Range does not fail with four arguments");
             Assert.ThrowsException<ArgumentTypeException>(() => _run("(range 1.1 2.1)"), "Range does not fail with non-integers");
         }
 
@@ -354,7 +377,9 @@ namespace BroccoliTest {
 
         [TestMethod]
         public void TestComments() {
+#pragma warning disable IDE0022 // Use expression body for methods
             Assert.AreEqual(_run("#| a #|;this is a comment.\n !@\r|#$%^&*()|#\n\"yey\""), new BString("yey"), "Comment does not work correctly");
+#pragma warning restore IDE0022 // Use expression body for methods
         }
 
         [TestMethod]
@@ -390,6 +415,7 @@ namespace BroccoliTest {
         [TestMethod]
         public void TestOOP() {
             Assert.AreEqual(_run("(namespace foo (namespace bar (fn baz ($a $b) (+ $a $b)))) (. foo bar baz)").Inspect(), "baz($a $b)", "Nested namespaces do not work");
+            Assert.AreEqual(_run("(class foo (fn bar ($i) (+ $i 1))) ((-> (new $foo) bar) 100)"), (BInteger) 101, "Classes do not work");
         }
         
         [TestMethod]

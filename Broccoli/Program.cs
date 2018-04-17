@@ -15,8 +15,6 @@ namespace Broccoli {
     public static class Program {
 
         public static void Main(string[] args) {
-            // TODO: remove as many try/catches as possible, this isn't Python, nor is it Java
-            // TODO: do we even need row/col in ParseNode
             string file;
             bool getHelp = false, useREPL = args.Length == 0, isCauliflower = false;
 
