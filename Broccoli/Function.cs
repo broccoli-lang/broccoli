@@ -54,8 +54,8 @@ namespace Broccoli {
         /// <typeparam name="T">The type of the arguments.</typeparam>
         /// <exception cref="Exception">Throws when the amount of arguments given does not match with the given argument count.</exception>
         public static void ValidateArgs<T>(int argc, T[] args, string name) {
-            bool isVariadic = argc < 0;
-            int requiredArgc = isVariadic ? -argc - 1 : argc;
+            var isVariadic = argc < 0;
+            var requiredArgc = isVariadic ? -argc - 1 : argc;
 
             if (isVariadic ? args.Length < requiredArgc : args.Length != requiredArgc)
                 throw new Exception($"Function '{name}' requires {(isVariadic ? "at least" : "exactly")} {requiredArgc} arguments, {args.Length} provided");

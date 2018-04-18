@@ -423,6 +423,8 @@ namespace Broccoli {
                             throw new Exception($"Object '{a.Value}' not found in namespace");
                     } else
                         throw new ArgumentTypeException(item, "atom", index + 1, ".");
+                if (scope.Value == null)
+                    throw new Exception($"Scope '{string.Join('.', args.Select(arg => arg.Inspect()))}' does not exist");
                 switch (args.Last()) {
                     case ScalarVar s:
                         return scope.Value[s];
@@ -1367,6 +1369,70 @@ namespace Broccoli {
                 File.WriteAllText(path.Value, toWrite.Value);
                 return null;
             })},
+            {"say", new Function("say", ~0, (broccoli, args) => {
+                foreach (var value in args) {
+                    string print = null;
+                    if (value is BAtom atom)
+                        switch (atom.Value) {
+                            case "tab":
+                                print = "\t";
+                                break;
+                            case "endl":
+                                print = "\n";
+                                break;
+                        }
+                    Console.Write(print ?? value.ToString());
+                }
+                Console.Write('\n');
+                return null;
+            })},
+
+            // Basic math
+            {"^", new Function("^", ~1, (broccoli, args) => {
+                foreach (var (value, index) in args.WithIndex())
+                    if (!(value is BInteger))
+                        throw new ArgumentTypeException(value, "integer", index + 1, "-");
+
+                return args.Aggregate(new BInteger(0L), (m, v) => new BInteger(((BInteger) m).Value ^ ((BInteger) v).Value));
+            })},
+            {"|", new Function("|", ~0, (broccoli, args) => {
+                foreach (var (value, index) in args.WithIndex())
+                    if (!(value is BInteger))
+                        throw new ArgumentTypeException(value, "integer", index + 1, "-");
+
+                return args.Aggregate(new BInteger(0L), (m, v) => new BInteger(((BInteger) m).Value | ((BInteger) v).Value));
+            })},
+            {"&", new Function("&", ~0, (broccoli, args) => {
+                foreach (var (value, index) in args.WithIndex())
+                    if (!(value is BInteger))
+                        throw new ArgumentTypeException(value, "integer", index + 1, "-");
+
+                return args.Aggregate(new BInteger(~0L), (m, v) => new BInteger(((BInteger) m).Value & ((BInteger) v).Value));
+            })},
+            {"**", new Function("**", ~0, (broccoli, args) => {
+                foreach (var (value, index) in args.WithIndex())
+                    if (!(value is BInteger || value is BFloat))
+                        throw new ArgumentTypeException(value, "integer or float", index + 1, "*");
+
+                return args.Reverse().Aggregate((IValue) new BInteger(1), (m, v) => {
+                    if (m is BInteger im && v is BInteger iv) {
+                        var result = Math.Pow(iv.Value, im.Value);
+                        if (result < long.MaxValue)
+                            return new BInteger(result);
+                        return new BFloat(result);
+                    }
+                    double fm, fv;
+                    if (m is BInteger mValue)
+                        fm = mValue.Value;
+                    else
+                        fm = ((BFloat) m).Value;
+                    if (v is BInteger vValue)
+                        fv = vValue.Value;
+                    else
+                        fv = ((BFloat) v).Value;
+                    return new BFloat(Math.Pow(fv, fm));
+                });
+            })},
 
             {"string", new Function("string", 1, (cauliflower, args) => new BString(args[0].ToString()))},
             {"bool", new Function("bool", 1, (cauliflower, args) => Boolean(CauliflowerInline.Truthy(args[0])))},
@@ -1585,6 +1651,15 @@ namespace Broccoli {
                 cauliflower.Scope = cauliflower.Scope.Parent;
                 return null;
             })},
+            {"while", new ShortCircuitFunction("while", ~1, (cauliflower, args) => {
+                var condition = args[0];
+                var statements = args.Skip(1).ToList();
+                IValue result = null;
+                while (CauliflowerInline.Truthy(cauliflower.Run(condition)))
+                    foreach (var statement in statements)
+                        result = cauliflower.Run(statement);
+                return result;
+            })},
             {"do", new ShortCircuitFunction("do", ~2, (cauliflower, args) => {
                 cauliflower.Scope = new CauliflowerScope(cauliflower.Scope);
                 var assignments = args[0] as ValueExpression;
@@ -1624,11 +1699,11 @@ namespace Broccoli {
 
             {"len", new Function("len", 1, (cauliflower, args) => {
                 switch (args[0]) {
-                    case BList l:
-                        return new BInteger(l.Count);
                     case BString s:
                         return new BInteger(s.Value.Length);
-                    case BDictionary d:
+                    case IList l:
+                        return new BInteger(l.Count());
+                    case IDictionary d:
                         return new BInteger(d.Count);
                     default:
                         throw new ArgumentTypeException(args[0], "list, dictionary or string", 1, "len");
@@ -1769,7 +1844,17 @@ namespace Broccoli {
                 }
                 throw new Exception("First argument to listkeys must be a Dict.");
             })},
-        }.Extend(Interpreter.StaticBuiltins);
+        }.Extend(Interpreter.StaticBuiltins)
+            .Alias("print", "p")
+            .Alias("say", "s")
+            .Alias("read", "r")
+            .Alias("write", "w")
+            .Alias("fn", "function", "fun", "func")
+            .Alias("\\", "lambda")
+            .Alias("cat", "concat", "concatenate")
+            .Alias("len", "length")
+            .Alias("first", "car")
+            .Alias("rest", "cdr");
 
         /// <summary>
         /// Helper functions for Cauliflower that can be inlined.
@@ -2094,10 +2179,17 @@ namespace Broccoli {
         /// <typeparam name="K">The key type.</typeparam>
         /// <typeparam name="V">The value type.</typeparam>
         /// <returns>The current dictionary.</returns>
-        public static Dictionary<K, V> Extend<K, V>(this Dictionary<K, V> self, Dictionary<K, V> other) {
+        public static Dictionary<K, V> Extend<K, V>(this Dictionary<K, V> self, Dictionary<K, V> other, bool overwrite = false) {
             foreach (var (key, value) in other)
-                if (!self.ContainsKey(key))
+                if (overwrite || !self.ContainsKey(key))
                     self[key] = value;
+            return self;
+        }
+
+        public static Dictionary<K, V> Alias<K, V>(this Dictionary<K, V> self, K key, params K[] newKeys) {
+            var value = self[key];
+            foreach (var newKey in newKeys)
+                self[newKey] = value;
             return self;
         }
     }

@@ -163,9 +163,7 @@ namespace Broccoli {
     public class BString : IScalar {
         public string Value { get; }
 
-        public BString(string s) {
-            Value = s;
-        }
+        public BString(string s) => Value = s;
 
         public static implicit operator BString(string s) => new BString(s);
 
@@ -201,9 +199,7 @@ namespace Broccoli {
 
         public string Value { get; }
 
-        public BAtom(string a) {
-            Value = a;
-        }
+        public BAtom(string a) => Value = a;
 
         public static implicit operator BAtom(string s) => new BAtom(s);
 
@@ -247,9 +243,7 @@ namespace Broccoli {
     public class ScalarVar : IScalar {
         public string Value { get; }
 
-        public ScalarVar(string s) {
-            Value = s;
-        }
+        public ScalarVar(string s) => Value = s;
 
         public static implicit operator ScalarVar(string s) => new ScalarVar(s);
 
@@ -276,10 +270,8 @@ namespace Broccoli {
     public class ListVar : IScalar {
         public string Value { get; }
 
-        public ListVar(string l) {
-            Value = l;
-        }
-        
+        public ListVar(string l) => Value = l;
+
         public static implicit operator ListVar(string s) => new ListVar(s);
 
         public static implicit operator string(ListVar l) => l.Value;
@@ -305,9 +297,7 @@ namespace Broccoli {
     public class DictVar : IScalar {
         public string Value { get; }
 
-        public DictVar(string d) {
-            Value = d;
-        }
+        public DictVar(string d) => Value = d;
 
         public static implicit operator DictVar(string s) => new DictVar(s);
 
@@ -432,7 +422,7 @@ namespace Broccoli {
 
         public override string ToString() {
             var sb = new StringBuilder("(");
-            foreach (KeyValuePair<IValue, IValue> i in this)
+            foreach (var i in this)
                 sb.Append($"{i.Key}: {i.Value}, ");
             if (sb.Length > 1)
                 sb.Length -= 2;
@@ -442,7 +432,7 @@ namespace Broccoli {
 
         public string Inspect() {
             var sb = new StringBuilder("(");
-            foreach (KeyValuePair<IValue, IValue> i in this)
+            foreach (var i in this)
                 sb.Append($"{i.Key.Inspect()}: {i.Value.Inspect()}, ");
             if (sb.Length > 1)
                 sb.Length -= 2;

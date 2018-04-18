@@ -122,6 +122,22 @@ namespace BroccoliTest {
         }
 
         [TestMethod]
+        public void TestPow() {
+            Assert.AreEqual(_run("(** 3 2 3)"), new BInteger(6561L), "** does not work correctly");
+            Assert.AreEqual(_run("(** 3 4 3)"), new BFloat(Math.Pow(3, Math.Pow(4, 3))), "** does not work correctly");
+            Assert.AreEqual(_run("(** 3 3.5)"), new BFloat(Math.Pow(3, 3.5)), "** does not work correctly");
+        }
+
+        [TestMethod]
+        public void TestBitwiseXor() => Assert.AreEqual(_run("(^ 3 6 12)"), new BInteger(9), "^ does not work correctly");
+
+        [TestMethod]
+        public void TestBitwiseOr() => Assert.AreEqual(_run("(| 1 3 9 10 24)"), new BInteger(27), "| does not work correctly");
+
+        [TestMethod]
+        public void TestBitwiseAnd() => Assert.AreEqual(_run("(& 255 31 193)"), new BInteger(1), "& does not work correctly");
+
+        [TestMethod]
         public void TestAssign() {
             Assert.AreEqual(_run("(:= $e 2) $e"), new BInteger(2), ":= does not work correctly for scalars");
             Assert.AreEqual(_run("(:= $e 2)"), new BInteger(2), ":= does not work correctly for scalars");
@@ -247,6 +263,9 @@ namespace BroccoliTest {
         public void TestFor() => Assert.AreEqual(_run("(:= $a 0) (for $i in '(1 10 100) (:= $a (+ $a $i))) $a"), new BInteger(111), "For loop does not work correctly");
 
         [TestMethod]
+        public void TestWhile() => Assert.AreEqual(_run("(:= $a 0) (while (< (:= $a (+ $a 1)) 5)) $a"), new BInteger(5), "While loop does not work correctly");
+
+        [TestMethod]
         public void TestDo() {
             Assert.AreEqual(_run("(do (($a 1 (+ $a 1))) ((= $a 5) $a $a))"), new BInteger(5), "Do loop does not work correctly");
             Assert.AreEqual(_run("(do (($a 1 $b) ($b 1 (+ $a $b))) ((= $a 13) $b))"), new BInteger(21), "Do loop with simultaneous assignment does not work correctly");
@@ -267,6 +286,8 @@ namespace BroccoliTest {
             Assert.AreEqual(_run("(len \"\\\\\")"), new BInteger(1), "String len does not work correctly");
             Assert.AreEqual(_run("(len '(0 1 2))"), new BInteger(3), "List len does not work correctly");
             Assert.AreEqual(_run("(len '())"), new BInteger(0), "Zero-length list len does not work correctly");
+            Assert.AreEqual(_run("(len `((0 0) (1 1) (2 2)))"), new BInteger(3), "Dict len does not work correctly");
+            Assert.AreEqual(_run("(length `((0 0) (1 1) (2 2)))"), new BInteger(3), "Dict length does not work correctly");
             Assert.ThrowsException<ArgumentTypeException>(() => _run("(len 1)"), "Len does not fail with non-list");
             Assert.ThrowsException<Exception>(() => _run("(len '() '())"), "Len does not fail with two arguments");
             Assert.ThrowsException<Exception>(() => _run("(len)"), "Len does not fail with no arguments");
@@ -421,7 +442,7 @@ namespace BroccoliTest {
             Assert.AreEqual(ReadOutput(_run("(print \"foo\")")), "foo", "Print does not work correctly for strings");
             Assert.AreEqual(ReadOutput(_run("(print 3.3)")), "3.3", "Print does not work correctly for numbers");
             Assert.AreEqual(ReadOutput(_run("(print '(foo bar))")), "(foo bar)", "Print does not work correctly for lists");
-            Assert.AreEqual(ReadOutput(_run("(print `((foo bar)(baz quux))")), "(foo: bar, baz: quux)", "Print does not work correctly for dictionaries");
+            Assert.AreEqual(ReadOutput(_run("(p `((foo bar)(baz quux))")), "(foo: bar, baz: quux)", "Print does not work correctly for dictionaries");
         }
 
         [TestMethod]
