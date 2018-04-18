@@ -8,6 +8,8 @@ using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Text;
 
+// TODO: clisp's boole, and various other 
+
 namespace Broccoli {
     /// <summary>
     /// Useful variants of type methods.
@@ -271,18 +273,20 @@ namespace Broccoli {
         /// <returns>The created value.</returns>
         private static BCSharpValue CSharpCreate(BCSharpType type, IEnumerable<IValue> parameters) => new BCSharpValue(
             type.Value.GetConstructor(parameters.Select(p => p.Type()).ToArray())
-                .Invoke(parameters.Select(p => p.ToCSharp()).ToArray())
+                ?.Invoke(parameters.Select(p => p.ToCSharp()).ToArray())
+            ?? throw new Exception($"C# type '{type.Value.FullName}' has no constructor accepting arguments {string.Join(", ", parameters.Select(p => p.Type().FullName))}")
         );
 
         /// <summary>
-        /// Create a Cauliflower native value.
+        /// Create a Cauliflower value.
         /// </summary>
         /// <param name="type">Type of value to create.</param>
         /// <param name="parameters">Parameters to feed to the constructor.</param>
         /// <returns>The created value.</returns>
-        private static IValue CauliflowerCreate(BCauliflowerType type, IEnumerable<IValue> parameters) => (IValue)(
+        private static IValue CauliflowerCreate(BCauliflowerType type, IEnumerable<IValue> parameters) => (IValue) (
             type.Value.GetConstructor(parameters.Select(p => p.Type()).ToArray())
                 .Invoke(parameters.ToArray())
+            ?? throw new Exception($"Cauliflower type '{type.Value.FullName}' has no constructor accepting arguments {string.Join(", ", parameters.Select(p => p.Type().Name.Substring(1)))}")
         );
 
         /// <summary>
@@ -1388,26 +1392,117 @@ namespace Broccoli {
             })},
 
             // Basic math
+            {"mod", new Function("mod", 2, (broccoli, args) => {
+                if (!(args[0] is BInteger i))
+                    throw new ArgumentTypeException(args[0], "integer", 1, "mod");
+                if (!(args[1] is BInteger j))
+                    throw new ArgumentTypeException(args[1], "integer", 2, "mod");
+
+                return new BInteger(i.Value % j.Value);
+            })},
             {"^", new Function("^", ~1, (broccoli, args) => {
                 foreach (var (value, index) in args.WithIndex())
                     if (!(value is BInteger))
-                        throw new ArgumentTypeException(value, "integer", index + 1, "-");
+                        throw new ArgumentTypeException(value, "integer", index + 1, "^");
 
                 return args.Aggregate(new BInteger(0L), (m, v) => new BInteger(((BInteger) m).Value ^ ((BInteger) v).Value));
+            })},
+            {"~^", new Function("~^", ~1, (broccoli, args) => {
+                foreach (var (value, index) in args.WithIndex())
+                    if (!(value is BInteger))
+                        throw new ArgumentTypeException(value, "integer", index + 1, "~^");
+
+                return args.Aggregate(new BInteger(~0L), (m, v) => new BInteger(~((BInteger) m).Value ^ ((BInteger) v).Value));
             })},
             {"|", new Function("|", ~0, (broccoli, args) => {
                 foreach (var (value, index) in args.WithIndex())
                     if (!(value is BInteger))
-                        throw new ArgumentTypeException(value, "integer", index + 1, "-");
+                        throw new ArgumentTypeException(value, "integer", index + 1, "|");
 
                 return args.Aggregate(new BInteger(0L), (m, v) => new BInteger(((BInteger) m).Value | ((BInteger) v).Value));
             })},
             {"&", new Function("&", ~0, (broccoli, args) => {
                 foreach (var (value, index) in args.WithIndex())
                     if (!(value is BInteger))
-                        throw new ArgumentTypeException(value, "integer", index + 1, "-");
+                        throw new ArgumentTypeException(value, "integer", index + 1, "&");
 
                 return args.Aggregate(new BInteger(~0L), (m, v) => new BInteger(((BInteger) m).Value & ((BInteger) v).Value));
+            })},
+            {"~", new Function("~", 1, (broccoli, args) => {
+                if (!(args[0] is BInteger i))
+                    throw new ArgumentTypeException(args[0], "integer", 1, "~");
+
+                return new BInteger(~i.Value);
+            })},
+            {"~&", new Function("~&", 2, (broccoli, args) => {
+                if (!(args[0] is BInteger i))
+                    throw new ArgumentTypeException(args[0], "integer", 1, "~&");
+                if (!(args[1] is BInteger j))
+                    throw new ArgumentTypeException(args[1], "integer", 2, "~&");
+
+                return new BInteger(~(i.Value & j.Value));
+            })},
+            {"~|", new Function("~|", 2, (broccoli, args) => {
+                if (!(args[0] is BInteger i))
+                    throw new ArgumentTypeException(args[0], "integer", 1, "~|");
+                if (!(args[1] is BInteger j))
+                    throw new ArgumentTypeException(args[1], "integer", 2, "~|");
+
+                return new BInteger(~(i.Value | j.Value));
+            })},
+            {"&~1", new Function("&~1", 2, (broccoli, args) => {
+                if (!(args[0] is BInteger i))
+                    throw new ArgumentTypeException(args[0], "integer", 1, "&~1");
+                if (!(args[1] is BInteger j))
+                    throw new ArgumentTypeException(args[1], "integer", 2, "&~1");
+
+                return new BInteger(~i.Value & j.Value);
+            })},
+            {"&~2", new Function("&~2", 2, (broccoli, args) => {
+                if (!(args[0] is BInteger i))
+                    throw new ArgumentTypeException(args[0], "integer", 1, "&~2");
+                if (!(args[1] is BInteger j))
+                    throw new ArgumentTypeException(args[1], "integer", 2, "&~2");
+
+                return new BInteger(i.Value & ~j.Value);
+            })},
+            {"|~1", new Function("|~1", 2, (broccoli, args) => {
+                if (!(args[0] is BInteger i))
+                    throw new ArgumentTypeException(args[0], "integer", 1, "|~1");
+                if (!(args[1] is BInteger j))
+                    throw new ArgumentTypeException(args[1], "integer", 2, "|~1");
+
+                return new BInteger(~i.Value | j.Value);
+            })},
+            {"|~2", new Function("|~2", 2, (broccoli, args) => {
+                if (!(args[0] is BInteger i))
+                    throw new ArgumentTypeException(args[0], "integer", 1, "|~2");
+                if (!(args[1] is BInteger j))
+                    throw new ArgumentTypeException(args[1], "integer", 2, "|~2");
+
+                return new BInteger(i.Value | ~j.Value);
+            })},
+            {"logtest", new Function("logtest", 2, (broccoli, args) => {
+                if (!(args[0] is BInteger i))
+                    throw new ArgumentTypeException(args[0], "integer", 1, "logtest");
+                if (!(args[1] is BInteger j))
+                    throw new ArgumentTypeException(args[1], "integer", 2, "logtest");
+
+                return Boolean((i.Value & j.Value) != 0);
+            })},
+            {"logbitp", new Function("logtest", 2, (broccoli, args) => {
+                if (!(args[0] is BInteger i))
+                    throw new ArgumentTypeException(args[0], "integer", 1, "logtest");
+                if (!(args[1] is BInteger j))
+                    throw new ArgumentTypeException(args[1], "integer", 2, "logtest");
+
+                return Boolean((j >> i) % 2 == 1);
+            })},
+            {"integer-length", new Function("integer-length", 1, (broccoli, args) => {
+                if (!(args[0] is BInteger i))
+                    throw new ArgumentTypeException(args[0], "integer", 1, "integer-length");
+
+                return new BInteger(Math.Ceiling(Math.Log(i.Value < 0 ? -i.Value : i.Value + 1, 2)));
             })},
             {"**", new Function("**", ~0, (broccoli, args) => {
                 foreach (var (value, index) in args.WithIndex())
@@ -1432,6 +1527,35 @@ namespace Broccoli {
                         fv = ((BFloat) v).Value;
                     return new BFloat(Math.Pow(fv, fm));
                 });
+            })},
+            {"evenp", new Function("evenp", 1, (broccoli, args) => {
+                if (!(args[0] is BInteger i))
+                    throw new ArgumentTypeException(args[0], "integer", 1, "evenp");
+
+                return Boolean(i.Value % 2 == 0);
+            })},
+            {"oddp", new Function("oddp", 1, (broccoli, args) => {
+                if (!(args[0] is BInteger i))
+                    throw new ArgumentTypeException(args[0], "integer", 1, "oddp");
+
+                return Boolean(i.Value % 2 == 1);
+            })},
+            {"zerop", new Function("zerop", 1, (broccoli, args) => {
+                if (args[0] is BInteger i)
+                    return Boolean(((BInteger) args[0]).Value == 0);
+                if (args[0] is BFloat f)
+                    return Boolean(((BFloat) args[0]).Value == 0);
+                throw new ArgumentTypeException(args[0], "number", 1, "zerop");
+            })},
+
+            {"popcnt", new Function("popcnt", 1, (broccoli, args) => {
+                if (!(args[0] is BInteger i))
+                    throw new ArgumentTypeException(args[0], "integer", 1, "popcnt");
+
+                var n = i.Value;
+                n = n - ((n >> 1) & 0x5555555555555555);
+                n = (n & 0x3333333333333333) + ((n >> 2) & 0x3333333333333333);
+                return new BInteger((((n + (n >> 4)) & 0xF0F0F0F0F0F0F0F) * 0x101010101010101) >> 56);
             })},
 
             {"string", new Function("string", 1, (cauliflower, args) => new BString(args[0].ToString()))},
@@ -1664,7 +1788,7 @@ namespace Broccoli {
                 cauliflower.Scope = new CauliflowerScope(cauliflower.Scope);
                 var assignments = args[0] as ValueExpression;
                 if (assignments == null)
-                    throw new Exception();
+                    throw new Exception("Do loop has no assignments");
                 var returnSpec = args[1] as ValueExpression ?? new ValueExpression(args[1]);
                 var condition = returnSpec.Values.Length == 0 ? BAtom.Nil : returnSpec.Values[0];
                 var resultForm = returnSpec.Values.Skip(1).ToArray();
@@ -1683,16 +1807,85 @@ namespace Broccoli {
                         cauliflower.Run(expression);
                     if (CauliflowerInline.Truthy(cauliflower.Run(condition)))
                         break;
-                    values = new List<IValueExpressible>();
+                    values.Clear();
                     foreach (ValueExpression assignment in assignments.Values) {
                         values.Add(assignment.Values[0]);
                         values.Add(assignment.Values[2]);
                     }
                     cauliflower.Run(new ValueExpression(assignmentBase.Concat(values)));
                 }
-                IValue result = null;
+                IValue result = BAtom.Nil;
                 foreach (var item in resultForm)
                     result = cauliflower.Run(item);
+                cauliflower.Scope = cauliflower.Scope.Parent;
+                return result;
+            })},
+            {"dotimes", new ShortCircuitFunction("dotimes", ~2, (cauliflower, args) => {
+                cauliflower.Scope = new CauliflowerScope(cauliflower.Scope);
+                var range = args[0] as ValueExpression;
+                if (range == null)
+                    throw new Exception("Dotimes loop has no range");
+                if (range.Values.Length < 2)
+                    throw new Exception($"Dotimes loop recieved {range.Values.Length} arguments in initializer, expected 2 or more");
+                long start = 0, end = 0, step = 1;
+                if (range.Values.Length > 1) {
+                    //(dox($i 1 101 t)(dox($j 1(1+ i)t)(if(=(mod$i$j)0)(p$j" ")))(s))
+                    var value = cauliflower.Run(range.Values[1]);
+                    if (!(value is BInteger i))
+                        throw new ArgumentTypeException(value, "integer", 2, "dotimes");
+
+                    end = i.Value;
+                }
+                if (range.Values.Length > 3) {
+                    var value = cauliflower.Run(range.Values[2]);
+                    if (!(value is BInteger i))
+                        throw new ArgumentTypeException(value, "integer", 3, "dotimes");
+
+                    start = end;
+                    end = i.Value;
+                }
+                if (range.Values.Length > 4) {
+                    var value = cauliflower.Run(range.Values[3]);
+                    if (!(value is BInteger i))
+                        throw new ArgumentTypeException(value, "integer", 4, "dotimes");
+
+                    step = i.Value;
+                }
+                var resultVar = range.Values.Length > 2 ? range.Values.Last() : null;
+                var assignment = new IValueExpressible[] { new BAtom(":="), range.Values[0], null };
+                var body = args.Skip(1);
+                for (var i = start; end > 0 ? i < end : i > end; i += step) {
+                    assignment[2] = new BInteger(i);
+                    cauliflower.Run(new ValueExpression(assignment));
+                    foreach (var expression in body)
+                        cauliflower.Run(expression);
+                }
+                IValue result = BAtom.Nil;
+                if (resultVar != null)
+                    result = cauliflower.Run(resultVar);
+                cauliflower.Scope = cauliflower.Scope.Parent;
+                return result;
+            })},
+            {"dolist", new ShortCircuitFunction("dolist", ~2, (cauliflower, args) => {
+                cauliflower.Scope = new CauliflowerScope(cauliflower.Scope);
+                var list = args[0] as ValueExpression;
+                if (list == null)
+                    throw new Exception("Dolist loop has no list");
+                if (list.Values.Length < 2)
+                    throw new Exception($"Dolist loop recieved {list.Values.Length} arguments in initializer, expected 2 or more");
+                var iterable = cauliflower.Run(list.Values[1]) as IList;
+                var resultVar = list.Values.Length > 2 ? list.Values.Last() : null;
+                var assignment = new IValueExpressible[] { new BAtom(":="), list.Values[0], null };
+                var body = args.Skip(1);
+                foreach (var item in iterable) {
+                    assignment[2] = item;
+                    cauliflower.Run(new ValueExpression(assignment));
+                    foreach (var expression in body)
+                        cauliflower.Run(expression);
+                }
+                IValue result = BAtom.Nil;
+                if (resultVar != null)
+                    result = cauliflower.Run(resultVar);
                 cauliflower.Scope = cauliflower.Scope.Parent;
                 return result;
             })},
@@ -1849,12 +2042,29 @@ namespace Broccoli {
             .Alias("say", "s")
             .Alias("read", "r")
             .Alias("write", "w")
-            .Alias("fn", "function", "fun", "func")
+            .Alias("fn", "f", "fun", "func", "function")
             .Alias("\\", "lambda")
             .Alias("cat", "concat", "concatenate")
             .Alias("len", "length")
             .Alias("first", "car")
-            .Alias("rest", "cdr");
+            .Alias("rest", "cdr")
+            .Alias("^", "logxor")
+            .Alias("|", "logior")
+            .Alias("&", "logand")
+            .Alias("~", "lognot")
+            .Alias("~^", "logeqv")
+            .Alias("~|", "lognor")
+            .Alias("~&", "lognand")
+            .Alias("&~1", "logandc1")
+            .Alias("&~2", "logandc2")
+            .Alias("|~1", "logorc1")
+            .Alias("|~2", "logorc2")
+            .Alias("popcnt", "popcount", "logcount")
+            .Alias("evenp", "ep")
+            .Alias("oddp", "op")
+            .Alias("zerop", "zp")
+            .Alias("dotimes", "dox")
+            .Alias("dolist", "dol");
 
         /// <summary>
         /// Helper functions for Cauliflower that can be inlined.

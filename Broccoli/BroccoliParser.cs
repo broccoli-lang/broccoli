@@ -12,9 +12,9 @@ namespace Broccoli {
         private static Regex _rStringStart = new Regex(@"\G""(?:\\[\s\S]|[^""])*$", RegexOptions.Compiled);
         private static Regex _rStringEnd = new Regex(@"^(?:\\[\s\S]|[^""])*""", RegexOptions.Compiled);
         private static Regex _rNumber = new Regex(@"\G-?(?:\d*\.\d+|\d+\.?\d*|\d*)", RegexOptions.Compiled);
-        private static Regex _rScalar = new Regex(@"\G\$[^\s()$@%&|~][^\s()&|~]*", RegexOptions.Compiled);
-        private static Regex _rList = new Regex(@"\G@[^\s()$@%&|~][^\s()&|~]*", RegexOptions.Compiled);
-        private static Regex _rName = new Regex(@"\G[^\s\d()$@%&|~][^\s()&|~]*", RegexOptions.Compiled);
+        private static Regex _rScalar = new Regex(@"\G\$[^\s()$@%&|~][^\s()&|~""]*", RegexOptions.Compiled);
+        private static Regex _rList = new Regex(@"\G@[^\s()$@%&|~][^\s()&|~""]*", RegexOptions.Compiled);
+        private static Regex _rName = new Regex(@"\G[^\s\d()$@%&|~][^\s()&|~""]*", RegexOptions.Compiled);
         private static Regex _rEscapes = new Regex(@"\\(.)", RegexOptions.Compiled);
 
         /// <summary>
