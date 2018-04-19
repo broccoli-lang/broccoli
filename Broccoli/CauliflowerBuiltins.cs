@@ -22,12 +22,7 @@ namespace Broccoli {
         /// <param name="name">Name of property.</param>
         /// <returns>Property.</returns>
         /// <exception cref="Exception">Throws when property is not found.</exception>
-        public static PropertyInfo TryGetProperty(this Type type, string name) {
-            var result = type.GetProperty(name);
-            if (result == null)
-                throw new Exception($"Type '{type.FullName}' has no field '{name}'");
-            return result;
-        }
+        public static PropertyInfo TryGetProperty(this Type type, string name) => type.GetProperty(name) ?? throw new Exception($"Type '{type.FullName}' has no field '{name}'");
 
         /// <summary>
         /// Gets field of object.
@@ -36,12 +31,7 @@ namespace Broccoli {
         /// <param name="name">Name of field.</param>
         /// <returns>Field.</returns>
         /// <exception cref="Exception">Throws when field is not found.</exception>
-        public static FieldInfo TryGetField(this Type type, string name) {
-            var result = type.GetField(name);
-            if (result == null)
-                throw new Exception($"Type '{type.FullName}' has no field '{name}'");
-            return result;
-        }
+        public static FieldInfo TryGetField(this Type type, string name)  => type.GetField(name) ?? throw new Exception($"Type '{type.FullName}' has no field '{name}'");
     }
 
     public partial class CauliflowerInterpreter : Interpreter {
@@ -444,14 +434,25 @@ namespace Broccoli {
             })},
             {"->", new ShortCircuitFunction("->", -2, (cauliflower, args) => {
                 var result = cauliflower.Run(args[0]);
-                var type = result.GetType();
+                var type = result is BCSharpType ? ((BCSharpType) result).Value : result.Type();
                 foreach (var (item, index) in args.Skip(1).WithIndex())
                     if (type == null)
                         throw new Exception("Cannot get property of method");
                     else if (item is BAtom a) {
                         var name = a.Value;
-                        var members = result.GetType().GetMember(name);
+                        var members = type.GetMember(name);
                         if (members.Length != 0) {
+                            if (members.Length > 1) {
+                                var _type = type;
+                                var _name = name;
+                                var _result = result;
+                                if (!(type is IValue))
+                                    result = new Function(name, ~0, (_, innerArgs) => CSharpMethod(_type, _name, _result, innerArgs));
+                                else
+                                    result = new Function(name, ~0, (_, innerArgs) => CauliflowerMethod(_type, _name, _result, innerArgs));
+                                type = null;
+                                break;
+                            }
                             switch (members[0].MemberType) {
                                 case MemberTypes.Method:
                                     if (!methods.ContainsKey(type))
@@ -469,7 +470,7 @@ namespace Broccoli {
                                     if (!fields[type].ContainsKey(name))
                                         fields[type][name] = type.GetField(name);
                                     var field = fields[type][name];
-                                    type = (result = (IValue) field.GetValue(result)).GetType();
+                                    type = (result = CreateValue(field.GetValue(result is BCSharpValue ? result.ToCSharp() : result))).GetType();
                                     break;
                                 case MemberTypes.Property:
                                     if (!properties.ContainsKey(type))
@@ -477,13 +478,13 @@ namespace Broccoli {
                                     if (!properties[type].ContainsKey(name))
                                         properties[type][name] = type.GetProperty(name);
                                     var property = properties[type][name];
-                                    type = (result = (IValue) property.GetValue(result)).GetType();
+                                    type = (result = CreateValue(property.GetValue(result is BCSharpValue ? result.ToCSharp() : result))).GetType();
                                     break;
                             }
                         } else
                             throw new Exception($"Member '{a.Value}' not found in item");
                     } else
-                        throw new ArgumentTypeException(item, "atom", index + 1, ".");
+                        throw new ArgumentTypeException(item, "atom", index + 1, "");
                 return result;
             })},
             {"$", new Function("$", 1, (cauliflower, args) => args[0] is IScalar ? args[0] : args[0].ScalarContext())},
@@ -595,92 +596,11 @@ namespace Broccoli {
 
             // Meta-commands
             {"new", new Function("new", -2, (cauliflower, args) => {
-                if (!(args[0] is BCauliflowerType type))
-                    throw new ArgumentTypeException(args[0], "Cauliflower type", 1, "new");
-                return CauliflowerCreate(type, args.Skip(1));
-            })},
-            {"c#-import", new Function("c#-import", -2, (cauliflower, args) => {
-                if (!(args[0] is BAtom a))
-                    throw new ArgumentTypeException(args[0], "atom", 1, "c#-import");
-                CSharpImport(cauliflower, a);
-                return null;
-            })},
-            {"c#-new", new Function("c#-new", -2, (cauliflower, args) => {
-                if (!(args[0] is BCSharpType type))
-                    throw new ArgumentTypeException(args[0], "C# type", 1, "c#-new");
-                return CSharpCreate(type, args.Skip(1));
-            })},
-            {"c#-static", new Function("c#-static", -2, (cauliflower, args) => {
-                if (args[0] is BCSharpMethod method)
-                    try {
-                        return CSharpMethod(method.Value.type, method.Value.name, null, args.Skip(1));
-                    } catch {
-                        throw new Exception($"C# method '{method.Value.name}' not found for specified arguments. Are you missing a 'c#-import'?");
-                    }
-                if (!(args[0] is BCSharpType type))
-                    throw new ArgumentTypeException(args[0], "C# type or method", 1, "c#-static");
-                if (!(args[1] is BAtom name))
-                    throw new ArgumentTypeException(args[1], "atom", 2, "c#-static");
-                try {
-                    return CSharpMethod(type, name, null, args.Skip(2));
-                } catch {
-                    throw new Exception($"C# method '{name}' not found for specified arguments. Are you missing a 'c#-import'?");
-                }
-            })},
-            {"c#-method", new Function("c#-method", -3, (cauliflower, args) => {
-                if (!(args[0] is BCSharpValue value))
-                    throw new ArgumentTypeException(args[0], "C# value", 1, "c#-method");
-                if (!(args[1] is BAtom name))
-                    throw new ArgumentTypeException(args[1], "atom", 2, "c#-method");
-                try {
-                    return CSharpMethod(value.Type(), name, value, args.Skip(2));
-                } catch {
-                    throw new Exception($"C# method '{name}' not found for specified arguments. Are you missing a 'c#-import'?");
-                }
-            })},
-            {"c#-property", new Function("c#-property", -2, (cauliflower, args) => {
-                if (args[0] is BCSharpType type && args[1] is BAtom a) {
-                    if (args.Length > 2) {
-                        AssignCSharpProperty(type.Value, a, null, args[2]);
-                        return null;
-                    }
-                    return CSharpProperty(type.Value, a, null);
-                }
-                if (!(args[0] is BCSharpValue value))
-                    throw new ArgumentTypeException(args[0], "C# value or type", 1, "c#-property");
-                if (!(args[1] is BAtom name))
-                    throw new ArgumentTypeException(args[1], "atom", 2, "c#-property");
-                try {
-                    if (args.Length > 2) {
-                        AssignCSharpProperty(value.Type(), name, value, args[2]);
-                        return null;
-                    }
-                    return CSharpProperty(value.Type(), name, value);
-                } catch {
-                    throw new Exception($"C# property '{name}' not found for specified arguments. Are you missing a 'c#-import'?");
-                }
-            })},
-            {"c#-field", new Function("c#-field", -2, (cauliflower, args) => {
-                if (args[0] is BCSharpType type && args[1] is BAtom a) {
-                    if (args.Length > 2) {
-                        AssignCSharpField(type.Value, a, null, args[2]);
-                        return null;
-                    }
-                    return CSharpField(type.Value, a, null);
-                }
-                if (!(args[0] is BCSharpValue value))
-                    throw new ArgumentTypeException(args[0], "C# value or type", 1, "c#-field");
-                if (!(args[1] is BAtom name))
-                    throw new ArgumentTypeException(args[1], "atom", 2, "c#-field");
-                try {
-                    if (args.Length > 2) {
-                        AssignCSharpField(value.Type(), name, value, args[2]);
-                        return null;
-                    }
-                    return CSharpField(value.Type(), name, value);
-                } catch {
-                    throw new Exception($"C# property '{name}' not found for specified arguments. Are you missing a 'c#-import'?");
-                }
+                if (args[0] is BCauliflowerType type)
+                    return CauliflowerCreate(type, args.Skip(1));
+                if (args[0] is BCSharpType cstype)
+                    return CSharpCreate(cstype, args.Skip(1));
+                throw new ArgumentTypeException(args[0], "Cauliflower or C# type", 1, "new");
             })},
             {"c#-char", new Function("c#-char", 1, (cauliflower, args) => {
                 switch (args[0]) {
@@ -726,7 +646,12 @@ namespace Broccoli {
                 return new BList(cauliflower.Builtins.Keys.Skip(1).Select(key => (IValue) new BString(key)));
             })},
             {"import", new Function("import", ~1, (cauliflower, args) => {
-                if (args[0] is BAtom) {
+                if (args[0] is BAtom a) {
+                    if (args.Length == 1)
+                        try {
+                            CSharpImport(cauliflower, a);
+                            return null;
+                        } finally { }
                     CauliflowerInline.Import(cauliflower, args);
                     return null;
                 }
