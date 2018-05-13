@@ -447,7 +447,7 @@ namespace Broccoli {
                         throw new Exception("Cannot get property of method");
                     else if (item is BAtom a) {
                         var name = a.Value;
-                        var members = type.GetMember(name);
+                        var members = type.GetMember(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
                         if (members.Length != 0) {
                             if (members.Length > 1) {
                                 var _type = type;
@@ -465,7 +465,7 @@ namespace Broccoli {
                                     if (!methods.ContainsKey(type))
                                         methods[type] = new Dictionary<string, MethodBase>();
                                     if (!methods[type].ContainsKey(name))
-                                        methods[type][name] = type.GetMethod(name);
+                                        methods[type][name] = type.GetMethod(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
                                     var method = methods[type][name];
                                     var obj = result;
                                     result = new Function(name, -1, (_, innerArgs) => CreateValue(method.Invoke(obj, innerArgs)));
@@ -475,7 +475,7 @@ namespace Broccoli {
                                     if (!fields.ContainsKey(type))
                                         fields[type] = new Dictionary<string, FieldInfo>();
                                     if (!fields[type].ContainsKey(name))
-                                        fields[type][name] = type.GetField(name);
+                                        fields[type][name] = type.GetField(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
                                     var field = fields[type][name];
                                     type = (result = CreateValue(field.GetValue(result is BCSharpValue ? result.ToCSharp() : result))).GetType();
                                     break;
@@ -483,7 +483,7 @@ namespace Broccoli {
                                     if (!properties.ContainsKey(type))
                                         properties[type] = new Dictionary<string, PropertyInfo>();
                                     if (!properties[type].ContainsKey(name))
-                                        properties[type][name] = type.GetProperty(name);
+                                        properties[type][name] = type.GetProperty(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
                                     var property = properties[type][name];
                                     type = (result = CreateValue(property.GetValue(result is BCSharpValue ? result.ToCSharp() : result))).GetType();
                                     break;
@@ -728,16 +728,16 @@ namespace Broccoli {
                             if (!(v.Values[2] is BAtom memberName))
                                 throw new ArgumentTypeException(v.Values[2], "atom", 3, "-> inside :=");
 
-                            var members = target.GetType().GetMember(memberName.Value);
+                            var members = target.GetType().GetMember(memberName.Value, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
                             if (members.Length == 0)
                                 throw new Exception($"Unable to find member '{memberName.Value}'");
 
                             switch (members[0]) {
                                 case FieldInfo f:
-                                    f.SetValue(target, result);
+                                    f.SetValue(target, result is BCSharpValue ? result.ToCSharp() : result);
                                     break;
                                 case PropertyInfo p:
-                                    p.SetValue(target, result);
+                                    p.SetValue(target, result is BCSharpValue ? result.ToCSharp() : result);
                                     break;
                                 default:
                                     throw new Exception("Values can only be assigned to fields or properties");
@@ -1372,6 +1372,7 @@ namespace Broccoli {
 
                 // Custom constructor implementation (after initial values)
                 if (isCustomCtor) {
+                    CauliflowerInline.AddThisToScope(ctorIL, interpreterField, isScalar, isList, isDictionary);
                     CauliflowerInline.AddParametersToScope(ctorIL, interpreterField, ctorParamDecl);
                     CauliflowerInline.CreateNewScope(ctorIL, interpreterField);
                     CauliflowerInline.LoadInterpreterInvocation(ctorIL, interpreterField, ctorParamTuple.Item3.Values.Skip(2));
@@ -2388,7 +2389,7 @@ namespace Broccoli {
                             methILGen.Emit(OpCodes.Ldfld, typeof(Scope).GetField("Scalars"));
                             methILGen.Emit(OpCodes.Ldstr, s.Value);
                             methILGen.Emit(OpCodes.Ldarg_S, index);
-                            methILGen.Emit(OpCodes.Callvirt, typeof(Dictionary<string, IValue>).GetMethod("set_Item"));
+                            methILGen.Emit(OpCodes.Callvirt, typeof(Dictionary<string, IScalar>).GetMethod("set_Item"));
                             break;
                         case ListVar l:
                             methILGen.Emit(OpCodes.Ldfld, typeof(Scope).GetField("Lists"));
@@ -2416,7 +2417,7 @@ namespace Broccoli {
                             methILGen.Emit(OpCodes.Ldfld, typeof(Scope).GetField("Lists"));
                             methILGen.Emit(OpCodes.Ldstr, rest.Value);
                             methILGen.Emit(OpCodes.Ldarg_S, index);
-                            methILGen.Emit(OpCodes.Callvirt, typeof(Dictionary<string, BList>).GetMethod("set_Item"));
+                            methILGen.Emit(OpCodes.Callvirt, typeof(Dictionary<string, IList>).GetMethod("set_Item"));
                             break;
                         default:
                             throw new ArgumentTypeException(param, "variable name", index + 1, "fn parameters");
