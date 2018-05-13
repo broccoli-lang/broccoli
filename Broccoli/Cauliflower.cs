@@ -46,6 +46,8 @@ namespace Broccoli {
                     return Scope[l] ?? throw new Exception($"List {l.Value} not found");
                 case DictVar d:
                     return Scope[d] ?? throw new Exception($"Dictionary {d.Value} not found");
+                case TypeName t:
+                    return Scope[t] ?? throw new Exception($"Type {t.Value} not in scope (are you missing an (import)?)");
                 case ValueExpression e:
                     return Builtins[""].Invoke(this, e);
                 case IValue i:

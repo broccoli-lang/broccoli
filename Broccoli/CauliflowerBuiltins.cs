@@ -8,7 +8,7 @@ using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Text;
 
-// TODO: clisp's boole, and various other 
+// TODO: clisp's boole, and various other
 
 namespace Broccoli {
     /// <summary>
@@ -79,7 +79,7 @@ namespace Broccoli {
         /// <summary>
         /// All valid class item modifiers.
         /// </summary>
-        private static string[] modifiers = accessControlModifiers.Concat(new [] { "readonly", "static" }).ToArray();
+        private static string[] modifiers = accessControlModifiers.Concat(new [] { "readonly", "static", "operator" }).ToArray();
 
         public static Function Noop = new Function("", ~0, (interpreter, args) => {
             return null;
@@ -127,7 +127,7 @@ namespace Broccoli {
 
             public override string ToString() => Value.ToString();
 
-            public string Inspect() => $"C#Value<{Value.GetType().FullName}>({Value.ToString()})";
+            public string Inspect() => $"C#Value<{Value.GetType().FullName}>({Value})";
 
             public object ToCSharp() => Value;
 
@@ -143,7 +143,7 @@ namespace Broccoli {
         /// <summary>
         /// IScalar wrapper for C# types.
         /// </summary>
-        private class BCSharpType : IScalar {
+       public class BCSharpType : IScalar {
             public Type Value { get; }
 
             public BCSharpType(Type value) => Value = value;
@@ -170,7 +170,7 @@ namespace Broccoli {
         /// <summary>
         /// IScalar wrapper for Cauliflower native module types.
         /// </summary>
-        private class BCauliflowerType : BCSharpType {
+        public class BCauliflowerType : BCSharpType {
             public BCauliflowerType(Type value) : base(value) { }
 
             public static implicit operator BCauliflowerType(Type type) => new BCauliflowerType(type);
@@ -220,9 +220,9 @@ namespace Broccoli {
         /// <param name="interpreter">Interpreter to add types to.</param>
         /// <param name="type">Type to add.</param>
         private static void CSharpAddType(Interpreter interpreter, BCSharpType type) {
-            interpreter.Scope.Scalars[type.Value.Name] = type;
-            foreach (var method in new HashSet<string>(type.Value.GetMethods(BindingFlags.Public | BindingFlags.Static).Select(method => method.Name)))
-                interpreter.Scope.Scalars[type.Value.Name + '.' + method] = new BCSharpMethod(type, method);
+            interpreter.Scope.Types[type.Value.Name] = type;
+//            foreach (var method in new HashSet<string>(type.Value.GetMethods(BindingFlags.Public | BindingFlags.Static).Select(method => method.Name)))
+//                interpreter.Scope.Scalars[type.Value.Name + '.' + method] = new BCSharpMethod(type, method);
         }
 
         /// <summary>
@@ -237,22 +237,26 @@ namespace Broccoli {
                 assemblyLookup = new Dictionary<string, Assembly>(assemblies.ToDictionary(a => new AssemblyName(a.FullName).Name, a => a));
             }
             var path = name.Value;
-            if (assemblyLookup.ContainsKey(path)) {
-                foreach (var subType in assemblyLookup[path].GetExportedTypes())
-                    CSharpAddType(interpreter, subType);
-                return;
-            }
+
+
             Type type;
             if ((type = Type.GetType($"{path}")) != null) {
                 CSharpAddType(interpreter, type);
                 return;
             }
+
+            var directSubtypes = assemblyLookup.Values.SelectMany(v => v.ExportedTypes).Where(a => a.Namespace == path);
+            foreach (var subtype in directSubtypes)
+                CSharpAddType(interpreter, subtype);
+
             foreach (var assembly in assemblies)
                 if ((type = Type.GetType($"{path}, {assembly.FullName}")) != null) {
                     CSharpAddType(interpreter, type);
                     return;
                 }
-            throw new Exception($"C# type {path} not found");
+
+            if (!directSubtypes.Any())
+                throw new Exception($"C# type {path} not found");
         }
 
         /// <summary>
@@ -273,11 +277,14 @@ namespace Broccoli {
         /// <param name="type">Type of value to create.</param>
         /// <param name="parameters">Parameters to feed to the constructor.</param>
         /// <returns>The created value.</returns>
-        private static IValue CauliflowerCreate(BCauliflowerType type, IEnumerable<IValue> parameters) => (IValue) (
-            type.Value.GetConstructor(parameters.Select(p => p.Type()).ToArray())
-                .Invoke(parameters.ToArray())
-            ?? throw new Exception($"Cauliflower type '{type.Value.FullName}' has no constructor accepting arguments {string.Join(", ", parameters.Select(p => p.Type().Name.Substring(1)))}")
-        );
+        private static IValue CauliflowerCreate(BCauliflowerType type, IEnumerable<IValue> parameters) {
+            return (IValue) (
+                type.Value.GetConstructor(parameters.Select(p => p.GetType()).ToArray())
+                    ?.Invoke(parameters.ToArray())
+                ?? throw new Exception(
+                    $"Cauliflower type '{type.Value.FullName}' has no constructor accepting arguments {string.Join(", ", parameters.Select(p => p.Type().Name))}")
+            );
+        }
 
         /// <summary>
         /// Call a C# method.
@@ -361,7 +368,7 @@ namespace Broccoli {
                     var property = nested.GetProperty("interpreter", BindingFlags.Static);
                     if (property?.PropertyType == typeof(Interpreter))
                         property.SetValue(null, cauliflower);
-                    space.Value.Scalars[nested.Name.Replace('_', '-')] = (BCauliflowerType)nested;
+                    space.Value.Types[nested.Name.Replace('_', '-')] = (BCauliflowerType)nested;
                 }
             }
             foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.Static))
@@ -461,7 +468,7 @@ namespace Broccoli {
                                         methods[type][name] = type.GetMethod(name);
                                     var method = methods[type][name];
                                     var obj = result;
-                                    result = new Function(name, -1, (_, innerArgs) => (IValue) method.Invoke(obj, innerArgs));
+                                    result = new Function(name, -1, (_, innerArgs) => CreateValue(method.Invoke(obj, innerArgs)));
                                     type = null;
                                     break;
                                 case MemberTypes.Field:
@@ -596,9 +603,10 @@ namespace Broccoli {
 
             // Meta-commands
             {"new", new Function("new", -2, (cauliflower, args) => {
-                if (args[0] is BCauliflowerType type)
-                    return CauliflowerCreate(type, args.Skip(1));
-                if (args[0] is BCSharpType cstype)
+                var type = cauliflower.Run(args[0]);
+                if (type is BCauliflowerType ctype)
+                    return CauliflowerCreate(ctype, args.Skip(1));
+                if (type is BCSharpType cstype)
                     return CSharpCreate(cstype, args.Skip(1));
                 throw new ArgumentTypeException(args[0], "Cauliflower or C# type", 1, "new");
             })},
@@ -659,6 +667,7 @@ namespace Broccoli {
                     throw new Exception($"Function 'import' requires exactly 1 argument, 3 provided");
                 if (!(args[0] is BString s))
                     throw new ArgumentTypeException(args[0], "string", 1, "import");
+
                 var tempCauliflower = new CauliflowerInterpreter();
                 tempCauliflower.Run(File.ReadAllText(s.Value));
                 foreach (var (key, value) in tempCauliflower.Scope.Functions)
@@ -711,6 +720,29 @@ namespace Broccoli {
                                 throw new Exception("Only functions can be assigned to atom variables");
                             args[i + 1] = fn;
                             break;
+                        case ValueExpression v:
+                            if (!(v.Values[0] is BAtom arrow && arrow.Value == "->"))
+                                throw new Exception("Assignments to an expression must be assignments to fields or properties");
+
+                            var target = cauliflower.Run(v.Values[1]);
+                            if (!(v.Values[2] is BAtom memberName))
+                                throw new ArgumentTypeException(v.Values[2], "atom", 3, "-> inside :=");
+
+                            var members = target.GetType().GetMember(memberName.Value);
+                            if (members.Length == 0)
+                                throw new Exception($"Unable to find member '{memberName.Value}'");
+
+                            switch (members[0]) {
+                                case FieldInfo f:
+                                    f.SetValue(target, result);
+                                    break;
+                                case PropertyInfo p:
+                                    p.SetValue(target, result);
+                                    break;
+                                default:
+                                    throw new Exception("Values can only be assigned to fields or properties");
+                            }
+                            break;
                         default:
                             throw new Exception("Values can only be assigned to scalar ($), list (@), dictionary (%) or atom variables");
                     }
@@ -751,10 +783,38 @@ namespace Broccoli {
                 return null;
             })},
             {"class", new ShortCircuitFunction("class", ~0, (cauliflower, args) => {
-                if (!(args[0] is BAtom name))
-                    throw new ArgumentTypeException(args[0], "atom", 1, "class");
+                if (!(args[0] is TypeName name))
+                    throw new ArgumentTypeException(args[0], "type name", 1, "class");
 
                 bool hasCustomScalarContext = false, hasCustomListContext = false, hasCustomDictionaryContext = false, isScalar = true, isList = false, isDictionary = false;
+
+                var supertypes = new List<Type>();
+
+                if (!(args[1] is ValueExpression _)) {
+                    if (!(args[1] is BAtom isAtom && isAtom.Value == "is"))
+                        throw new ArgumentTypeException(args[1], "statement or `is`", 2, "class");
+                    if (!(args[2] is ValueExpression superVexp))
+                        throw new ArgumentTypeException(args[2], "expression of supertypes", 3, "class");
+
+                    supertypes = superVexp.Values.Select(v => {
+                        if (!(v is TypeName t))
+                            throw new ArgumentTypeException(v, "supertype name", 4, "class");
+
+                        return (Type) cauliflower.Run((IValueExpressible) t);
+                    }).ToList();
+
+                    args = args.Skip(2).ToArray();
+                }
+
+                if (supertypes.Contains(typeof(IList))) {
+                    isList = true;
+                    isScalar = false;
+                } else if (supertypes.Contains(typeof(IDictionary))) {
+                    isDictionary = true;
+                    isScalar = false;
+                } else if (!supertypes.Contains(typeof(IScalar))) {
+                    supertypes.Add(typeof(IScalar));
+                }
 
                 // Generate initial class
                 var asmName = new AssemblyName("CauliflowerGenerated-" + name.Value);
@@ -764,7 +824,7 @@ namespace Broccoli {
                     name.Value,
                     TypeAttributes.Public | TypeAttributes.Class,
                     null,
-                    new [] { typeof(IScalar) }
+                    supertypes.ToArray()
                 );
 
                 // Validate + collate statements
@@ -833,12 +893,15 @@ namespace Broccoli {
                     }
                 }
 
-                MethodAttributes MethodAttrsFromAllMods(IEnumerable<string> modifiers, MethodAttributes defaultAttr = MethodAttributes.Public) {
-                    if (!modifiers.Any()) return defaultAttr;
+                MethodAttributes MethodAttrsFromAllMods(IEnumerable<string> modifiers, MethodAttributes defaultAttr = MethodAttributes.Public, bool isConstructor = false) {
+                    modifiers = modifiers.Where(m => m != "operator");
+                    if (!modifiers.Any()) return isConstructor ? defaultAttr : defaultAttr | MethodAttributes.Virtual;
                     var attrs = modifiers.Select(MethodAttrFromMod).Aggregate((a, m) => a | m);
-                    return modifiers.Any(accessControlModifiers.Contains)
+
+                    var attrsWithDefault = (modifiers.Any(accessControlModifiers.Contains)
                         ? attrs
-                        : defaultAttr | attrs;
+                        : defaultAttr | attrs);
+                    return isConstructor ? attrsWithDefault : attrsWithDefault | MethodAttributes.Virtual; // All methods are virtual in Cauliflower
                 }
 
                 FieldAttributes FieldAttrFromMod(string modifier) {
@@ -869,7 +932,7 @@ namespace Broccoli {
 
                 // Generate constructor
                 var ctor = typeBuilder.DefineConstructor(
-                    MethodAttrsFromAllMods(ctorParamTuple.Item2 ?? new List<string>()),
+                    MethodAttrsFromAllMods(ctorParamTuple.Item2 ?? new List<string>(), isConstructor: true),
                     CallingConventions.HasThis,
                     ctorParams
                 );
@@ -991,7 +1054,7 @@ namespace Broccoli {
                                             getterIL.Emit(isStatic ? OpCodes.Ldsfld : OpCodes.Ldfld, backingField);
                                         } else {
                                             CauliflowerInline.CreateNewScope(getterIL, interpreterField);
-                                            if (!isStatic) CauliflowerInline.AddThisToScope(getterIL, interpreterField);
+                                            if (!isStatic) CauliflowerInline.AddThisToScope(getterIL, interpreterField, isScalar, isList, isDictionary);
                                             CauliflowerInline.LoadInterpreterInvocation(getterIL, interpreterField, aArgs.Values);
                                             CauliflowerInline.ReturnToParentScope(getterIL, interpreterField);
                                         }
@@ -1016,7 +1079,7 @@ namespace Broccoli {
                                             setterIL.Emit(isStatic ? OpCodes.Stsfld : OpCodes.Stfld, backingField);
                                         } else {
                                             CauliflowerInline.CreateNewScope(setterIL, interpreterField);
-                                            if (!isStatic) CauliflowerInline.AddThisToScope(setterIL, interpreterField);
+                                            if (!isStatic) CauliflowerInline.AddThisToScope(setterIL, interpreterField, isScalar, isList, isDictionary);
                                             CauliflowerInline.LoadInterpreterInvocation(setterIL, interpreterField, aArgs.Values);
                                             setterIL.Emit(OpCodes.Pop);
                                             CauliflowerInline.ReturnToParentScope(setterIL, interpreterField);
@@ -1048,33 +1111,78 @@ namespace Broccoli {
                                 initCtorIL.Emit(isStatic ? OpCodes.Stsfld : OpCodes.Stfld, backingField);
                             }
                             break;
-                        case "op":
-                        case "operator":
                         case "fn":
                         case "fun":
                         case "func":
                         case "function":
-                            if (sName[0] == 'o' && sName[1] == 'p') {
-                                // TODO: operator things
-                            }
                             if (!(sArgs.Values.ElementAtOrDefault(0) is BAtom fnName))
                                 throw new ArgumentTypeException(sArgs.Values.ElementAtOrDefault(0), "atom", 1, "fn");
-
                             if (!(sArgs.Values.ElementAtOrDefault(1) is ValueExpression vexp2))
                                 throw new ArgumentTypeException(sArgs.Values.ElementAtOrDefault(1), "expression", 2, "fn");
 
-                            if (fnName.Value == "init") continue;
-                            var newMethod = typeBuilder.DefineMethod(
-                                fnName.Value,
-                                MethodAttrsFromAllMods(sModifiers),
-                                typeof(IValue),
-                                CauliflowerInline.GetParameterTypes(vexp2)
-                            );
+                            MethodBuilder newMethod;
+
+                            if (sModifiers.Contains("operator")) {
+                                switch (fnName.Value) {
+                                    case "scalar":
+                                        if (isScalar)
+                                            throw new Exception("A scalar cannot have a custom scalar context");
+                                        if (vexp2.Values.Length != 0)
+                                            throw new Exception("Custom scalar contexts cannot have arguments");
+                                        newMethod = typeBuilder.DefineMethod(
+                                            "ScalarContext",
+                                            MethodAttrsFromAllMods(sModifiers),
+                                            typeof(IScalar),
+                                            Type.EmptyTypes
+                                        );
+                                        typeBuilder.DefineMethodOverride(newMethod, typeof(IValue).GetMethod("ScalarContext"));
+                                        hasCustomScalarContext = true;
+                                        break;
+                                    case "list":
+                                        if (isList)
+                                            throw new Exception("A list cannot have a custom list context");
+                                        if (vexp2.Values.Length != 0)
+                                            throw new Exception("Custom list contexts cannot have arguments");
+                                        newMethod = typeBuilder.DefineMethod(
+                                            "ListContext",
+                                            MethodAttrsFromAllMods(sModifiers),
+                                            typeof(IList),
+                                            Type.EmptyTypes
+                                        );
+                                        typeBuilder.DefineMethodOverride(newMethod, typeof(IValue).GetMethod("ListContext"));
+                                        hasCustomListContext = true;
+                                        break;
+                                    case "dictionary":
+                                        if (isDictionary)
+                                            throw new Exception("A dictionary cannot have a custom dictionary context");
+                                        if (vexp2.Values.Length != 0)
+                                            throw new Exception("Custom dictionary contexts cannot have arguments");
+                                        newMethod = typeBuilder.DefineMethod(
+                                            "DictionaryContext",
+                                            MethodAttrsFromAllMods(sModifiers),
+                                            typeof(IDictionary),
+                                            Type.EmptyTypes
+                                        );
+                                        typeBuilder.DefineMethodOverride(newMethod, typeof(IValue).GetMethod("DictionaryContext"));
+                                        hasCustomDictionaryContext = true;
+                                        break;
+                                    default:
+                                        throw new Exception($"Operator '{fnName.Value}' not supported");
+                                }
+                            } else {
+                                if (fnName.Value == "init") continue;
+                                newMethod = typeBuilder.DefineMethod(
+                                    fnName.Value,
+                                    MethodAttrsFromAllMods(sModifiers),
+                                    typeof(IValue),
+                                    CauliflowerInline.GetParameterTypes(vexp2)
+                                );
+                            }
                             var methodIL = newMethod.GetILGenerator();
 
                             // Add new function scope + populate
                             CauliflowerInline.CreateNewScope(methodIL, interpreterField);
-                            if (!isStatic) CauliflowerInline.AddThisToScope(methodIL, interpreterField);
+                            if (!isStatic) CauliflowerInline.AddThisToScope(methodIL, interpreterField, isScalar, isList, isDictionary);
                             CauliflowerInline.AddParametersToScope(methodIL, interpreterField, vexp2, isStatic);
 
                             // Invoke interpreter, back out of scope, return
@@ -1278,7 +1386,7 @@ namespace Broccoli {
                 classType.GetMethod("(init)", BindingFlags.NonPublic | BindingFlags.Static)
                     .Invoke(null, new [] {cauliflower});
 
-                cauliflower.Scope.Scalars[((BAtom) args[0]).Value] = new BCauliflowerType(classType);
+                cauliflower.Scope.Types[name.Value] = (BCauliflowerType) classType;
 
                 return null;
             })},
@@ -1421,7 +1529,7 @@ namespace Broccoli {
                 if (!(args[1] is BInteger j))
                     throw new ArgumentTypeException(args[1], "integer", 2, "logtest");
 
-                return Boolean((j >> i) % 2 == 1);
+                return Boolean((j.Value >> (int) i.Value) % 2 == 1);
             })},
             {"integer-length", new Function("integer-length", 1, (broccoli, args) => {
                 if (!(args[0] is BInteger i))
@@ -1467,9 +1575,9 @@ namespace Broccoli {
             })},
             {"zerop", new Function("zerop", 1, (broccoli, args) => {
                 if (args[0] is BInteger i)
-                    return Boolean(((BInteger) args[0]).Value == 0);
+                    return Boolean(i.Value == 0);
                 if (args[0] is BFloat f)
-                    return Boolean(((BFloat) args[0]).Value == 0);
+                    return Boolean(f.Value == 0);
                 throw new ArgumentTypeException(args[0], "number", 1, "zerop");
             })},
 
@@ -2106,7 +2214,7 @@ namespace Broccoli {
                             var property = nested.GetProperty("interpreter", BindingFlags.Static);
                             if (property?.PropertyType == typeof(Interpreter))
                                 property.SetValue(null, cauliflower);
-                            cauliflower.Scope.Namespaces.Value.Scalars[nested.Name.Replace('_', '-')] = (BCauliflowerType) nested;
+                            cauliflower.Scope.Namespaces.Value.Types[nested.Name.Replace('_', '-')] = (BCauliflowerType) nested;
                         }
                     }
                 }
@@ -2224,12 +2332,28 @@ namespace Broccoli {
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static void AddThisToScope(ILGenerator gen, FieldInfo interpreterField) {
+            public static void AddThisToScope(ILGenerator gen, FieldInfo interpreterField, bool isScalar = true, bool isList = false, bool isDictionary = false) {
+                FieldInfo scopeField;
+                MethodInfo dictSetter;
+
+                if (isScalar) {
+                    scopeField = typeof(Scope).GetField("Scalars");
+                    dictSetter = typeof(Dictionary<string, IScalar>).GetMethod("set_Item");
+                } else if (isList) {
+                    scopeField = typeof(Scope).GetField("Lists");
+                    dictSetter = typeof(Dictionary<string, IList>).GetMethod("set_Item");
+                } else if (isDictionary) {
+                    scopeField = typeof(Scope).GetField("Dictionaries");
+                    dictSetter = typeof(Dictionary<string, IDictionary>).GetMethod("set_Item");
+                } else {
+                    throw new NotImplementedException();
+                }
+
                 LoadScopeReference(gen, interpreterField);
-                gen.Emit(OpCodes.Ldfld, typeof(Scope).GetField("Scalars"));
+                gen.Emit(OpCodes.Ldfld, scopeField);
                 gen.Emit(OpCodes.Ldstr, "this");
                 gen.Emit(OpCodes.Ldarg_0);
-                gen.Emit(OpCodes.Callvirt, typeof(Dictionary<string, IValue>).GetMethod("set_Item"));
+                gen.Emit(OpCodes.Callvirt, dictSetter);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]

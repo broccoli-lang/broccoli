@@ -4,7 +4,7 @@ namespace Broccoli {
     /// </summary>
     public enum TokenType {
         // Literals
-        List, 
+        List,
         String,
         Integer,
         Float,
@@ -14,6 +14,7 @@ namespace Broccoli {
         ScalarName,
         ListName,
         DictionaryName,
+        TypeName,
         Cast,
 
         // Miscellaneous

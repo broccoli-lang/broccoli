@@ -458,16 +458,15 @@ namespace BroccoliTest {
         [TestMethod]
         public void TestOOP() {
             Assert.AreEqual(_run("(namespace foo (namespace bar (fn baz ($a $b) (+ $a $b)))) (. foo bar baz)").Inspect(), "baz($a $b)", "Nested namespaces do not work");
-            Assert.AreEqual(_run("(class foo (fn bar ($i) (+ $i 1))) ((-> (new $foo) bar) 100)"), (BInteger) 101, "Classes do not work");
+            Assert.AreEqual(_run("(class foo (fn bar ($i) (+ $i 1))) ((-> (new !foo) bar) 100)"), (BInteger) 101, "Classes do not work");
         }
-        
+
         [TestMethod]
         public void TestInterop() {
-            Assert.AreEqual(ReadOutput(_run("(import System.Console) ($Console.Write \"foo {0} {1}\" t '(1 2))")), "foo True (1 2)", "Calling static methods directly does not work");
-            Assert.AreEqual(ReadOutput(_run("(import System.Console) ((-> $Console Write) \"foo {0} {1}\" t '(1 2))")), "foo True (1 2)", "Calling static methods via type and name with c#-static does not work");
-            Assert.AreEqual(_run("(import System.Text.RegularExpressions) ((-> (new $Regex \"asdf+\") IsMatch) \"asdfghjkl\")"), BAtom.True, "Calling instance methods does not work");
-            Assert.AreEqual(_run("(import System.Text.RegularExpressions) ((-> (new $Regex \"asdf+\") IsMatch) \"asfdghjkl\")"), BAtom.Nil, "Calling instance methods does not work");
-            Assert.AreEqual(_run("(import System.Linq) @($Enumerable.Range (c#-int 0) (c#-int 100))"), _run("(range 0 100)"), "Enumerable.Range does not match builtin range");
+            Assert.AreEqual(ReadOutput(_run("(import System.Console) ((-> !Console Write) \"foo {0} {1}\" t '(1 2))")), "foo True (1 2)", "Calling static methods via type and name with c#-static does not work");
+            Assert.AreEqual(_run("(import System.Text.RegularExpressions) ((-> (new !Regex \"asdf+\") IsMatch) \"asdfghjkl\")"), BAtom.True, "Calling instance methods does not work");
+            Assert.AreEqual(_run("(import System.Text.RegularExpressions) ((-> (new !Regex \"asdf+\") IsMatch) \"asfdghjkl\")"), BAtom.Nil, "Calling instance methods does not work");
+            Assert.AreEqual(_run("(import System.Linq) @((-> !Enumerable Range) (c#-int 0) (c#-int 100))"), _run("(range 0 100)"), "Enumerable.Range does not match builtin range");
         }
 
         [TestCleanup]

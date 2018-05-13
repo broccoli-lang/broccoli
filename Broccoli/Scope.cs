@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using BCSharpType = Broccoli.CauliflowerInterpreter.BCSharpType;
 
 namespace Broccoli {
     /// <summary>
@@ -22,6 +24,7 @@ namespace Broccoli {
         public readonly Dictionary<string, IDictionary> Dictionaries = new Dictionary<string, IDictionary>();
         public readonly Dictionary<string, IFunction> Functions = new Dictionary<string, IFunction>();
         public readonly Tree<string, Scope> Namespaces = new Tree<string, Scope>();
+        public readonly Dictionary<string, BCSharpType> Types = new Dictionary<string, BCSharpType>();
         public readonly Scope Parent;
 
         public Scope() { }
@@ -112,6 +115,16 @@ namespace Broccoli {
                 } while (current != null);
                 Functions[f] = value;
             }
+        }
+
+        /// <summary>
+        /// Gets the type corresponding to the given type name.
+        /// </summary>
+        /// <param name="t">The type name to retrieve.</param>
+        public BCSharpType this[TypeName t] {
+            get => Types.ContainsKey(t) ? Types[t] : Parent?[t];
+
+            set => Types[t] = value;
         }
     }
 }

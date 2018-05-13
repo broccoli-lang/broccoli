@@ -17,6 +17,7 @@ namespace Broccoli {
         private static Regex _rScalar = new Regex(@"\G\$[^\s()$@%'`""]+", RegexOptions.Compiled);
         private static Regex _rList = new Regex(@"\G@[^\s()$@%'`""]+", RegexOptions.Compiled);
         private static Regex _rDict = new Regex(@"\G%[^\s()$@%'`""]+", RegexOptions.Compiled);
+        private static Regex _rType = new Regex(@"\G![^\s()$@%'`""]+", RegexOptions.Compiled);
         private static Regex _rName = new Regex(@"\G[^\s()$@%'`""]+", RegexOptions.Compiled);
 
         /// <summary>
@@ -148,7 +149,7 @@ namespace Broccoli {
                                 } else {
                                     value = match.Substring(1);
                                     if (_rNumber.Match(value).Success) {
-                                        current.Children.Add(new ParseNode(new Token(TokenType.Cast, "@")));
+                                        current.Children.Add(new ParseNode(new Token(TokenType.Cast, "$")));
                                         type = value.Contains('.') ? TokenType.Float : TokenType.Integer;
                                     } else
                                         type = TokenType.ScalarName;
@@ -185,6 +186,20 @@ namespace Broccoli {
                                     } else
                                         type = TokenType.DictionaryName;
                                 }
+                                break;
+                            case '!':
+                                match = _rType.Match(line, column).ToString();
+                                if (match.Contains("|#"))
+                                    throw new Exception("Unexpected '!#' outside of comment");
+                                if (match == "")
+                                    throw new Exception("Cannot cast to type name");
+
+                                value = match.Substring(1);
+                                if (_rNumber.Match(value).Success)
+                                    throw new Exception("Cannot cast to type name");
+
+                                type = TokenType.TypeName;
+
                                 break;
                             // Lists
                             case '\'':

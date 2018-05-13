@@ -319,6 +319,33 @@ namespace Broccoli {
     }
 
     /// <summary>
+    /// Represents a type name.
+    /// </summary>
+    public class TypeName : IValue {
+        public string Value { get; }
+
+        public TypeName(string t) => Value = t;
+
+        public static implicit operator TypeName(string t) => new TypeName(t);
+
+        public static implicit operator string(TypeName t) => t.Value;
+
+        public override string ToString() => Value;
+
+        public string Inspect() => '!' + Value;
+
+        public object ToCSharp() => Value;
+
+        public Type Type() => typeof(string);
+
+        public IScalar ScalarContext() => throw new NoScalarContextException(this);
+
+        public IList ListContext() => throw new NoListContextException(this);
+
+        public IDictionary DictionaryContext() => throw new NoDictionaryContextException(this);
+    }
+
+    /// <summary>
     /// Represents a list of values.
     /// </summary>
     public class BList : List<IValue>, IList {

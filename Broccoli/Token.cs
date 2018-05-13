@@ -25,7 +25,7 @@ namespace Broccoli {
                 // Int32#Parse and Float#Parse are locale dependent!
                 // E.g. in Russia it might switch the meaning of `.` and `,`.
                 case TokenType.Integer:
-                    return new BInteger(int.Parse(Literal, CultureInfo.InvariantCulture)); 
+                    return new BInteger(int.Parse(Literal, CultureInfo.InvariantCulture));
                 case TokenType.Float:
                     return new BFloat(double.Parse(Literal, CultureInfo.InvariantCulture));
                 case TokenType.Atom:
@@ -36,6 +36,8 @@ namespace Broccoli {
                     return new ListVar(Literal);
                 case TokenType.DictionaryName:
                     return new DictVar(Literal);
+                case TokenType.TypeName:
+                    return new TypeName(Literal);
                 default:
                     throw new Exception($"{Type} cannot be converted to a value");
             }
