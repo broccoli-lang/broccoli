@@ -2,13 +2,15 @@
 using System.IO;
 using System.Collections.Generic;
 using Broccoli;
+// ReSharper disable InconsistentNaming
 
 #pragma warning disable IDE1006
 
+// ReSharper disable once CheckNamespace
 namespace cauliflower.core {
     public static class fs {
         private static Dictionary<string, IValue[]> args = new Dictionary<string, IValue[]> {
-            {"path", new[] { (ScalarVar) "path" } }
+            {"path", new IValue[] { (ScalarVar) "path" } }
         };
 
         public static IValue exists(IValue path) {

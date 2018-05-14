@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Linq;
 
 namespace Broccoli {
     public class ArgumentTypeException : Exception {
@@ -17,9 +16,6 @@ namespace Broccoli {
         public ArgumentTypeException(object o, string expectedType, int n, string caller) : base(
             $"Recieved {TypeName(o.GetType())} instead of {expectedType} in argument {n} for '{caller}'"
         ) {
-            var t = o.GetType();
-            var u = t.GetInterfaces();
-            var v = t.GetInterface("IEnumerabke");
             Object = o;
             ExpectedType = expectedType;
             Argument = n;

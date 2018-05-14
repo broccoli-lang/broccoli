@@ -1,6 +1,4 @@
-﻿using System.Collections.Generic;
-
-namespace Broccoli {
+﻿namespace Broccoli {
     /// <summary>
     /// Represents a nested scope with various scoped variables.
     /// </summary>

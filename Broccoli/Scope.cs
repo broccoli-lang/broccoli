@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using BCSharpType = Broccoli.CauliflowerInterpreter.BCSharpType;
 
 namespace Broccoli {
@@ -7,10 +6,10 @@ namespace Broccoli {
     /// Represents a nested scope with various scoped variables.
     /// </summary>
     public class Scope {
-        public class Tree<K, V> : Dictionary<K, Tree<K, V>> {
-            public V Value;
+        public class Tree<TKey, TValue> : Dictionary<TKey, Tree<TKey, TValue>> {
+            public TValue Value;
 
-            public void Add(Tree<K, V> other) {
+            public void Add(Tree<TKey, TValue> other) {
                 foreach (var (key, value) in other)
                     if (ContainsKey(key))
                         this[key].Add(value);

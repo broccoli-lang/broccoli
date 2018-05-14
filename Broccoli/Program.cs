@@ -1,10 +1,7 @@
 ﻿using System;
-using System.CodeDom;
-using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using NDesk.Options;
 using static System.Console;
 
@@ -16,13 +13,13 @@ namespace Broccoli {
 
         public static void Main(string[] args) {
             string file;
-            bool getHelp = false, useREPL = args.Length == 0, isCauliflower = false;
+            bool getHelp = false, useRepl = args.Length == 0, isCauliflower = false;
 
             var options = new OptionSet {
                 {
                     "h|help", "Show help", n => getHelp = n != null
                 }, {
-                    "r|repl", "Use REPL", n => useREPL = n != null
+                    "r|repl", "Use REPL", n => useRepl = n != null
                 }, {
                     "c|cauliflower", "Use Cauliflower", n => isCauliflower = n != null
                 }
@@ -35,10 +32,9 @@ namespace Broccoli {
             var continuationPrompt = new string(' ', prompt.Length - 2) + "> ";
             file = argv.FirstOrDefault();
             if (file is null)
-                useREPL = true;
-            argv = argv.Skip(1);
+                useRepl = true;
 
-            if (useREPL)
+            if (useRepl)
                 while (true) {
                     if (CursorLeft != 0)
                         WriteLine();
@@ -53,7 +49,7 @@ namespace Broccoli {
                         return line;
                     }
 
-                    ParseNode parsed = null;
+                    ParseNode parsed;
                     try {
                         parsed = interpreter.Parse(ReadOrDie() + '\n');
                     } catch (Exception e) {

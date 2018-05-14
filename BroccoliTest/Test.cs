@@ -34,6 +34,7 @@ namespace BroccoliTest {
             Console.SetIn(_input);
         }
 
+        // ReSharper disable once UnusedParameter.Local
         private string ReadOutput(params object[] ignored) {
             var result = _output.ToString();
             _output.Clear();
@@ -136,7 +137,7 @@ namespace BroccoliTest {
             Assert.AreEqual(_run("(/ 2.2 2.2 2.2)"), new BFloat(1 / 2.2), "/ does not work correctly with multiple arguments");
             Assert.AreEqual(_run("(/ 3)"), new BInteger(3), "/ does not work correctly with one argument");
         }
-        
+
         [TestMethod]
         public void TestAssign() {
             Assert.AreEqual(_run("(:= $e 2) $e"), new BInteger(2), ":= does not work correctly for scalars");

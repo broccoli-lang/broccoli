@@ -37,7 +37,7 @@ namespace Broccoli {
         }
 
         public override string ToString() {
-            return Token != null ? Token.Literal : '(' + string.Join<ParseNode>(' ', Children) + ')';
+            return Token != null ? Token.Literal : '(' + string.Join(' ', Children) + ')';
         }
 
         public void Finish() {

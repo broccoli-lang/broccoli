@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace Broccoli {
-    public partial class CauliflowerInterpreter : Interpreter {
+    public partial class CauliflowerInterpreter {
         private static Regex _rNewline = new Regex(@"(?<=[\r\n][\s\r\n]*[\r\n]|[\r\n])", RegexOptions.Compiled);
         private static Regex _rComment = new Regex(@"\G;[\s\S]*$", RegexOptions.Compiled);
         private static Regex _rBlockCommentStart = new Regex(@"\G#\|\s?", RegexOptions.Compiled);
@@ -20,13 +20,7 @@ namespace Broccoli {
         private static Regex _rType = new Regex(@"\G![^\s()$@%'`""]+", RegexOptions.Compiled);
         private static Regex _rName = new Regex(@"\G[^\s()$@%'`""]+", RegexOptions.Compiled);
 
-        /// <summary>
-        /// Takes a string and traverses it to create a ParseNode with associated values.
-        /// </summary>
-        /// <param name="s">The string to parse.</param>
-        /// <param name="p">A partially-parsed node coming from multiline inputs in the REPL.</param>
-        /// <returns>Returns the root ParseNode that represents the string.</returns>
-        /// <exception cref="Exception">Thrown when the parser fails to parse an token.</exception>
+        /// <inheritdoc />
         public override ParseNode Parse(string s, ParseNode p = null, bool keepComments = false) {
             var source = _rNewline.Split(s).ToList();
             var result = new ParseNode();
@@ -57,9 +51,9 @@ namespace Broccoli {
                 while (column < line.Length) {
                     var c = line[column];
                     var type = TokenType.None;
-                    Match rawMatch = null;
+                    Match rawMatch;
                     string value = null;
-                    string match = null;
+                    string match;
                     if (current.UnfinishedString != null) {
                         rawMatch = _rStringEnd.Match(line);
                         if (!rawMatch.Success) {
@@ -290,12 +284,10 @@ namespace Broccoli {
                             current.Children.Add(next);
                             current = next;
                             stack.Add(current);
-                            continue;
                         } else {
                             current.UnfinishedComment = "";
                             depth--;
                             current.Finish();
-                            var finished = current;
                             stack.RemoveAt(stack.Count - 1);
                             current = stack.Last();
                         }

@@ -41,6 +41,7 @@ namespace BroccoliTest {
             Console.SetIn(_input);
         }
 
+        // ReSharper disable once UnusedParameter.Local
         private string ReadOutput(params object[] ignored) {
             var result = _output.ToString();
             _output.Clear();
@@ -417,13 +418,13 @@ namespace BroccoliTest {
 
         [TestMethod]
         public void TestDicts() {
-            Assert.AreEqual(_run("(mkdict)"), new BDictionary{}, "mkdict fails");
+            Assert.AreEqual(_run("(mkdict)"), new BDictionary(), "mkdict fails");
             Assert.AreEqual(_run("(setkey (mkdict) 1 2)"), new BDictionary{{(BInteger)1, (BInteger)2}},
              "setkey fails to add key");
             _run("(:= %dict (setkey (mkdict) 1 2))");
             Assert.AreEqual(_run("(setkey %dict 1 3)"), new BDictionary{{(BInteger)1, (BInteger)3}},
              "setkey fails to change key");
-            Assert.AreEqual(_run("(rmkey %dict 1)"), new BDictionary{}, "rmkey fails");
+            Assert.AreEqual(_run("(rmkey %dict 1)"), new BDictionary(), "rmkey fails");
             Assert.AreEqual(_run("(haskey %dict 1)"), BAtom.True, "haskey fails");
             Assert.AreNotEqual(_run("(haskey %dict 42)"), BAtom.True, "haskey fails");
             Assert.AreEqual(_run("(getkey %dict 1)"), (BInteger)2);

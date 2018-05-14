@@ -26,7 +26,7 @@ namespace Broccoli {
                 if (e.Values.Length == 0)
                     throw new Exception("Expected function name");
                 var first = e.Values.First();
-                IFunction fn = null;
+                IFunction fn;
                 if (!(first is BAtom a))
                     throw new Exception($"Function name {first} must be an identifier");
 
@@ -71,7 +71,7 @@ namespace Broccoli {
                 });
                 return null;
             })},
-            
+
             // Meta-commands
             // Note: Many of these technically short-circuit because they have no args
             {"quit", new ShortCircuitFunction("quit", 0, (broccoli, args) => {
@@ -104,7 +104,7 @@ namespace Broccoli {
                 return broccoli.Run(s.Value);
             })},
             {"call", new ShortCircuitFunction("call", ~1, (broccoli, args) => {
-                IFunction fn = null;
+                IFunction fn;
                 var value = broccoli.Run(args[0]);
                 if (!(broccoli.Run(value) is BAtom a))
                     throw new ArgumentTypeException(args[0], "atom", 1, "call");

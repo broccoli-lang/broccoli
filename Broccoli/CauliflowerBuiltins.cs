@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Text;
+// ReSharper disable InconsistentNaming
 
 // TODO: clisp's boole, and various other
 
@@ -38,22 +39,22 @@ namespace Broccoli {
         /// <summary>
         /// Array of all assembles used by this project.
         /// </summary>
-        private static Assembly[] assemblies = null;
+        private static Assembly[] assemblies;
 
         /// <summary>
         /// Dictionary of assembly full name to Assembly object.
         /// </summary>
-        private static Dictionary<string, Assembly> assemblyLookup = null;
+        private static Dictionary<string, Assembly> assemblyLookup;
 
         /// <summary>
         /// Base path of Cauliflower module storage.
         /// </summary>
-        private static string basePath = null;
+        private static string basePath;
 
         /// <summary>
         /// Path separator of OS.
         /// </summary>
-        private static string pathSeparator = null;
+        private static string pathSeparator;
 
         /// <summary>
         /// Cache of methods grouped by type.
@@ -355,12 +356,13 @@ namespace Broccoli {
         /// <summary>
         /// Add Cauliflower native types to interpreter.
         /// </summary>
+        /// <param name="cauliflower">The Cauliflower interpreter to use.</param>
         /// <param name="type">Type containing wanted types.</param>
         /// <param name="space">Namespace to set value on.</param>
         private static void AddTypes(Interpreter cauliflower, Type type, Scope.Tree<string, Scope> space) {
             var name = type.Name.Replace('_', '-');
             if (!(space.ContainsKey(name))) {
-                space[name] = new CauliflowerScope.Tree<string, Scope> { Value = new CauliflowerScope() };
+                space[name] = new Scope.Tree<string, Scope> { Value = new CauliflowerScope() };
             }
             foreach (var nested in type.GetNestedTypes(BindingFlags.Public).Where(t => !t.Name.Contains("<"))) {
                 AddTypes(cauliflower, nested, space[name]);
@@ -400,7 +402,7 @@ namespace Broccoli {
                     } catch {
                         throw new Exception($"Cauliflower method '{cauliflowerMethod.Value.name}' not found for specified arguments. Are you missing an 'import'?");
                     }
-                IFunction fn = null;
+                IFunction fn;
                 if (first is BAtom fnAtom) {
                     var fnName = fnAtom.Value;
                     fn = cauliflower.Scope[fnName] ?? cauliflower.Builtins.GetValueOrDefault(fnName, null);
@@ -537,10 +539,10 @@ namespace Broccoli {
                 IValue varargs = null;
                 if (argNames.Count != 0) {
                     switch (argNames.Last()) {
-                        case ListVar l:
-                        case ScalarVar s:
-                        case DictVar d:
-                        case BAtom b:
+                        case ListVar _:
+                        case ScalarVar _:
+                        case DictVar _:
+                        case BAtom _:
                             break;
                         case ValueExpression expr when expr.Values.Length == 1 && expr.Values[0] is ListVar l:
                             length = -length;
@@ -655,11 +657,11 @@ namespace Broccoli {
             })},
             {"import", new Function("import", ~1, (cauliflower, args) => {
                 if (args[0] is BAtom a) {
-                    if (args.Length == 1)
-                        try {
-                            CSharpImport(cauliflower, a);
-                            return null;
-                        } finally { }
+                    if (args.Length == 1) {
+                        CSharpImport(cauliflower, a);
+                        return null;
+                    }
+
                     CauliflowerInline.Import(cauliflower, args);
                     return null;
                 }
@@ -686,14 +688,14 @@ namespace Broccoli {
                 for (var i = 0; i < args.Length; i += 2) {
                     result = i + 1 < args.Length ? cauliflower.Run(args[i + 1]) : null;
                     switch (args[i]) {
-                        case ScalarVar s:
+                        case ScalarVar _:
                             if (result == null)
                                 throw new Exception("Scalar has no default value to be assigned");
                             if (!(result is IScalar scalar))
                                 throw new Exception("Only scalars can be assigned to scalar ($) variables");
                             args[i + 1] = scalar;
                             break;
-                        case ListVar l:
+                        case ListVar _:
                             if (result == null) {
                                 args = args.Concat(new[] { result = new BList()}).ToArray();
                                 break;
@@ -702,7 +704,7 @@ namespace Broccoli {
                                 throw new Exception("Only lists can be assigned to list (@) variables");
                             args[i + 1] = list;
                             break;
-                        case DictVar d:
+                        case DictVar _:
                             if (result == null) {
                                 args = args.Concat(new[] { result = new BDictionary()}).ToArray();
                                 break;
@@ -711,7 +713,7 @@ namespace Broccoli {
                                 throw new Exception("Only dicts can be assigned to dict (%) variables");
                             args[i + 1] = dict;
                             break;
-                        case BAtom a:
+                        case BAtom _:
                             if (result == null) {
                                 args = args.Concat(new[] { result = Noop }).ToArray();
                                 break;
@@ -1439,28 +1441,28 @@ namespace Broccoli {
                     if (!(value is BInteger))
                         throw new ArgumentTypeException(value, "integer", index + 1, "^");
 
-                return args.Aggregate(new BInteger(0L), (m, v) => new BInteger(((BInteger) m).Value ^ ((BInteger) v).Value));
+                return args.Aggregate(new BInteger(0L), (m, v) => new BInteger(m.Value ^ ((BInteger) v).Value));
             })},
             {"~^", new Function("~^", ~1, (broccoli, args) => {
                 foreach (var (value, index) in args.WithIndex())
                     if (!(value is BInteger))
                         throw new ArgumentTypeException(value, "integer", index + 1, "~^");
 
-                return args.Aggregate(new BInteger(~0L), (m, v) => new BInteger(~((BInteger) m).Value ^ ((BInteger) v).Value));
+                return args.Aggregate(new BInteger(~0L), (m, v) => new BInteger(~m.Value ^ ((BInteger) v).Value));
             })},
             {"|", new Function("|", ~0, (broccoli, args) => {
                 foreach (var (value, index) in args.WithIndex())
                     if (!(value is BInteger))
                         throw new ArgumentTypeException(value, "integer", index + 1, "|");
 
-                return args.Aggregate(new BInteger(0L), (m, v) => new BInteger(((BInteger) m).Value | ((BInteger) v).Value));
+                return args.Aggregate(new BInteger(0L), (m, v) => new BInteger(m.Value | ((BInteger) v).Value));
             })},
             {"&", new Function("&", ~0, (broccoli, args) => {
                 foreach (var (value, index) in args.WithIndex())
                     if (!(value is BInteger))
                         throw new ArgumentTypeException(value, "integer", index + 1, "&");
 
-                return args.Aggregate(new BInteger(~0L), (m, v) => new BInteger(((BInteger) m).Value & ((BInteger) v).Value));
+                return args.Aggregate(new BInteger(~0L), (m, v) => new BInteger(m.Value & ((BInteger) v).Value));
             })},
             {"~", new Function("~", 1, (broccoli, args) => {
                 if (!(args[0] is BInteger i))
@@ -1696,10 +1698,10 @@ namespace Broccoli {
                 IValue varargs = null;
                 if (argNames.Count != 0) {
                     switch (argNames.Last()) {
-                        case ListVar l:
-                        case ScalarVar s:
-                        case DictVar d:
-                        case BAtom a:
+                        case ListVar _:
+                        case ScalarVar _:
+                        case DictVar _:
+                        case BAtom _:
                             break;
                         case ValueExpression expr when expr.Values.Length == 1 && expr.Values[0] is ListVar l:
                             length = -length;
@@ -1886,7 +1888,7 @@ namespace Broccoli {
                     step = i.Value;
                 }
                 var resultVar = range.Values.Length > 2 ? range.Values.Last() : null;
-                var assignment = new IValueExpressible[] { new BAtom(":="), range.Values[0], null };
+                var assignment = new[] { new BAtom(":="), range.Values[0], null };
                 var body = args.Skip(1);
                 for (var i = start; end > 0 ? i < end : i > end; i += step) {
                     assignment[2] = new BInteger(i);
@@ -1909,7 +1911,7 @@ namespace Broccoli {
                     throw new Exception($"Dolist loop recieved {list.Values.Length} arguments in initializer, expected 2 or more");
                 var iterable = cauliflower.Run(list.Values[1]) as IList;
                 var resultVar = list.Values.Length > 2 ? list.Values.Last() : null;
-                var assignment = new IValueExpressible[] { new BAtom(":="), list.Values[0], null };
+                var assignment = new[] { new BAtom(":="), list.Values[0], null };
                 var body = args.Skip(1);
                 foreach (var item in iterable) {
                     assignment[2] = item;
@@ -1940,7 +1942,7 @@ namespace Broccoli {
                 if (!(args[0] is BList list))
                     throw new ArgumentTypeException(args[0], "list", 1, "slice");
                 foreach (var (arg, index) in args.Skip(1).WithIndex())
-                    if (!(arg is BInteger i))
+                    if (!(arg is BInteger))
                         throw new ArgumentTypeException(arg, "integer", index + 2, "slice");
                 var ints = args.Skip(1).Select(arg => (int) ((BInteger) arg).Value).ToArray();
                 if (ints.Length > 0) {
@@ -1971,7 +1973,7 @@ namespace Broccoli {
             })},
             {"range", new Function("range", ~1, (cauliflower, args) => {
                 foreach (var (arg, index) in args.WithIndex())
-                    if (!(arg is BInteger i))
+                    if (!(arg is BInteger))
                         throw new ArgumentTypeException(arg, "integer", index + 1, "range");
                 var ints = args.Select(arg => (int) ((BInteger) arg).Value).ToArray();
 
@@ -2017,14 +2019,14 @@ namespace Broccoli {
                 throw new ArgumentTypeException(args[1], "list", 2, "reduce");
             })},
             {"all", new Function("all", 2, (cauliflower, args) => {
-                var func = CauliflowerInline.FindFunction("all", cauliflower, args[0]);
+                // var func = CauliflowerInline.FindFunction("all", cauliflower, args[0]);
 
                 if (args[1] is BList l)
                     return Boolean(l.All(CauliflowerInline.Truthy));
                 throw new ArgumentTypeException(args[1], "list", 2, "all");
             })},
             {"any", new Function("any", 2, (cauliflower, args) => {
-                var func = CauliflowerInline.FindFunction("any", cauliflower, args[0]);
+                // var func = CauliflowerInline.FindFunction("any", cauliflower, args[0]);
 
                 if (args[1] is BList l)
                     return Boolean(l.Any(CauliflowerInline.Truthy));
@@ -2145,7 +2147,7 @@ namespace Broccoli {
                         return !a.Equals(BAtom.Nil);
                     case BList v:
                         return v.Value.Count != 0;
-                    case IFunction f:
+                    case IFunction _:
                         return true;
                     default:
                         return false;
@@ -2280,21 +2282,21 @@ namespace Broccoli {
                 var results = new Type[vexp.Values.Length];
                 foreach (var (param, index) in vexp.Values.WithIndex()) {
                     switch (param) {
-                        case ScalarVar s:
+                        case ScalarVar _:
                             results[index] = typeof(IScalar);
                             break;
-                        case ListVar l:
+                        case ListVar _:
                             results[index] = typeof(IList);
                             break;
-                        case DictVar d:
+                        case DictVar _:
                             results[index] = typeof(IDictionary);
                             break;
-                        case BAtom a:
+                        case BAtom _:
                             results[index] = typeof(IFunction);
                             break;
                         // Rest args
                         case ValueExpression v:
-                            if (!(v.Values.ElementAtOrDefault(0) is ListVar rest))
+                            if (!(v.Values.ElementAtOrDefault(0) is ListVar _))
                                 throw new ArgumentTypeException(v.Values.ElementAtOrDefault(0), "rest arguments list variable", index + 1, "fn parameters");
 
                             results[index] = typeof(IValue[]);
@@ -2436,6 +2438,7 @@ namespace Broccoli {
         /// </summary>
         /// <param name="self">The current dictionary.</param>
         /// <param name="other">The other dictionary whose values to add.</param>
+        /// <param name="overwrite">Whether or not to overwrite the value when inserting duplicate keys.</param>
         /// <typeparam name="K">The key type.</typeparam>
         /// <typeparam name="V">The value type.</typeparam>
         /// <returns>The current dictionary.</returns>

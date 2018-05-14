@@ -10,8 +10,6 @@ namespace Broccoli {
         public Scope Scope = new Scope();
         public Dictionary<string, IFunction> Builtins = StaticBuiltins;
 
-        public Interpreter() { }
-
         /// <summary>
         /// Runs the given string as Broccoli code.
         /// </summary>

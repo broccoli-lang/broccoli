@@ -5,7 +5,7 @@ namespace Broccoli {
     /// <summary>
     /// The interpreter for the Broccoli dialect Cauliflower.
     /// </summary>
-    public partial class CauliflowerInterpreter : Interpreter {
+    public partial class CauliflowerInterpreter {
 
         public CauliflowerInterpreter(BList argv = null) {
             Scope = new CauliflowerScope();
@@ -18,7 +18,7 @@ namespace Broccoli {
         /// </summary>
         /// <param name="code">The code to run.</param>
         /// <returns>The final value returned by the overall expression.</returns>
-        public override IValue Run(string code) => Run(Parse(code, null));
+        public override IValue Run(string code) => Run(Parse(code));
 
         /// <summary>
         /// Evaluates the already-parsed tree as Cauliflower code.

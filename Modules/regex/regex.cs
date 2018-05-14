@@ -1,13 +1,15 @@
 ﻿using System;
 using System.Text.RegularExpressions;
 using Broccoli;
+// ReSharper disable InconsistentNaming
 
 #pragma warning disable IDE1006
 
+// ReSharper disable once CheckNamespace
 namespace cauliflower.core {
     public class regex : IScalar {
         public static Interpreter interpreter;
-        private static IValue[] ctorArgs = new[] { (ScalarVar) "pattern" };
+        private static IValue[] ctorArgs = { (ScalarVar) "pattern" };
         public Regex Value { get; }
 
         public regex(IValue[] args) {

@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System;
+using System.Globalization;
+// ReSharper disable InconsistentNaming
 
 namespace Broccoli {
     /// <inheritdoc />
@@ -142,9 +144,9 @@ namespace Broccoli {
 
         public override int GetHashCode() => Value.GetHashCode();
 
-        public override string ToString() => Value.ToString();
+        public override string ToString() => Value.ToString(CultureInfo.InvariantCulture);
 
-        public string Inspect() => Value.ToString();
+        public string Inspect() => Value.ToString(CultureInfo.InvariantCulture);
 
         public object ToCSharp() => Value;
 
@@ -351,7 +353,7 @@ namespace Broccoli {
     public class BList : List<IValue>, IList {
         public BList Value { get; }
 
-        public BList() : base() => Value = this;
+        public BList() => Value = this;
 
         public BList(IEnumerable<IValue> values) : base(values) => Value = this;
 
@@ -392,7 +394,7 @@ namespace Broccoli {
     public class BCSharpList : List<object>, IValue {
         public BCSharpList Value { get; }
 
-        public BCSharpList() : base() => Value = this;
+        public BCSharpList() => Value = this;
 
         public BCSharpList(IEnumerable<object> values) : base(values) => Value = this;
 
@@ -434,7 +436,7 @@ namespace Broccoli {
     public class BDictionary : Dictionary<IValue, IValue>, IDictionary {
         public BDictionary Value { get; }
 
-        public BDictionary() : base() => Value = this;
+        public BDictionary() => Value = this;
 
         public BDictionary(IReadOnlyDictionary<IValue, IValue> values) : base(values) => Value = this;
 
@@ -481,7 +483,7 @@ namespace Broccoli {
     public class BCSharpDictionary : Dictionary<object, object>, IValue {
         public BCSharpDictionary Value { get; }
 
-        public BCSharpDictionary() : base() => Value = this;
+        public BCSharpDictionary() => Value = this;
 
         public BCSharpDictionary(IReadOnlyDictionary<object, object> values) : base(values) => Value = this;
 

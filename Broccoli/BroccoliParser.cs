@@ -22,6 +22,7 @@ namespace Broccoli {
         /// </summary>
         /// <param name="s">The string to parse.</param>
         /// <param name="p">A partially-parsed node coming from multiline inputs in the REPL.</param>
+        /// <param name="keepComments">Whether to keep comments in the parse tree or not.</param>
         /// <returns>Returns the root ParseNode that represents the string.</returns>
         /// <exception cref="Exception">Thrown when the parser fails to parse an token.</exception>
         public virtual ParseNode Parse(string s, ParseNode p = null, bool keepComments = false) {
@@ -51,9 +52,9 @@ namespace Broccoli {
                 while (column < line.Length) {
                     var c = line[column];
                     TokenType type = TokenType.None;
-                    Match rawMatch = null;
+                    Match rawMatch;
                     string value = null;
-                    string match = null;
+                    string match;
                     if (current.UnfinishedString != null) {
                         rawMatch = _rStringEnd.Match(line);
                         if (!rawMatch.Success) {
