@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using BCSharpType = Broccoli.CauliflowerInterpreter.BCSharpType;
 
 namespace Broccoli {
@@ -25,6 +26,13 @@ namespace Broccoli {
         public readonly Tree<string, Scope> Namespaces = new Tree<string, Scope>();
         public readonly Dictionary<string, BCSharpType> Types = new Dictionary<string, BCSharpType>();
         public readonly Scope Parent;
+
+        private Type _surroundingClass;
+        public Type SurroundingClass {
+            get => _surroundingClass != null ? _surroundingClass : Parent.SurroundingClass;
+
+            set => _surroundingClass = value;
+        }
 
         public Scope() { }
 

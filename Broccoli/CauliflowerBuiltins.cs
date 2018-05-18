@@ -2324,6 +2324,10 @@ namespace Broccoli {
                 LoadScopeReference(gen, interpreterField); // Load to get scope value
                 gen.Emit(OpCodes.Newobj, typeof(Scope).GetConstructor(new [] { typeof(Scope) })); // Create new scope
                 gen.Emit(OpCodes.Stfld, typeof(Interpreter).GetField("Scope"));
+                LoadScopeReference(gen, interpreterField);
+                gen.Emit(OpCodes.Call, typeof(MethodBase).GetMethod("GetCurrentMethod", BindingFlags.Public | BindingFlags.Static));
+                gen.Emit(OpCodes.Callvirt, typeof(MemberInfo).GetMethod("get_DeclaringType"));
+                gen.Emit(OpCodes.Callvirt, typeof(Scope).GetMethod("set_SurroundingClass"));
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
