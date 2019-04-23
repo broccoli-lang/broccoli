@@ -9,4 +9,15 @@
     <PackageReference Include="NDesk.Options" Version="0.2.1" />
     <PackageReference Include="System.ValueTuple" Version="4.4.0" />
   </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Lokad.ILPack, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+      <HintPath>Lokad.ILPack\Lokad.ILPack.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Collections.Immutable, Version=1.2.3.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
+      <HintPath>Lokad.ILPack\System.Collections.Immutable.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Reflection.Metadata, Version=1.4.3.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
+      <HintPath>Lokad.ILPack\System.Reflection.Metadata.dll</HintPath>
+    </Reference>
+  </ItemGroup>
 </Project>

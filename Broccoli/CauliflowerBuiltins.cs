@@ -7,6 +7,8 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Text;
+using Lokad.ILPack;
+
 // ReSharper disable InconsistentNaming
 // ReSharper disable PossibleMultipleEnumeration
 // ReSharper disable CoVariantArrayConversion
@@ -1375,6 +1377,9 @@ namespace Broccoli {
                 staticInitIL.Emit(OpCodes.Ret);
 
                 var classType = typeBuilder.CreateType();
+
+                new AssemblyGenerator().GenerateAssembly(asmBuilder, "cauliflower.dll");
+
                 classType.GetMethod("(init)", BindingFlags.NonPublic | BindingFlags.Static)
                     .Invoke(null, new [] {cauliflower});
 
