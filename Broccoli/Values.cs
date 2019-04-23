@@ -4,6 +4,8 @@ using System.Linq;
 using System;
 using System.Globalization;
 // ReSharper disable InconsistentNaming
+// ReSharper disable PossibleNullReferenceException
+// ReSharper disable CompareOfFloatsByEqualityOperator
 
 namespace Broccoli {
     /// <inheritdoc />

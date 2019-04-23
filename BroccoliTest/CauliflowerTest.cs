@@ -9,7 +9,6 @@ using System.Text;
 namespace BroccoliTest {
     [TestClass]
     public class CauliflowerTest {
-        private Interpreter _cauliflower;
         private Func<string, IValue> _run;
         private System.IO.StringReader _input;
         private Writer _output;
@@ -30,8 +29,6 @@ namespace BroccoliTest {
 
         private static BList ListFrom(params int[] a) => new BList(a.Select(i => (IValue)new BInteger(i)));
 
-        private static BList ListFrom(params double[] a) => new BList(a.Select(f => (IValue) new BFloat(f)));
-
         private static BList ListFrom(params IValue[] a) => new BList(a);
 
         private static BDictionary DictFrom(params (int, int)[] a) => new BDictionary(a.ToDictionary(o => (IValue) (BInteger) o.Item1, o => (IValue) (BInteger) o.Item2));
@@ -50,7 +47,7 @@ namespace BroccoliTest {
 
         [TestInitialize]
         public void Initialize() {
-            _run = (_cauliflower = new CauliflowerInterpreter()).Run;
+            _run = new CauliflowerInterpreter().Run;
             Console.SetOut(_output = new Writer());
         }
 
@@ -459,7 +456,7 @@ namespace BroccoliTest {
         [TestMethod]
         public void TestOOP() {
             Assert.AreEqual(_run("(namespace foo (namespace bar (fn baz ($a $b) (+ $a $b)))) (. foo bar baz)").Inspect(), "baz($a $b)", "Nested namespaces do not work");
-            Assert.AreEqual(_run("(class foo (fn bar ($i) (+ $i 1))) ((-> (new !foo) bar) 100)"), (BInteger) 101, "Classes do not work");
+            Assert.AreEqual(_run("(class !foo (fn bar ($i) (+ $i 1))) ((-> (new !foo) bar) 100)"), (BInteger) 101, "Classes do not work");
         }
 
         [TestMethod]
@@ -472,7 +469,6 @@ namespace BroccoliTest {
 
         [TestCleanup]
         public void Cleanup() {
-            _cauliflower = null;
             _run = null;
             Console.SetOut(Console.Out);
             _output = null;

@@ -8,9 +8,7 @@ using System.Text;
 namespace BroccoliTest {
     [TestClass]
     public class Test {
-        private Interpreter _broccoli;
         private Func<string, IValue> _run;
-        private System.IO.StringReader _input;
         private Writer _output;
 
         private class Writer : System.IO.TextWriter {
@@ -29,11 +27,6 @@ namespace BroccoliTest {
 
         private static BList ValueListFrom(params int[] a) => new BList(a.Select(i => (IValue)new BInteger(i)));
 
-        private void WriteInput(string input) {
-            _input = new System.IO.StringReader(input);
-            Console.SetIn(_input);
-        }
-
         // ReSharper disable once UnusedParameter.Local
         private string ReadOutput(params object[] ignored) {
             var result = _output.ToString();
@@ -43,7 +36,7 @@ namespace BroccoliTest {
 
         [TestInitialize]
         public void Initialize() {
-            _run = (_broccoli = new Interpreter()).Run;
+            _run = new Interpreter().Run;
             Console.SetOut(_output = new Writer());
         }
 
@@ -316,7 +309,6 @@ namespace BroccoliTest {
 
         [TestCleanup]
         public void Cleanup() {
-            _broccoli = null;
             _run = null;
         }
     }

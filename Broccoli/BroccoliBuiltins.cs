@@ -565,6 +565,7 @@ namespace Broccoli {
                     if (!(value is BList))
                         throw new ArgumentTypeException(value, "list", index + 1, "cat");
                 var result = new BList();
+                // ReSharper disable once PossibleInvalidCastExceptionInForeachLoop
                 foreach (BList list in args)
                     result.AddRange(list);
                 return result;
