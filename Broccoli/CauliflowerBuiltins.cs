@@ -8,6 +8,8 @@ using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Lokad.ILPack;
+using Sigil;
+using Sigil.NonGeneric;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable PossibleMultipleEnumeration
@@ -783,7 +785,7 @@ namespace Broccoli {
 
                 var supertypes = new List<Type>();
 
-                if (!(args[1] is ValueExpression _)) {
+                if (args.Length > 1 && !(args[1] is ValueExpression _)) {
                     if (!(args[1] is BAtom isAtom && isAtom.Value == "is"))
                         throw new ArgumentTypeException(args[1], "statement or `is`", 2, "class");
                     if (!(args[2] is ValueExpression superVexp))
@@ -825,8 +827,7 @@ namespace Broccoli {
 
                 // Generate constructor params
                 var ctorParamTuple = statements.FirstOrDefault(s => s.Item1 == "fn" && s.Item3.Values.ElementAtOrDefault(0) is BAtom fnName && fnName.Value == "init");
-                var isCustomCtor =
-                    !ctorParamTuple.Equals(default((string, List<string>, ValueExpression)));
+                var isCustomCtor = !ctorParamTuple.Equals(default((string, List<string>, ValueExpression)));
                 var ctorParams = Type.EmptyTypes;
                 var ctorParamDecl = new ValueExpression();
                 if (isCustomCtor) {
@@ -837,39 +838,35 @@ namespace Broccoli {
                 }
 
                 // Interface implementations
-                var toCSharp = typeBuilder.DefineMethod(
+                var toCSharpEmit = Emit<Func<object>>.BuildMethod(
+                    typeBuilder,
                     "ToCSharp",
                     MethodAttributes.Public | MethodAttributes.Virtual,
-                    typeof(object),
-                    Type.EmptyTypes
+                    CallingConventions.Standard | CallingConventions.HasThis
                 );
-                var toCSharpIL = toCSharp.GetILGenerator();
-                toCSharpIL.Emit(OpCodes.Ldarg_0);
-                toCSharpIL.Emit(OpCodes.Ret);
-                typeBuilder.DefineMethodOverride(toCSharp, typeof(IValue).GetMethod("ToCSharp"));
+                toCSharpEmit.LoadArgument(0).Return();
+                typeBuilder.DefineMethodOverride(toCSharpEmit.CreateMethod(), typeof(IValue).GetMethod("ToCSharp"));
 
-                var type = typeBuilder.DefineMethod(
+                var typeEmit = Emit<Func<Type>>.BuildMethod(
+                    typeBuilder,
                     "Type",
                     MethodAttributes.Public | MethodAttributes.Virtual,
-                    typeof(Type),
-                    Type.EmptyTypes
+                    CallingConventions.Standard | CallingConventions.HasThis
                 );
-                var typeIL = type.GetILGenerator();
-                typeIL.Emit(OpCodes.Ldarg_0);
-                typeIL.Emit(OpCodes.Call, typeof(object).GetMethod("GetType"));
-                typeIL.Emit(OpCodes.Ret);
-                typeBuilder.DefineMethodOverride(type, typeof(IValue).GetMethod("Type"));
+                typeEmit
+                    .LoadArgument(0)
+                    .CallVirtual(typeof(object).GetMethod("GetType"))
+                    .Return();
+                typeBuilder.DefineMethodOverride(typeEmit.CreateMethod(), typeof(IValue).GetMethod("Type"));
 
-                var inspect = typeBuilder.DefineMethod(
+                var inspectEmit = Emit<Func<string>>.BuildMethod(
+                    typeBuilder,
                     "Inspect",
-                    MethodAttributes.Virtual,
-                    typeof(string),
-                    Type.EmptyTypes
+                    MethodAttributes.Public | MethodAttributes.Virtual,
+                    CallingConventions.Standard | CallingConventions.HasThis
                 );
-                var inspectIL = inspect.GetILGenerator();
-                inspectIL.Emit(OpCodes.Ldstr, $"<{name.Value}>");
-                inspectIL.Emit(OpCodes.Ret);
-                typeBuilder.DefineMethodOverride(inspect, typeof(IValueExpressible).GetMethod("Inspect"));
+                inspectEmit.LoadConstant($"<instance !{name.Value}>").Return();
+                typeBuilder.DefineMethodOverride(inspectEmit.CreateMethod(), typeof(IValueExpressible).GetMethod("Inspect"));
 
                 MethodAttributes MethodAttrFromMod(string modifier) {
                     switch (modifier) {
@@ -891,9 +888,9 @@ namespace Broccoli {
                     if (!modifiers.Any()) return isConstructor ? defaultAttr : defaultAttr | MethodAttributes.Virtual;
                     var attrs = modifiers.Select(MethodAttrFromMod).Aggregate((a, m) => a | m);
 
-                    var attrsWithDefault = (modifiers.Any(accessControlModifiers.Contains)
+                    var attrsWithDefault = modifiers.Any(accessControlModifiers.Contains)
                         ? attrs
-                        : defaultAttr | attrs);
+                        : defaultAttr | attrs;
                     return isConstructor ? attrsWithDefault : attrsWithDefault | MethodAttributes.Virtual; // All methods are virtual in Cauliflower
                 }
 
@@ -924,14 +921,12 @@ namespace Broccoli {
                     throw new Exception($"Custom static constructors currently not allowed (in class '{name.Value}')");
 
                 // Generate constructor
-                var ctor = typeBuilder.DefineConstructor(
-                    MethodAttrsFromAllMods(ctorParamTuple.Item2 ?? new List<string>(), isConstructor: true),
-                    CallingConventions.HasThis,
-                    ctorParams
+                var ctorEmit = Emit.BuildConstructor(
+                    ctorParams,
+                    typeBuilder,
+                    MethodAttrsFromAllMods(ctorParamTuple.Item2 ?? new List<string>(), isConstructor: true)
                 );
-                var ctorIL = ctor.GetILGenerator();
-                ctorIL.Emit(OpCodes.Ldarg_0);
-                ctorIL.Emit(OpCodes.Call, typeof(object).GetConstructor(Type.EmptyTypes));
+                ctorEmit.LoadArgument(0).Call(typeof(object).GetConstructor(Type.EmptyTypes));
 
                 // Add (interpreter) field
                 var interpreterField = typeBuilder.DefineField(
@@ -941,20 +936,22 @@ namespace Broccoli {
                 );
 
                 // Generate static initializer
-                var staticInit = typeBuilder.DefineMethod(
-                    "(init)",
-                    MethodAttributes.Private | MethodAttributes.Static,
+                var staticInitEmit = Emit.BuildStaticMethod(
                     typeof(void),
-                    new [] {typeof(CauliflowerInterpreter)}
+                    new [] {typeof(CauliflowerInterpreter)},
+                    typeBuilder,
+                    "(init)",
+                    MethodAttributes.Private | MethodAttributes.Static
                 );
-                var staticInitIL = staticInit.GetILGenerator();
-                staticInitIL.Emit(OpCodes.Ldarg_0);
-                staticInitIL.Emit(OpCodes.Stsfld, interpreterField);
+                staticInitEmit.LoadArgument(0).StoreField(interpreterField);
 
                 foreach (var (sName, sModifiers, sArgs) in statements) {
                     // Console.WriteLine(string.Join(", ", sName, $"[{string.Join(", ", sModifiers)}]", sArgs));
 
                     var isStatic = sModifiers.Contains("static");
+
+                    var callingConventions = CallingConventions.Standard;
+                    if (!isStatic) callingConventions |= CallingConventions.HasThis;
 
                     switch (sName) {
                         case "field":
@@ -970,15 +967,12 @@ namespace Broccoli {
                             var initFieldVal = sArgs.Values.ElementAtOrDefault(1);
                             if (initFieldVal != null) {
                                 // Init value inside constructor
-                                var initCtorIL = isStatic ? staticInitIL : ctorIL;
+                                var initCtorEmit = isStatic ? staticInitEmit : ctorEmit;
+                                if (!isStatic) initCtorEmit.LoadArgument(0);
 
-                                if (!isStatic) initCtorIL.Emit(OpCodes.Ldarg_0);
-                                CauliflowerInline.LoadInterpreterInvocation(initCtorIL, interpreterField, initFieldVal);
-                                initCtorIL.Emit(isStatic ? OpCodes.Stsfld : OpCodes.Stfld, newField);
+                                CauliflowerInline.LoadInterpreterInvocation(initCtorEmit, interpreterField, initFieldVal);
+                                initCtorEmit.StoreField(newField);
                             }
-
-                            // Console.WriteLine($"field {fieldName.Value} attrs: {newField.Attributes}");
-
                             break;
                         case "prop":
                         case "property":
@@ -1034,54 +1028,51 @@ namespace Broccoli {
 
                                 switch (aType) {
                                     case "get":
-                                        var getter = typeBuilder.DefineMethod(
-                                            "get_" + propName.Value,
-                                            MethodAttrsFromAllMods(aModifiers, propModifier | MethodAttributes.SpecialName | MethodAttributes.HideBySig),
+                                        var getterEmit = Emit.BuildMethod(
                                             typeof(IValue),
-                                            Type.EmptyTypes
+                                            Type.EmptyTypes,
+                                            typeBuilder,
+                                            $"get_{propName.Value}",
+                                            MethodAttrsFromAllMods(aModifiers, propModifier | MethodAttributes.SpecialName | MethodAttributes.HideBySig),
+                                            callingConventions
                                         );
-
-                                        var getterIL = getter.GetILGenerator();
                                         if (argsEmpty) {
-                                            if (!isStatic) getterIL.Emit(OpCodes.Ldarg_0);
-                                            getterIL.Emit(isStatic ? OpCodes.Ldsfld : OpCodes.Ldfld, backingField);
+                                            if (!isStatic) getterEmit.LoadArgument(0);
+                                            getterEmit.LoadField(backingField);
                                         } else {
-                                            CauliflowerInline.CreateNewScope(getterIL, interpreterField);
-                                            if (!isStatic) CauliflowerInline.AddThisToScope(getterIL, interpreterField, isScalar, isList, isDictionary);
-                                            CauliflowerInline.LoadInterpreterInvocation(getterIL, interpreterField, aArgs.Values);
-                                            CauliflowerInline.ReturnToParentScope(getterIL, interpreterField);
+                                            CauliflowerInline.CreateNewScope(getterEmit, interpreterField);
+                                            if (!isStatic) CauliflowerInline.AddThisToScope(getterEmit, interpreterField, isScalar, isList, isDictionary);
+                                            CauliflowerInline.LoadInterpreterInvocation(getterEmit, interpreterField, aArgs.Values);
+                                            CauliflowerInline.ReturnToParentScope(getterEmit, interpreterField);
                                         }
-                                        getterIL.Emit(OpCodes.Ret);
 
-                                        newProp.SetGetMethod(getter);
-
-                                        // Console.WriteLine($"{propName.Value} getter attrs: {getter.Attributes}");
+                                        getterEmit.Return();
+                                        newProp.SetGetMethod(getterEmit.CreateMethod());
                                         break;
                                     case "set":
-                                        var setter = typeBuilder.DefineMethod(
-                                            "set_" + propName.Value,
-                                            MethodAttrsFromAllMods(aModifiers, propModifier | MethodAttributes.SpecialName | MethodAttributes.HideBySig),
+                                        var setterEmit = Emit.BuildMethod(
                                             null,
-                                            new [] { typeof(IValue) }
+                                            new [] { typeof(IValue) },
+                                            typeBuilder,
+                                            $"set_{propName.Value}",
+                                            MethodAttrsFromAllMods(aModifiers, propModifier | MethodAttributes.SpecialName | MethodAttributes.HideBySig),
+                                            callingConventions
                                         );
 
-                                        var setterIL = setter.GetILGenerator();
                                         if (argsEmpty) {
-                                            setterIL.Emit(OpCodes.Ldarg_0); // Arg 0 is this for instance, value for static
-                                            if (!isStatic) setterIL.Emit(OpCodes.Ldarg_1); // Arg 1 is value for instance, undefined for static
-                                            setterIL.Emit(isStatic ? OpCodes.Stsfld : OpCodes.Stfld, backingField);
+                                            setterEmit.LoadArgument(0); // Arg 0 is this for instance, value for static
+                                            if (!isStatic) setterEmit.LoadArgument(1); // Arg 1 is value for instance, undefined for static
+                                            setterEmit.LoadField(backingField);
                                         } else {
-                                            CauliflowerInline.CreateNewScope(setterIL, interpreterField);
-                                            if (!isStatic) CauliflowerInline.AddThisToScope(setterIL, interpreterField, isScalar, isList, isDictionary);
-                                            CauliflowerInline.LoadInterpreterInvocation(setterIL, interpreterField, aArgs.Values);
-                                            setterIL.Emit(OpCodes.Pop);
-                                            CauliflowerInline.ReturnToParentScope(setterIL, interpreterField);
+                                            CauliflowerInline.CreateNewScope(setterEmit, interpreterField);
+                                            if (!isStatic) CauliflowerInline.AddThisToScope(setterEmit, interpreterField, isScalar, isList, isDictionary);
+                                            CauliflowerInline.LoadInterpreterInvocation(setterEmit, interpreterField, aArgs.Values);
+                                            setterEmit.Pop();
+                                            CauliflowerInline.ReturnToParentScope(setterEmit, interpreterField);
                                         }
-                                        setterIL.Emit(OpCodes.Ret);
 
-                                        newProp.SetSetMethod(setter);
-
-                                        // Console.WriteLine($"{propName.Value} setter attrs: {setter.Attributes}");
+                                        setterEmit.Return();
+                                        newProp.SetSetMethod(setterEmit.CreateMethod());
                                         break;
                                     default:
                                         throw new Exception($"Unrecognized property accessor '{aType}'");
@@ -1095,13 +1086,13 @@ namespace Broccoli {
                                 if (propStatements.Any(a => a.Item3.Values.Length > 0))
                                     throw new Exception($"Only auto-properties can have initial values ('{propName.Value}')");
 
-                                var initCtorIL = isStatic ? staticInitIL : ctorIL;
+                                var initCtorEmit = isStatic ? staticInitEmit : ctorEmit;
 
-                                if (!isStatic) initCtorIL.Emit(OpCodes.Ldarg_0);
-                                CauliflowerInline.CreateNewScope(initCtorIL, interpreterField);
-                                CauliflowerInline.LoadInterpreterInvocation(initCtorIL, interpreterField, initPropVal);
-                                CauliflowerInline.ReturnToParentScope(initCtorIL, interpreterField);
-                                initCtorIL.Emit(isStatic ? OpCodes.Stsfld : OpCodes.Stfld, backingField);
+                                if (!isStatic) initCtorEmit.LoadArgument(0);
+                                CauliflowerInline.CreateNewScope(initCtorEmit, interpreterField);
+                                CauliflowerInline.LoadInterpreterInvocation(initCtorEmit, interpreterField, initPropVal);
+                                CauliflowerInline.ReturnToParentScope(initCtorEmit, interpreterField);
+                                initCtorEmit.StoreField(backingField);
                             }
                             break;
                         case "fn":
@@ -1113,22 +1104,26 @@ namespace Broccoli {
                             if (!(sArgs.Values.ElementAtOrDefault(1) is ValueExpression vexp2))
                                 throw new ArgumentTypeException(sArgs.Values.ElementAtOrDefault(1), "expression", 2, "fn");
 
-                            MethodBuilder newMethod;
+                            Emit methodEmit;
+                            var contextOverrides = new List<string>();
 
                             if (sModifiers.Contains("operator")) {
+                                if (isStatic) throw new Exception("Custom contexts cannot be static");
                                 switch (fnName.Value) {
                                     case "scalar":
                                         if (isScalar)
                                             throw new Exception("A scalar cannot have a custom scalar context");
                                         if (vexp2.Values.Length != 0)
                                             throw new Exception("Custom scalar contexts cannot have arguments");
-                                        newMethod = typeBuilder.DefineMethod(
+                                        methodEmit = Emit.BuildMethod(
+                                            typeof(IScalar),
+                                            Type.EmptyTypes,
+                                            typeBuilder,
                                             "ScalarContext",
                                             MethodAttrsFromAllMods(sModifiers),
-                                            typeof(IScalar),
-                                            Type.EmptyTypes
+                                            callingConventions
                                         );
-                                        typeBuilder.DefineMethodOverride(newMethod, typeof(IValue).GetMethod("ScalarContext"));
+                                        contextOverrides.Add("ScalarContext");
                                         hasCustomScalarContext = true;
                                         break;
                                     case "list":
@@ -1136,13 +1131,15 @@ namespace Broccoli {
                                             throw new Exception("A list cannot have a custom list context");
                                         if (vexp2.Values.Length != 0)
                                             throw new Exception("Custom list contexts cannot have arguments");
-                                        newMethod = typeBuilder.DefineMethod(
+                                        methodEmit = Emit.BuildMethod(
+                                            typeof(IList),
+                                            Type.EmptyTypes,
+                                            typeBuilder,
                                             "ListContext",
                                             MethodAttrsFromAllMods(sModifiers),
-                                            typeof(IList),
-                                            Type.EmptyTypes
+                                            callingConventions
                                         );
-                                        typeBuilder.DefineMethodOverride(newMethod, typeof(IValue).GetMethod("ListContext"));
+                                        contextOverrides.Add("ListContext");
                                         hasCustomListContext = true;
                                         break;
                                     case "dictionary":
@@ -1150,13 +1147,15 @@ namespace Broccoli {
                                             throw new Exception("A dictionary cannot have a custom dictionary context");
                                         if (vexp2.Values.Length != 0)
                                             throw new Exception("Custom dictionary contexts cannot have arguments");
-                                        newMethod = typeBuilder.DefineMethod(
+                                        methodEmit = Emit.BuildMethod(
+                                            typeof(IDictionary),
+                                            Type.EmptyTypes,
+                                            typeBuilder,
                                             "DictionaryContext",
                                             MethodAttrsFromAllMods(sModifiers),
-                                            typeof(IDictionary),
-                                            Type.EmptyTypes
+                                            callingConventions
                                         );
-                                        typeBuilder.DefineMethodOverride(newMethod, typeof(IValue).GetMethod("DictionaryContext"));
+                                        contextOverrides.Add("DictionaryContext");
                                         hasCustomDictionaryContext = true;
                                         break;
                                     default:
@@ -1164,26 +1163,29 @@ namespace Broccoli {
                                 }
                             } else {
                                 if (fnName.Value == "init") continue;
-                                newMethod = typeBuilder.DefineMethod(
+                                methodEmit = Emit.BuildMethod(
+                                    typeof(IValue),
+                                    CauliflowerInline.GetParameterTypes(vexp2),
+                                    typeBuilder,
                                     fnName.Value,
                                     MethodAttrsFromAllMods(sModifiers),
-                                    typeof(IValue),
-                                    CauliflowerInline.GetParameterTypes(vexp2)
+                                    callingConventions
                                 );
                             }
-                            var methodIL = newMethod.GetILGenerator();
 
                             // Add new function scope + populate
-                            CauliflowerInline.CreateNewScope(methodIL, interpreterField);
-                            if (!isStatic) CauliflowerInline.AddThisToScope(methodIL, interpreterField, isScalar, isList, isDictionary);
-                            CauliflowerInline.AddParametersToScope(methodIL, interpreterField, vexp2, isStatic);
+                            CauliflowerInline.CreateNewScope(methodEmit, interpreterField);
+                            if (!isStatic) CauliflowerInline.AddThisToScope(methodEmit, interpreterField, isScalar, isList, isDictionary);
+                            CauliflowerInline.AddParametersToScope(methodEmit, interpreterField, vexp2, isStatic);
 
                             // Invoke interpreter, back out of scope, return
-                            CauliflowerInline.LoadInterpreterInvocation(methodIL, interpreterField, sArgs.Values.Skip(2));
-                            CauliflowerInline.ReturnToParentScope(methodIL, interpreterField);
-                            methodIL.Emit(OpCodes.Ret);
+                            CauliflowerInline.LoadInterpreterInvocation(methodEmit, interpreterField, sArgs.Values.Skip(2));
+                            CauliflowerInline.ReturnToParentScope(methodEmit, interpreterField);
+                            var methodBuilder = methodEmit.Return().CreateMethod();
 
-                            // Console.WriteLine($"method {fnName.Value} attrs: {newMethod.Attributes}");
+                            foreach (var context in contextOverrides) {
+                                typeBuilder.DefineMethodOverride(methodBuilder, typeof(IValue).GetMethod(context));
+                            }
                             break;
                         default:
                             throw new Exception($"Unrecognized class definition statement '{sName}'");
@@ -1191,194 +1193,138 @@ namespace Broccoli {
                 }
 
                 if (isScalar) {
-                    var defaultContext = typeBuilder.DefineMethod(
+                    var defaultScalarContextEmit = Emit<Func<IScalar>>.BuildMethod(
+                        typeBuilder,
                         "ScalarContext",
                         MethodAttributes.Public | MethodAttributes.Virtual,
-                        typeof(IScalar),
-                        Type.EmptyTypes
+                        CallingConventions.Standard | CallingConventions.HasThis
                     );
-                    var defaultContextIL = defaultContext.GetILGenerator();
-                    defaultContextIL.Emit(OpCodes.Ldarg_0);
-                    defaultContextIL.Emit(OpCodes.Ret);
-                    typeBuilder.DefineMethodOverride(defaultContext, typeof(IValue).GetMethod("ScalarContext"));
+                    defaultScalarContextEmit.LoadArgument(0).Return();
+                    typeBuilder.DefineMethodOverride(defaultScalarContextEmit.CreateMethod(), typeof(IValue).GetMethod("ScalarContext"));
 
                     if (!hasCustomListContext) {
-                        var defaultListContext = typeBuilder.DefineMethod(
+                        var defaultListContextEmit = Emit<Func<IList>>.BuildMethod(
+                            typeBuilder,
                             "ListContext",
                             MethodAttributes.Public | MethodAttributes.Virtual,
-                            typeof(IList),
-                            Type.EmptyTypes
+                            CallingConventions.Standard | CallingConventions.HasThis
                         );
-                        var defaultListContextIL = defaultListContext.GetILGenerator();
-                        defaultListContextIL.Emit(OpCodes.Ldarg_0);
-                        defaultListContextIL.Emit(OpCodes.Newobj, typeof(NoListContextException).GetConstructor(new[] {typeof(object)}));
-                        defaultListContextIL.Emit(OpCodes.Throw);
-                        typeBuilder.DefineMethodOverride(defaultListContext, typeof(IValue).GetMethod("ListContext"));
+                        defaultListContextEmit
+                            .LoadArgument(0)
+                            .NewObject<NoListContextException, object>()
+                            .Throw();
+                        typeBuilder.DefineMethodOverride(defaultListContextEmit.CreateMethod(), typeof(IValue).GetMethod("ListContext"));
                     }
 
                     if (!hasCustomDictionaryContext) {
-                        var defaultDictionaryContext = typeBuilder.DefineMethod(
+                        var defaultDictionaryContextEmit = Emit<Func<IDictionary>>.BuildMethod(
+                            typeBuilder,
                             "DictionaryContext",
                             MethodAttributes.Public | MethodAttributes.Virtual,
-                            typeof(IDictionary),
-                            Type.EmptyTypes
+                            CallingConventions.Standard | CallingConventions.HasThis
                         );
-                        var defaultDictionaryContextIL = defaultDictionaryContext.GetILGenerator();
-                        defaultDictionaryContextIL.Emit(OpCodes.Ldarg_0);
-                        defaultDictionaryContextIL.Emit(OpCodes.Newobj, typeof(NoDictionaryContextException).GetConstructor(new[] {typeof(object)}));
-                        defaultDictionaryContextIL.Emit(OpCodes.Throw);
-                        typeBuilder.DefineMethodOverride(defaultDictionaryContext, typeof(IValue).GetMethod("DictionaryContext"));
+                        defaultDictionaryContextEmit
+                            .LoadArgument(0)
+                            .NewObject<NoDictionaryContextException, object>()
+                            .Throw();
+                        typeBuilder.DefineMethodOverride(defaultDictionaryContextEmit.CreateMethod(), typeof(IValue).GetMethod("DictionaryContext"));
                     }
                 }
 
                 if (isList) {
-                    var defaultContext = typeBuilder.DefineMethod(
+                    var defaultListContextEmit = Emit<Func<IList>>.BuildMethod(
+                        typeBuilder,
                         "ListContext",
                         MethodAttributes.Public | MethodAttributes.Virtual,
-                        typeof(IList),
-                        Type.EmptyTypes
+                        CallingConventions.Standard | CallingConventions.HasThis
                     );
-                    var defaultContextIL = defaultContext.GetILGenerator();
-                    defaultContextIL.Emit(OpCodes.Ldarg_0);
-                    defaultContextIL.Emit(OpCodes.Ret);
-                    typeBuilder.DefineMethodOverride(defaultContext, typeof(IValue).GetMethod("ListContext"));
+                    defaultListContextEmit.LoadArgument(0).Return();
+                    typeBuilder.DefineMethodOverride(defaultListContextEmit.CreateMethod(), typeof(IValue).GetMethod("ListContext"));
 
                     if (!hasCustomScalarContext) {
-                        var defaultScalarContext = typeBuilder.DefineMethod(
+                        var defaultScalarContextEmit = Emit<Func<IScalar>>.BuildMethod(
+                            typeBuilder,
                             "ScalarContext",
                             MethodAttributes.Public | MethodAttributes.Virtual,
-                            typeof(IScalar),
-                            Type.EmptyTypes
+                            CallingConventions.Standard | CallingConventions.HasThis
                         );
-                        var defaultScalarContextIL = defaultScalarContext.GetILGenerator();
-                        defaultScalarContextIL.Emit(OpCodes.Ldfld, typeBuilder.UnderlyingSystemType.GetField("Count"));
-                        defaultScalarContextIL.Emit(OpCodes.Newobj, typeof(BInteger).GetConstructor(new[] { typeof(int) }));
-                        defaultScalarContextIL.Emit(OpCodes.Ret);
-                        typeBuilder.DefineMethodOverride(defaultScalarContext, typeof(IValue).GetMethod("ScalarContext"));
+                        defaultScalarContextEmit
+                            .LoadField(typeof(IList).GetField("Count"))
+                            .NewObject<BInteger, int>()
+                            .Return();
+                        typeBuilder.DefineMethodOverride(defaultScalarContextEmit.CreateMethod(), typeof(IValue).GetMethod("ScalarContext"));
                     }
 
                     if (!hasCustomDictionaryContext) {
-                        var defaultDictionaryContext = typeBuilder.DefineMethod(
+                        var defaultDictionaryContextEmit = Emit<Func<IDictionary>>.BuildMethod(
+                            typeBuilder,
                             "DictionaryContext",
                             MethodAttributes.Public | MethodAttributes.Virtual,
-                            typeof(IDictionary),
-                            Type.EmptyTypes
+                            CallingConventions.Standard | CallingConventions.HasThis
                         );
-                        var defaultDictionaryContextIL = defaultDictionaryContext.GetILGenerator();
-                        var loopStart = defaultDictionaryContextIL.DefineLabel();
-                        var loopEnd = defaultDictionaryContextIL.DefineLabel();
-                        defaultDictionaryContextIL.Emit(OpCodes.Ldc_I4_0);
-                        defaultDictionaryContextIL.Emit(OpCodes.Stloc_0);
-                        defaultDictionaryContextIL.Emit(OpCodes.Newobj, typeof(BDictionary).GetConstructor(Type.EmptyTypes));
-                        defaultDictionaryContextIL.Emit(OpCodes.Stloc_1);
-                        defaultDictionaryContextIL.MarkLabel(loopStart);
-                        defaultDictionaryContextIL.Emit(OpCodes.Ldloc_0);
-                        defaultDictionaryContextIL.Emit(OpCodes.Ldfld, typeBuilder.UnderlyingSystemType.GetField("Count"));
-                        defaultDictionaryContextIL.Emit(OpCodes.Ceq);
-                        defaultDictionaryContextIL.Emit(OpCodes.Brtrue, loopEnd);
-                        defaultDictionaryContextIL.Emit(OpCodes.Ldloc_0);
-                        defaultDictionaryContextIL.Emit(OpCodes.Ldloc_0);
-                        defaultDictionaryContextIL.Emit(OpCodes.Ldarg_0);
-                        defaultDictionaryContextIL.Emit(OpCodes.Callvirt, typeBuilder.UnderlyingSystemType.GetMethod("get_Item"));
-                        defaultDictionaryContextIL.Emit(OpCodes.Ldloc_1);
-                        defaultDictionaryContextIL.Emit(OpCodes.Callvirt, typeof(BDictionary).GetMethod("set_Item"));
-                        defaultDictionaryContextIL.Emit(OpCodes.Ldloc_0);
-                        defaultDictionaryContextIL.Emit(OpCodes.Ldc_I4_1);
-                        defaultDictionaryContextIL.Emit(OpCodes.Add);
-                        defaultDictionaryContextIL.Emit(OpCodes.Stloc_0);
-                        defaultDictionaryContextIL.Emit(OpCodes.Jmp, loopStart);
-                        defaultDictionaryContextIL.MarkLabel(loopEnd);
-                        defaultDictionaryContextIL.Emit(OpCodes.Ldloc_1);
-                        defaultDictionaryContextIL.Emit(OpCodes.Ret);
-                        typeBuilder.DefineMethodOverride(defaultDictionaryContext, typeof(IValue).GetMethod("DictionaryContext"));
+                        defaultDictionaryContextEmit
+                            .LoadArgument(0)
+                            .Call(typeof(DefaultContexts).GetMethod("DictionaryContextForList", BindingFlags.Public | BindingFlags.Static))
+                            .Return();
+                        typeBuilder.DefineMethodOverride(defaultDictionaryContextEmit.CreateMethod(), typeof(IValue).GetMethod("DictionaryContext"));
                     }
                 }
 
                 if (isDictionary) {
-                    var defaultContext = typeBuilder.DefineMethod(
+                    var defaultDictionaryContextEmit = Emit<Func<IDictionary>>.BuildMethod(
+                        typeBuilder,
                         "DictionaryContext",
                         MethodAttributes.Public | MethodAttributes.Virtual,
-                        typeof(IDictionary),
-                        Type.EmptyTypes
+                        CallingConventions.Standard | CallingConventions.HasThis
                     );
-                    var defaultContextIL = defaultContext.GetILGenerator();
-                    defaultContextIL.Emit(OpCodes.Ldarg_0);
-                    defaultContextIL.Emit(OpCodes.Ret);
-                    typeBuilder.DefineMethodOverride(defaultContext, typeof(IValue).GetMethod("DictionaryContext"));
+                    defaultDictionaryContextEmit.LoadArgument(0).Return();
+                    typeBuilder.DefineMethodOverride(defaultDictionaryContextEmit.CreateMethod(), typeof(IValue).GetMethod("DictionaryContext"));
 
                     if (!hasCustomScalarContext) {
-                        var defaultScalarContext = typeBuilder.DefineMethod(
+                        var defaultScalarContextEmit = Emit<Func<IScalar>>.BuildMethod(
+                            typeBuilder,
                             "ScalarContext",
                             MethodAttributes.Public | MethodAttributes.Virtual,
-                            typeof(IScalar),
-                            Type.EmptyTypes
+                            CallingConventions.Standard | CallingConventions.HasThis
                         );
-                        var defaultScalarContextIL = defaultScalarContext.GetILGenerator();
-                        defaultScalarContextIL.Emit(OpCodes.Ldfld, typeBuilder.UnderlyingSystemType.GetField("Count"));
-                        defaultScalarContextIL.Emit(OpCodes.Newobj, typeof(BInteger).GetConstructor(new[] { typeof(int) }));
-                        defaultScalarContextIL.Emit(OpCodes.Ret);
-                        typeBuilder.DefineMethodOverride(defaultScalarContext, typeof(IValue).GetMethod("ScalarContext"));
+                        defaultScalarContextEmit
+                            .LoadField(typeof(IDictionary).GetField("Count"))
+                            .NewObject<BInteger, int>()
+                            .Return();
+                        typeBuilder.DefineMethodOverride(defaultScalarContextEmit.CreateMethod(), typeof(IValue).GetMethod("ScalarContext"));
                     }
 
                     if (!hasCustomListContext) {
-                        var defaultListContext = typeBuilder.DefineMethod(
+                        var defaultListContextEmit = Emit<Func<IList>>.BuildMethod(
+                            typeBuilder,
                             "ListContext",
                             MethodAttributes.Public | MethodAttributes.Virtual,
-                            typeof(IList),
-                            Type.EmptyTypes
+                            CallingConventions.Standard | CallingConventions.HasThis
                         );
-                        var defaultListContextIL = defaultListContext.GetILGenerator();
-                        var loopStart = defaultListContextIL.DefineLabel();
-                        var loopEnd = defaultListContextIL.DefineLabel();
-                        defaultListContextIL.Emit(OpCodes.Ldc_I4_0);
-                        defaultListContextIL.Emit(OpCodes.Stloc_0);
-                        defaultListContextIL.Emit(OpCodes.Newobj, typeof(BList).GetConstructor(Type.EmptyTypes));
-                        defaultListContextIL.Emit(OpCodes.Stloc_1);
-                        defaultListContextIL.MarkLabel(loopStart);
-                        defaultListContextIL.Emit(OpCodes.Ldloc_0);
-                        defaultListContextIL.Emit(OpCodes.Ldfld, typeBuilder.UnderlyingSystemType.GetField("Count"));
-                        defaultListContextIL.Emit(OpCodes.Ceq);
-                        defaultListContextIL.Emit(OpCodes.Brtrue, loopEnd);
-                        defaultListContextIL.Emit(OpCodes.Ldloc_0);
-                        defaultListContextIL.Emit(OpCodes.Ldloc_0);
-                        defaultListContextIL.Emit(OpCodes.Ldfld, typeBuilder.UnderlyingSystemType.GetField("Values"));
-                        defaultListContextIL.Emit(OpCodes.Ldarg_0);
-                        defaultListContextIL.Emit(OpCodes.Callvirt, typeof(Dictionary<IValue, IValue>.ValueCollection).GetMethod("get_Item"));
-                        defaultListContextIL.Emit(OpCodes.Ldloc_0);
-                        defaultListContextIL.Emit(OpCodes.Ldfld, typeBuilder.UnderlyingSystemType.GetField("Keys"));
-                        defaultListContextIL.Emit(OpCodes.Ldarg_0);
-                        defaultListContextIL.Emit(OpCodes.Callvirt, typeof(Dictionary<IValue, IValue>.KeyCollection).GetMethod("get_Item"));
-                        defaultListContextIL.Emit(OpCodes.Newobj, typeof(BList).GetConstructor(new[] { typeof(IValue), typeof(IValue) }));
-                        defaultListContextIL.Emit(OpCodes.Ldloc_1);
-                        defaultListContextIL.Emit(OpCodes.Callvirt, typeof(BList).GetMethod("Add"));
-                        defaultListContextIL.Emit(OpCodes.Ldloc_0);
-                        defaultListContextIL.Emit(OpCodes.Ldc_I4_1);
-                        defaultListContextIL.Emit(OpCodes.Add);
-                        defaultListContextIL.Emit(OpCodes.Stloc_0);
-                        defaultListContextIL.Emit(OpCodes.Jmp, loopStart);
-                        defaultListContextIL.MarkLabel(loopEnd);
-                        defaultListContextIL.Emit(OpCodes.Ldloc_1);
-                        defaultListContextIL.Emit(OpCodes.Ret);
-                        typeBuilder.DefineMethodOverride(defaultListContext, typeof(IValue).GetMethod("ListContext"));
+                        defaultListContextEmit
+                            .LoadArgument(0)
+                            .Call(typeof(DefaultContexts).GetMethod("ListContextForDictionary", BindingFlags.Public | BindingFlags.Static))
+                            .Return();
+                        typeBuilder.DefineMethodOverride(defaultListContextEmit.CreateMethod(), typeof(IValue).GetMethod("ListContext"));
                     }
                 }
 
                 // Custom constructor implementation (after initial values)
                 if (isCustomCtor) {
-                    CauliflowerInline.AddThisToScope(ctorIL, interpreterField, isScalar, isList, isDictionary);
-                    CauliflowerInline.AddParametersToScope(ctorIL, interpreterField, ctorParamDecl);
-                    CauliflowerInline.CreateNewScope(ctorIL, interpreterField);
-                    CauliflowerInline.LoadInterpreterInvocation(ctorIL, interpreterField, ctorParamTuple.Item3.Values.Skip(2));
-                    ctorIL.Emit(OpCodes.Pop);
-                    CauliflowerInline.ReturnToParentScope(ctorIL, interpreterField);
+                    CauliflowerInline.AddThisToScope(ctorEmit, interpreterField, isScalar, isList, isDictionary);
+                    CauliflowerInline.AddParametersToScope(ctorEmit, interpreterField, ctorParamDecl);
+                    CauliflowerInline.CreateNewScope(ctorEmit, interpreterField);
+                    CauliflowerInline.LoadInterpreterInvocation(ctorEmit, interpreterField, ctorParamTuple.Item3.Values.Skip(2));
+                    ctorEmit.Pop();
+                    CauliflowerInline.ReturnToParentScope(ctorEmit, interpreterField);
                 }
 
-                ctorIL.Emit(OpCodes.Ret);
-                staticInitIL.Emit(OpCodes.Ret);
+                ctorEmit.Return().CreateConstructor();
+                staticInitEmit.Return().CreateMethod();
 
                 var classType = typeBuilder.CreateType();
 
-                new AssemblyGenerator().GenerateAssembly(asmBuilder, "cauliflower.dll");
+//                new AssemblyGenerator().GenerateAssembly(asmBuilder, "cauliflower.dll");
 
                 classType.GetMethod("(init)", BindingFlags.NonPublic | BindingFlags.Static)
                     .Invoke(null, new [] {cauliflower});
@@ -2312,127 +2258,149 @@ namespace Broccoli {
                 return results;
             }
 
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private static void LoadInterpreterReference(ILGenerator gen, FieldInfo interpreterField) => gen.Emit(OpCodes.Ldsfld, interpreterField);
+            // TODO: Maybe make all these local functions (to access the interpreterField)?
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private static void LoadScopeReference(ILGenerator gen, FieldInfo interpreterField) {
-                LoadInterpreterReference(gen, interpreterField);
-                gen.Emit(OpCodes.Ldfld, typeof(Interpreter).GetField("Scope"));
+            private static void LoadScopeReference(Emit emit, FieldInfo interpreterField) {
+                emit
+                    .LoadField(interpreterField)
+                    .LoadField(typeof(Interpreter).GetField("Scope"));
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static void CreateNewScope(ILGenerator gen, FieldInfo interpreterField) {
-                LoadInterpreterReference(gen, interpreterField); // Load to store in scope
-                LoadScopeReference(gen, interpreterField); // Load to get scope value
-                gen.Emit(OpCodes.Newobj, typeof(Scope).GetConstructor(new [] { typeof(Scope) })); // Create new scope
-                gen.Emit(OpCodes.Stfld, typeof(Interpreter).GetField("Scope"));
-                LoadScopeReference(gen, interpreterField);
-                gen.Emit(OpCodes.Call, typeof(MethodBase).GetMethod("GetCurrentMethod", BindingFlags.Public | BindingFlags.Static));
-                gen.Emit(OpCodes.Callvirt, typeof(MemberInfo).GetMethod("get_DeclaringType"));
-                gen.Emit(OpCodes.Callvirt, typeof(Scope).GetMethod("set_SurroundingClass"));
+            public static void CreateNewScope(Emit emit, FieldInfo interpreterField) {
+                emit.LoadField(interpreterField);
+                LoadScopeReference(emit, interpreterField); // Load to get scope value
+                emit
+                    .NewObject<Scope, Scope>() // Create new scope
+                    .StoreField(typeof(Interpreter).GetField("Scope"));
+                LoadScopeReference(emit, interpreterField);
+                emit
+                    .Call(typeof(MethodBase).GetMethod("GetCurrentMethod", BindingFlags.Public | BindingFlags.Static))
+                    .Call(typeof(MemberInfo).GetProperty("DeclaringType").GetGetMethod())
+                    .Call(typeof(Scope).GetProperty("SurroundingClass").GetSetMethod());
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static void ReturnToParentScope(ILGenerator gen, FieldInfo interpreterField) {
-                LoadInterpreterReference(gen, interpreterField);
-                LoadScopeReference(gen, interpreterField);
-                gen.Emit(OpCodes.Ldfld, typeof(Scope).GetField("Parent"));
-                gen.Emit(OpCodes.Stfld, typeof(Interpreter).GetField("Scope"));
+            public static void ReturnToParentScope(Emit emit, FieldInfo interpreterField) {
+                emit.LoadField(interpreterField);
+                LoadScopeReference(emit, interpreterField);
+                emit
+                    .LoadField(typeof(Scope).GetField("Parent"))
+                    .StoreField(typeof(Interpreter).GetField("Scope"));
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static void AddThisToScope(ILGenerator gen, FieldInfo interpreterField, bool isScalar = true, bool isList = false, bool isDictionary = false) {
+            public static void AddThisToScope(Emit emit, FieldInfo interpreterField, bool isScalar = true, bool isList = false,
+                bool isDictionary = false) {
                 FieldInfo scopeField;
-                MethodInfo dictSetter;
+                Type dictType;
 
                 if (isScalar) {
                     scopeField = typeof(Scope).GetField("Scalars");
-                    dictSetter = typeof(Dictionary<string, IScalar>).GetMethod("set_Item");
+                    dictType = typeof(Dictionary<string, IScalar>);
                 } else if (isList) {
                     scopeField = typeof(Scope).GetField("Lists");
-                    dictSetter = typeof(Dictionary<string, IList>).GetMethod("set_Item");
+                    dictType = typeof(Dictionary<string, IList>);
                 } else if (isDictionary) {
                     scopeField = typeof(Scope).GetField("Dictionaries");
-                    dictSetter = typeof(Dictionary<string, IDictionary>).GetMethod("set_Item");
+                    dictType = typeof(Dictionary<string, IDictionary>);
                 } else {
                     throw new NotImplementedException();
                 }
 
-                LoadScopeReference(gen, interpreterField);
-                gen.Emit(OpCodes.Ldfld, scopeField);
-                gen.Emit(OpCodes.Ldstr, "this");
-                gen.Emit(OpCodes.Ldarg_0);
-                gen.Emit(OpCodes.Callvirt, dictSetter);
+                LoadScopeReference(emit, interpreterField);
+                emit
+                    .LoadField(scopeField)
+                    .LoadConstant("this")
+                    .LoadArgument(0)
+                    .CallVirtual(dictType.GetProperty("Item").GetSetMethod());
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static void LoadInterpreterInvocation(ILGenerator gen, FieldInfo interpreterField, IValueExpressible expr) {
-                LoadInterpreterReference(gen, interpreterField);
-                gen.Emit(OpCodes.Ldstr, expr.Inspect());
-                gen.Emit(OpCodes.Callvirt, typeof(CauliflowerInterpreter).GetMethod("Run", new [] {typeof(string)}));
+            public static void LoadInterpreterInvocation(Emit emit, FieldInfo interpreterField, IValueExpressible expr) {
+                emit
+                    .LoadField(interpreterField)
+                    .LoadConstant(expr.Inspect())
+                    .Call(typeof(CauliflowerInterpreter).GetMethod("Run", new[] {typeof(string)}));
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static void LoadInterpreterInvocation(ILGenerator gen, FieldInfo interpreterField, IEnumerable<IValueExpressible> exprs) {
-                LoadInterpreterReference(gen, interpreterField);
-                gen.Emit(OpCodes.Ldstr, string.Join(' ', exprs.Select(e => e.Inspect())));
-                gen.Emit(OpCodes.Callvirt, typeof(CauliflowerInterpreter).GetMethod("Run", new [] {typeof(string)}));
+            public static void LoadInterpreterInvocation(Emit emit, FieldInfo interpreterField, IEnumerable<IValueExpressible> exprs) {
+                emit
+                    .LoadField(interpreterField)
+                    .LoadConstant(string.Join(' ', exprs.Select(e => e.Inspect())))
+                    .Call(typeof(CauliflowerInterpreter).GetMethod("Run", new[] {typeof(string)}));
             }
 
             /// <summary>
             /// Populates a function's scope with values from the given parameter expression.
             /// </summary>
-            /// <param name="methILGen">The <see cref="ILGenerator"/> for the method.</param>
+            /// <param name="methodEmit"></param>
             /// <param name="interpreterField">The <see cref="FieldInfo"/> that represents the interpreter field in the class.</param>
             /// <param name="paramExp">The parameter expression.</param>
             /// <param name="isStatic">Whether the parameters are for a Cauliflower static class function.</param>
             /// <exception cref="ArgumentTypeException">Throws when parameter types are invalid.</exception>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static void AddParametersToScope(ILGenerator methILGen, FieldInfo interpreterField, ValueExpression paramExp, bool isStatic = false) {
+            public static void AddParametersToScope(Emit methodEmit, FieldInfo interpreterField, ValueExpression paramExp,
+                bool isStatic = false) {
                 foreach (var (param, _index) in paramExp.Values.WithIndex()) {
                     var index = isStatic ? _index : _index + 1;
-                    LoadScopeReference(methILGen, interpreterField);
+                    LoadScopeReference(methodEmit, interpreterField);
+                    string scopeFieldName;
+                    string varName;
+                    Type dictType;
                     switch (param) {
                         case ScalarVar s:
-                            methILGen.Emit(OpCodes.Ldfld, typeof(Scope).GetField("Scalars"));
-                            methILGen.Emit(OpCodes.Ldstr, s.Value);
-                            methILGen.Emit(OpCodes.Ldarg_S, index);
-                            methILGen.Emit(OpCodes.Callvirt, typeof(Dictionary<string, IScalar>).GetMethod("set_Item"));
+                            scopeFieldName = "Scalars";
+                            varName = s.Value;
+                            dictType = typeof(Dictionary<string, IScalar>);
                             break;
                         case ListVar l:
-                            methILGen.Emit(OpCodes.Ldfld, typeof(Scope).GetField("Lists"));
-                            methILGen.Emit(OpCodes.Ldstr, l.Value);
-                            methILGen.Emit(OpCodes.Ldarg_S, index);
-                            methILGen.Emit(OpCodes.Callvirt, typeof(Dictionary<string, IList>).GetMethod("set_Item"));
+                            scopeFieldName = "Lists";
+                            varName = l.Value;
+                            dictType = typeof(Dictionary<string, IList>);
                             break;
                         case DictVar d:
-                            methILGen.Emit(OpCodes.Ldfld, typeof(Scope).GetField("Dictionaries"));
-                            methILGen.Emit(OpCodes.Ldstr, d.Value);
-                            methILGen.Emit(OpCodes.Ldarg_S, index);
-                            methILGen.Emit(OpCodes.Callvirt, typeof(Dictionary<string, IDictionary>).GetMethod("set_Item"));
+                            scopeFieldName = "Dictionaries";
+                            varName = d.Value;
+                            dictType = typeof(Dictionary<string, IDictionary>);
                             break;
                         case BAtom a:
-                            methILGen.Emit(OpCodes.Ldfld, typeof(Scope).GetField("Functions"));
-                            methILGen.Emit(OpCodes.Ldstr, a.Value);
-                            methILGen.Emit(OpCodes.Ldarg_S, index);
-                            methILGen.Emit(OpCodes.Callvirt, typeof(Dictionary<string, IFunction>).GetMethod("set_Item"));
+                            scopeFieldName = "Functions";
+                            varName = a.Value;
+                            dictType = typeof(Dictionary<string, IFunction>);
                             break;
                         // Rest args
                         case ValueExpression v:
                             if (!(v.Values.ElementAtOrDefault(0) is ListVar rest))
                                 throw new ArgumentTypeException(v.Values.ElementAtOrDefault(0), "rest arguments list variable", index + 1, "fn parameters");
 
-                            methILGen.Emit(OpCodes.Ldfld, typeof(Scope).GetField("Lists"));
-                            methILGen.Emit(OpCodes.Ldstr, rest.Value);
-                            methILGen.Emit(OpCodes.Ldarg_S, index);
-                            methILGen.Emit(OpCodes.Callvirt, typeof(Dictionary<string, IList>).GetMethod("set_Item"));
+                            scopeFieldName = "Lists";
+                            varName = rest.Value;
+                            dictType = typeof(Dictionary<string, IList>);
                             break;
                         default:
                             throw new ArgumentTypeException(param, "variable name", index + 1, "fn parameters");
                     }
+
+                    methodEmit
+                        .LoadField(typeof(Scope).GetField(scopeFieldName))
+                        .LoadConstant(varName)
+                        .LoadArgument((ushort) index)
+                        .CallVirtual(dictType.GetProperty("Item").GetSetMethod());
                 }
             }
+        }
+    }
+
+    static class DefaultContexts {
+        public static IDictionary DictionaryContextForList(IList value) {
+            return new BDictionary(value.WithIndex().ToDictionary(item => (IValue) (BInteger) item.index, item => item.value));
+        }
+
+        public static IList ListContextForDictionary(IDictionary value) {
+            return new BList(value.Select(kvp => new BList(kvp.Key, kvp.Value)));
         }
     }
 }

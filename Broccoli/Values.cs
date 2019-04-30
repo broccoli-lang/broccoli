@@ -23,7 +23,7 @@ namespace Broccoli {
 
     public interface IScalar : IValue { }
 
-    public interface IList : IValue, IEnumerable<IValue> { }
+    public interface IList : IValue, IList<IValue> { }
 
     public interface IDictionary : IValue, IDictionary<IValue, IValue> { }
 
@@ -390,7 +390,7 @@ namespace Broccoli {
 
         public IList ListContext() => this;
 
-        public IDictionary DictionaryContext() => new BDictionary(this.WithIndex().ToDictionary(item => (IValue) (BInteger) item.index, item => item.value));
+        public IDictionary DictionaryContext() => DefaultContexts.DictionaryContextForList(this);
     }
 
     public class BCSharpList : List<object>, IValue {
@@ -477,7 +477,7 @@ namespace Broccoli {
 
         public IScalar ScalarContext() => (BInteger) Count;
 
-        public IList ListContext() => new BList(this.Select(kvp => new BList(kvp.Key, kvp.Value)));
+        public IList ListContext() => DefaultContexts.ListContextForDictionary(this);
 
         public IDictionary DictionaryContext() => this;
     }
