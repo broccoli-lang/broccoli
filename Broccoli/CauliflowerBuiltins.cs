@@ -1324,7 +1324,7 @@ namespace Broccoli {
 
                 var classType = typeBuilder.CreateType();
 
-//                new AssemblyGenerator().GenerateAssembly(asmBuilder, "cauliflower.dll");
+                new AssemblyGenerator().GenerateAssembly(asmBuilder, "cauliflower.dll");
 
                 classType.GetMethod("(init)", BindingFlags.NonPublic | BindingFlags.Static)
                     .Invoke(null, new [] {cauliflower});
