@@ -141,13 +141,13 @@ namespace Broccoli {
                                 type = TokenType.Atom;
                                 break;
                         }
-                        if (type != TokenType.None)
-                            current.Children.Add(new ParseNode(new Token(type, value)));
-                        if (match.Length == 0)
-                            throw new Exception($"Could not match token '{Regex.Escape("" + c)}' at {row + 1}:{column}");
-                        column += match.Length;
-                    }
+                    if (type != TokenType.None)
+                        current.Children.Add(new ParseNode(new Token(type, value)));
+                    if (match.Length == 0)
+                        throw new Exception($"Could not match token '{Regex.Escape("" + c)}' at {row + 1}:{column}");
+                    column += match.Length;
                 }
+            }
             if (current.UnfinishedString == null && (result.Children.Count() == 0 || result.Children.Last().Finished))
                 result.Finished = true;
             return result;
