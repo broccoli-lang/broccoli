@@ -1,23 +1,23 @@
 ﻿using System;
 using System.Globalization;
+
 namespace Broccoli {
     /// <summary>
-    /// Represents a token with associated string representation before parsing to values.
+    ///     Represents a token with associated string representation before parsing to values.
     /// </summary>
     public class Token {
-        public TokenType Type { get; }
-        public string Literal { get; }
-
         public Token(TokenType type, string literal) {
-            Type = type;
+            Type    = type;
             Literal = literal;
         }
 
-        public override string ToString() {
-            return (Type, Literal).ToString();
-        }
+        public TokenType Type    { get; }
+        public string    Literal { get; }
+
+        public override string ToString() => (Type, Literal).ToString();
 
         public IValue ToIValue() {
+            // ReSharper disable once SwitchStatementMissingSomeCases
             switch (Type) {
                 case TokenType.String:
                     return new BString(Literal);

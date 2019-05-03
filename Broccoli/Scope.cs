@@ -1,47 +1,36 @@
 ﻿using System;
 using System.Collections.Generic;
-using BCSharpType = Broccoli.CauliflowerInterpreter.BCSharpType;
 
 namespace Broccoli {
     /// <summary>
-    /// Represents a nested scope with various scoped variables.
+    ///     Represents a nested scope with various scoped variables.
     /// </summary>
     public class Scope {
-        public class Tree<TKey, TValue> : Dictionary<TKey, Tree<TKey, TValue>> {
-            public TValue Value;
-
-            public void Add(Tree<TKey, TValue> other) {
-                foreach (var (key, value) in other)
-                    if (ContainsKey(key))
-                        this[key].Add(value);
-                    else
-                        this[key] = value;
-            }
-        }
+        public readonly Dictionary<string, IDictionary> Dictionaries = new Dictionary<string, IDictionary>();
+        public readonly Dictionary<string, IFunction>   Functions    = new Dictionary<string, IFunction>();
+        public readonly Dictionary<string, IList>       Lists        = new Dictionary<string, IList>();
+        public readonly Tree<string, Scope>             Namespaces   = new Tree<string, Scope>();
+        public readonly Scope                           Parent;
 
         public readonly Dictionary<string, IScalar> Scalars = new Dictionary<string, IScalar>();
-        public readonly Dictionary<string, IList> Lists = new Dictionary<string, IList>();
-        public readonly Dictionary<string, IDictionary> Dictionaries = new Dictionary<string, IDictionary>();
-        public readonly Dictionary<string, IFunction> Functions = new Dictionary<string, IFunction>();
-        public readonly Tree<string, Scope> Namespaces = new Tree<string, Scope>();
-        public readonly Dictionary<string, BCSharpType> Types = new Dictionary<string, BCSharpType>();
-        public readonly Scope Parent;
+
+        public readonly Dictionary<string, CauliflowerInterpreter.BCSharpType> Types =
+            new Dictionary<string, CauliflowerInterpreter.BCSharpType>();
 
         private Type _surroundingClass;
+
+        public Scope() { }
+
+        public Scope(Scope parent) => Parent = parent;
+
         public Type SurroundingClass {
             get => _surroundingClass != null ? _surroundingClass : Parent.SurroundingClass;
 
             set => _surroundingClass = value;
         }
 
-        public Scope() { }
-
-        public Scope(Scope parent) {
-            Parent = parent;
-        }
-
         /// <summary>
-        /// Gets or sets the value of the given scalar variable.
+        ///     Gets or sets the value of the given scalar variable.
         /// </summary>
         /// <param name="s">The scalar variable to access.</param>
         public virtual IScalar this[ScalarVar s] {
@@ -57,12 +46,13 @@ namespace Broccoli {
 
                     current = current.Parent;
                 } while (current != null);
+
                 Scalars[s.Value] = value;
             }
         }
 
         /// <summary>
-        /// Gets or sets the value of the given list variable.
+        ///     Gets or sets the value of the given list variable.
         /// </summary>
         /// <param name="l">The list variable to access.</param>
         public virtual IList this[ListVar l] {
@@ -78,12 +68,13 @@ namespace Broccoli {
 
                     current = current.Parent;
                 } while (current != null);
+
                 Lists[l.Value] = value;
             }
         }
 
         /// <summary>
-        /// Gets or sets the value of the given dictionary variable.
+        ///     Gets or sets the value of the given dictionary variable.
         /// </summary>
         /// <param name="d">The dictionary variable to access.</param>
         public virtual IDictionary this[DictVar d] {
@@ -99,12 +90,13 @@ namespace Broccoli {
 
                     current = current.Parent;
                 } while (current != null);
+
                 Dictionaries[d.Value] = value;
             }
         }
 
         /// <summary>
-        /// Gets or sets the value of the given function.
+        ///     Gets or sets the value of the given function.
         /// </summary>
         /// <param name="f">The name of the function to access.</param>
         public virtual IFunction this[string f] {
@@ -120,18 +112,31 @@ namespace Broccoli {
 
                     current = current.Parent;
                 } while (current != null);
+
                 Functions[f] = value;
             }
         }
 
         /// <summary>
-        /// Gets the type corresponding to the given type name.
+        ///     Gets the type corresponding to the given type name.
         /// </summary>
         /// <param name="t">The type name to retrieve.</param>
-        public BCSharpType this[TypeName t] {
+        public CauliflowerInterpreter.BCSharpType this[TypeName t] {
             get => Types.ContainsKey(t) ? Types[t] : Parent?[t];
 
             set => Types[t] = value;
+        }
+
+        public class Tree<TKey, TValue> : Dictionary<TKey, Tree<TKey, TValue>> {
+            public TValue Value;
+
+            public void Add(Tree<TKey, TValue> other) {
+                foreach (var (key, value) in other)
+                    if (ContainsKey(key))
+                        this[key].Add(value);
+                    else
+                        this[key] = value;
+            }
         }
     }
 }

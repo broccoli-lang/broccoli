@@ -3,25 +3,24 @@ using System.Linq;
 
 namespace Broccoli {
     /// <summary>
-    /// The interpreter for the Broccoli dialect Cauliflower.
+    ///     The interpreter for the Broccoli dialect Cauliflower.
     /// </summary>
     public partial class CauliflowerInterpreter {
-
         public CauliflowerInterpreter(BList argv = null) {
-            Scope = new CauliflowerScope();
-            Builtins = StaticBuiltins;
+            Scope               = new CauliflowerScope();
+            Builtins            = StaticBuiltins;
             Scope.Lists["ARGV"] = argv ?? new BList();
         }
 
         /// <summary>
-        /// Runs the given string as Cauliflower code.
+        ///     Runs the given string as Cauliflower code.
         /// </summary>
         /// <param name="code">The code to run.</param>
         /// <returns>The final value returned by the overall expression.</returns>
         public override IValue Run(string code) => Run(Parse(code));
 
         /// <summary>
-        /// Evaluates the already-parsed tree as Cauliflower code.
+        ///     Evaluates the already-parsed tree as Cauliflower code.
         /// </summary>
         /// <param name="node">The node to evaluate.</param>
         /// <returns>The final value returned by the root node.</returns>
@@ -33,7 +32,7 @@ namespace Broccoli {
         }
 
         /// <summary>
-        /// Takes an expression or value and evaluates it.
+        ///     Takes an expression or value and evaluates it.
         /// </summary>
         /// <param name="expr">The expression or value to evaluate.</param>
         /// <returns>The value represented by the expression or value.</returns>

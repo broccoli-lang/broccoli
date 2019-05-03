@@ -1,6 +1,6 @@
 namespace Broccoli {
     /// <summary>
-    /// Represents the different types of raw token before parsing.
+    ///     Represents the different types of raw token before parsing.
     /// </summary>
     public enum TokenType {
         // Literals
@@ -19,6 +19,6 @@ namespace Broccoli {
 
         // Miscellaneous
         Comment,
-        None,
+        None
     }
 }

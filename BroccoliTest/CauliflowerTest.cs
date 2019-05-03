@@ -1,40 +1,30 @@
 using System;
+using System.IO;
 using System.Linq;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Broccoli;
 using System.Text;
+using Broccoli;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 // TODO: allow user-defined classes to specify default context - make them automatically extend IEnumerable<IValue> or IDictionary<IValue, IValue> as needed
 
 namespace BroccoliTest {
     [TestClass]
     public class CauliflowerTest {
+        private StringReader         _input;
+        private Writer               _output;
         private Func<string, IValue> _run;
-        private System.IO.StringReader _input;
-        private Writer _output;
-
-        private class Writer : System.IO.TextWriter {
-            public override Encoding Encoding => Encoding.UTF8;
-
-            private StringBuilder _lastOutput = new StringBuilder();
-
-            public void Clear() => _lastOutput.Clear();
-
-            public override void Write(char c) => _lastOutput.Append(c);
-
-            public override string ToString() => _lastOutput.ToString();
-        }
 
         private static BList ListFrom() => new BList();
 
-        private static BList ListFrom(params int[] a) => new BList(a.Select(i => (IValue)new BInteger(i)));
+        private static BList ListFrom(params int[] a) => new BList(a.Select(i => (IValue) new BInteger(i)));
 
         private static BList ListFrom(params IValue[] a) => new BList(a);
 
-        private static BDictionary DictFrom(params (int, int)[] a) => new BDictionary(a.ToDictionary(o => (IValue) (BInteger) o.Item1, o => (IValue) (BInteger) o.Item2));
+        private static BDictionary DictFrom(params (int, int)[] a) =>
+            new BDictionary(a.ToDictionary(o => (IValue) (BInteger) o.Item1, o => (IValue) (BInteger) o.Item2));
 
         private void WriteInput(string input) {
-            _input = new System.IO.StringReader(input);
+            _input = new StringReader(input);
             Console.SetIn(_input);
         }
 
@@ -74,7 +64,7 @@ namespace BroccoliTest {
         public void TestPlus() {
             Assert.AreEqual(_run("(+ 2 2)"), new BInteger(4), "+ does not work correctly");
             Assert.AreEqual(_run("(+ 2 -3)"), new BInteger(-1), "+ does not work correctly with negative");
-            Assert.AreEqual(_run("(+ 2 2.2)"), new BFloat(2 + 2.2), "+ does not work correctly with float");
+            Assert.AreEqual(_run("(+ 2 2.2)"), new BFloat(2  + 2.2), "+ does not work correctly with float");
             Assert.AreEqual(_run("(+ 2 -2.2)"), new BFloat(2 - 2.2), "+ does not work correctly with negative float");
             Assert.AreEqual(_run("(+ -2 -2)"), new BInteger(-4), "+ does not work correctly with both arguments negative");
             Assert.AreEqual(_run("(+ 2.2 2.2)"), new BFloat(2.2 + 2.2), "+ does not work correctly with both arguments negative");
@@ -86,7 +76,7 @@ namespace BroccoliTest {
         public void TestTimes() {
             Assert.AreEqual(_run("(* 2 2)"), new BInteger(4), "* does not work correctly");
             Assert.AreEqual(_run("(* 2 -3)"), new BInteger(-6), "* does not work correctly with negative");
-            Assert.AreEqual(_run("(* 2 2.2)"), new BFloat(2 * 2.2), "* does not work correctly with float");
+            Assert.AreEqual(_run("(* 2 2.2)"), new BFloat(2  * 2.2), "* does not work correctly with float");
             Assert.AreEqual(_run("(* 2 -2.2)"), new BFloat(2 * -2.2), "* does not work correctly with negative float");
             Assert.AreEqual(_run("(* -2 -2)"), new BInteger(4), "* does not work correctly with both arguments negative");
             Assert.AreEqual(_run("(* 2.2 2.2)"), new BFloat(2.2 * 2.2), "* does not work correctly with both arguments negative");
@@ -98,7 +88,7 @@ namespace BroccoliTest {
         public void TestMinus() {
             Assert.AreEqual(_run("(- 2 2)"), new BInteger(0), "- does not work correctly");
             Assert.AreEqual(_run("(- 2 -3)"), new BInteger(5), "- does not work correctly with negative");
-            Assert.AreEqual(_run("(- 2 2.2)"), new BFloat(2 - 2.2), "- does not work correctly with float");
+            Assert.AreEqual(_run("(- 2 2.2)"), new BFloat(2  - 2.2), "- does not work correctly with float");
             Assert.AreEqual(_run("(- 2 -2.2)"), new BFloat(2 - -2.2), "- does not work correctly with negative float");
             Assert.AreEqual(_run("(- -2 -2)"), new BInteger(0), "- does not work correctly with both arguments negative");
             Assert.AreEqual(_run("(- 2.2 2.2)"), new BFloat(2.2 - 2.2), "- does not work correctly with both arguments negative");
@@ -109,9 +99,9 @@ namespace BroccoliTest {
         [TestMethod]
         public void TestDivide() {
             Assert.AreEqual(_run("(/ 2 2)"), new BFloat(1), "/ does not work correctly");
-            Assert.AreEqual(_run("(/ 2 -3)"), new BFloat((double)2 / -3), "/ does not work correctly with negative");
-            Assert.AreEqual(_run("(/ 2 2.2)"), new BFloat(2 / 2.2), "/ does not work correctly with float");
-            Assert.AreEqual(_run("(/ 2 -2.2)"), new BFloat(2 / -2.2), "/ does not work correctly with negative float");
+            Assert.AreEqual(_run("(/ 2 -3)"), new BFloat((double) 2 / -3), "/ does not work correctly with negative");
+            Assert.AreEqual(_run("(/ 2 2.2)"), new BFloat(2         / 2.2), "/ does not work correctly with float");
+            Assert.AreEqual(_run("(/ 2 -2.2)"), new BFloat(2        / -2.2), "/ does not work correctly with negative float");
             Assert.AreEqual(_run("(/ -2 -2)"), new BFloat(1), "/ does not work correctly with both arguments negative");
             Assert.AreEqual(_run("(/ 2.2 2.2)"), new BFloat(1), "/ does not work correctly with both arguments negative");
             Assert.AreEqual(_run("(/ 2.2 2.2)"), new BFloat(1), "/ does not work correctly with multiple arguments");
@@ -258,15 +248,27 @@ namespace BroccoliTest {
         }
 
         [TestMethod]
-        public void TestFor() => Assert.AreEqual(_run("(:= $a 0) (for $i in '(1 10 100) (:= $a (+ $a $i))) $a"), new BInteger(111), "For loop does not work correctly");
+        public void TestFor() => Assert.AreEqual(
+            _run("(:= $a 0) (for $i in '(1 10 100) (:= $a (+ $a $i))) $a"),
+            new BInteger(111),
+            "For loop does not work correctly"
+        );
 
         [TestMethod]
-        public void TestWhile() => Assert.AreEqual(_run("(:= $a 0) (while (< (:= $a (+ $a 1)) 5)) $a"), new BInteger(5), "While loop does not work correctly");
+        public void TestWhile() => Assert.AreEqual(
+            _run("(:= $a 0) (while (< (:= $a (+ $a 1)) 5)) $a"),
+            new BInteger(5),
+            "While loop does not work correctly"
+        );
 
         [TestMethod]
         public void TestDo() {
             Assert.AreEqual(_run("(do (($a 1 (+ $a 1))) ((= $a 5) $a $a))"), new BInteger(5), "Do loop does not work correctly");
-            Assert.AreEqual(_run("(do (($a 1 $b) ($b 1 (+ $a $b))) ((= $a 13) $b))"), new BInteger(21), "Do loop with simultaneous assignment does not work correctly");
+            Assert.AreEqual(
+                _run("(do (($a 1 $b) ($b 1 (+ $a $b))) ((= $a 13) $b))"),
+                new BInteger(21),
+                "Do loop with simultaneous assignment does not work correctly"
+            );
         }
 
         // List Functions
@@ -329,18 +331,73 @@ namespace BroccoliTest {
 
         [TestMethod]
         public void TestRange() {
-            Assert.AreEqual(_run("(range 0 5)"), ListFrom(0, 1, 2, 3, 4), "Range does not work correctly");
+            Assert.AreEqual(
+                _run("(range 0 5)"),
+                ListFrom(
+                    0,
+                    1,
+                    2,
+                    3,
+                    4
+                ),
+                "Range does not work correctly"
+            );
             Assert.AreEqual(_run("(range 5 0)"), ListFrom(), "Empty range does not work correctly");
-            Assert.AreEqual(_run("(range -5 5)"), ListFrom(-5, -4, -3, -2, -1, 0, 1, 2, 3, 4), "Negative range does not work correctly");
+            Assert.AreEqual(
+                _run("(range -5 5)"),
+                ListFrom(
+                    -5,
+                    -4,
+                    -3,
+                    -2,
+                    -1,
+                    0,
+                    1,
+                    2,
+                    3,
+                    4
+                ),
+                "Negative range does not work correctly"
+            );
             Assert.AreEqual(_run("(range 5 -5)"), ListFrom(), "Empty range does not work correctly");
             Assert.AreEqual(_run("(range -5 -1)"), ListFrom(-5, -4, -3, -2), "Negative to negative range does not work correctly");
             Assert.AreEqual(_run("(range -1 -10)"), ListFrom(), "Empty range does not work correctly");
             Assert.AreEqual(_run("(range 4)"), ListFrom(0, 1, 2, 3), "Range does not work correctly with one argument");
             Assert.AreEqual(_run("(range -4)"), ListFrom(), "Empty range does not work correctly with one argument");
-            Assert.AreEqual(_run("(range 0 10 2)"), ListFrom(0, 2, 4, 6, 8), "Range does not work correctly with three arguments");
+            Assert.AreEqual(
+                _run("(range 0 10 2)"),
+                ListFrom(
+                    0,
+                    2,
+                    4,
+                    6,
+                    8
+                ),
+                "Range does not work correctly with three arguments"
+            );
             Assert.AreEqual(_run("(range 0 10 -2)"), ListFrom(), "Empty range does not work correctly with three arguments");
-            Assert.AreEqual(_run("(range 0 9 2)"), ListFrom(0, 2, 4, 6, 8), "Range does not work correctly with three arguments");
-            Assert.AreEqual(_run("(range 10 0 -2)"), ListFrom(10, 8, 6, 4, 2), "Range does not work correctly with three arguments");
+            Assert.AreEqual(
+                _run("(range 0 9 2)"),
+                ListFrom(
+                    0,
+                    2,
+                    4,
+                    6,
+                    8
+                ),
+                "Range does not work correctly with three arguments"
+            );
+            Assert.AreEqual(
+                _run("(range 10 0 -2)"),
+                ListFrom(
+                    10,
+                    8,
+                    6,
+                    4,
+                    2
+                ),
+                "Range does not work correctly with three arguments"
+            );
             Assert.AreEqual(_run("(range 10 0 2)"), ListFrom(), "Empty range does not work correctly with three arguments");
             Assert.ThrowsException<Exception>(() => _run("(range)"), "Range does not fail with no arguments");
             Assert.ThrowsException<Exception>(() => _run("(range 1 2 3 4)"), "Range does not fail with four arguments");
@@ -349,8 +406,30 @@ namespace BroccoliTest {
 
         [TestMethod]
         public void TestCat() {
-            Assert.AreEqual(_run("(cat '(0 1 2) '(3 4 5))"), ListFrom(0, 1, 2, 3, 4, 5), "Cat does not work correctly");
-            Assert.AreEqual(_run("(cat '(0 1) '(2 3) '(4 5))"), ListFrom(0, 1, 2, 3, 4, 5), "Cat does not work correctly with multiple arguments");
+            Assert.AreEqual(
+                _run("(cat '(0 1 2) '(3 4 5))"),
+                ListFrom(
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                ),
+                "Cat does not work correctly"
+            );
+            Assert.AreEqual(
+                _run("(cat '(0 1) '(2 3) '(4 5))"),
+                ListFrom(
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                ),
+                "Cat does not work correctly with multiple arguments"
+            );
             Assert.AreEqual(_run("(cat 0 1 2)"), ListFrom(0, 1, 2), "Cat works correctly with non-lists");
         }
 
@@ -358,36 +437,46 @@ namespace BroccoliTest {
         public void TestLiterals() {
             Assert.AreEqual(_run("\"\\rfoo\\\"\\t\\n\""), new BString("\rfoo\"\t\n"), "String escaping does not work correctly");
             Assert.AreEqual(_run("\"\rfoo\n\""), new BString("\rfoo\n"), "Multiline strings do not work correctly");
-            Assert.AreEqual(_run("'(1 2 (3 4 foo (\"bar\")))"), new BList(
-                (BInteger) 1,
-                (BInteger) 2,
+            Assert.AreEqual(
+                _run("'(1 2 (3 4 foo (\"bar\")))"),
                 new BList(
-                    (BInteger) 3,
-                    (BInteger) 4,
-                    (BAtom) "foo",
+                    (BInteger) 1,
+                    (BInteger) 2,
                     new BList(
-                        (BString) "bar"
+                        (BInteger) 3,
+                        (BInteger) 4,
+                        (BAtom) "foo",
+                        new BList(
+                            (BString) "bar"
+                        )
                     )
-                )
-            ), "Lists do not work correctly");
-            Assert.AreEqual(_run("`((1 2) ('(baz quux) \"a\"))"), new BDictionary {
-                { (BInteger) 1, (BInteger) 2},
-                { new BList((BAtom) "baz", (BAtom) "quux"), (BString) "a"}
-            }, "Dictionaries do not work correctly");
-            Assert.AreEqual(_run("`((`((1 \"foo\") (asdf 123902.2)) 2) ('(baz quux) \"a\"))"), new BDictionary {
-                { new BDictionary {
-                    { (BInteger) 1, (BString) "foo" },
-                    { (BAtom) "asdf", (BFloat) 123902.2 }
-                }, (BInteger) 2},
-                { new BList((BAtom) "baz", (BAtom) "quux"), (BString) "a"}
-            }, "Dictionaries do not work correctly");
+                ),
+                "Lists do not work correctly"
+            );
+            Assert.AreEqual(
+                _run("`((1 2) ('(baz quux) \"a\"))"),
+                new BDictionary { { (BInteger) 1, (BInteger) 2 }, { new BList((BAtom) "baz", (BAtom) "quux"), (BString) "a" } },
+                "Dictionaries do not work correctly"
+            );
+            Assert.AreEqual(
+                _run("`((`((1 \"foo\") (asdf 123902.2)) 2) ('(baz quux) \"a\"))"),
+                new BDictionary {
+                    { new BDictionary { { (BInteger) 1, (BString) "foo" }, { (BAtom) "asdf", (BFloat) 123902.2 } }, (BInteger) 2 },
+                    { new BList((BAtom) "baz", (BAtom) "quux"), (BString) "a" }
+                },
+                "Dictionaries do not work correctly"
+            );
         }
 
         [TestMethod]
         public void TestAdd() {
             Assert.AreEqual(_run("(+ \"foo\" \"bar\" \"baz\")"), new BString("foobarbaz"), "List addition does not work");
             Assert.AreEqual(_run("(+ '(1 2) '(3 4) '(5 6))"), _run("'(1 2 3 4 5 6)"), "List addition does not work");
-            Assert.AreEqual(_run("(+ `((1 2)) `((3 4)) `((5 6)) `((5 7)))"), _run("`((1 2) (3 4) (5 7))"), "Dictionary addition does not work");
+            Assert.AreEqual(
+                _run("(+ `((1 2)) `((3 4)) `((5 6)) `((5 7)))"),
+                _run("`((1 2) (3 4) (5 7))"),
+                "Dictionary addition does not work"
+            );
         }
 
         [TestMethod]
@@ -398,36 +487,65 @@ namespace BroccoliTest {
             Assert.AreEqual(_run("(= foo foo foos)"), BAtom.Nil, "Atom equality does not fail correctly");
             Assert.AreEqual(_run("(= '(1 2) '(1 2) '(1 2))"), BAtom.True, "List equality does not succeed correctly");
             Assert.AreEqual(_run("(= '(1 2) '(1 3) '(1 3))"), BAtom.Nil, "List equality does not fail correctly");
-            Assert.AreEqual(_run("(= `((1 2) (3 4)) `((1 2) (3 4)) `((1 2) (3 4)))"), BAtom.True, "Dictionary equality does not succeed correctly");
-            Assert.AreEqual(_run("(= `((1 2) (3 4)) `((1 2) (3 4)) `((1 2) (3 5)))"), BAtom.Nil, "Dictionary equality does not fail correctly");
-            Assert.AreEqual(_run("(= `((1 2) (3 4)) `((1 2) (3 4)) `((1 3) (3 4)))"), BAtom.Nil, "Dictionary equality does not fail correctly");
-            Assert.AreEqual(_run("(/= `((1 2) (3 4)) `((1 2) (3 4)) `((1 3) (3 4)))"), BAtom.Nil, "Dictionary inequality does not fail correctly");
-            Assert.AreEqual(_run("(/= `((1 2) (3 4)) `((1 2) (4 4)) `((1 3) (3 4)))"), BAtom.True, "Dictionary inequality does not fail correctly");
-
+            Assert.AreEqual(
+                _run("(= `((1 2) (3 4)) `((1 2) (3 4)) `((1 2) (3 4)))"),
+                BAtom.True,
+                "Dictionary equality does not succeed correctly"
+            );
+            Assert.AreEqual(
+                _run("(= `((1 2) (3 4)) `((1 2) (3 4)) `((1 2) (3 5)))"),
+                BAtom.Nil,
+                "Dictionary equality does not fail correctly"
+            );
+            Assert.AreEqual(
+                _run("(= `((1 2) (3 4)) `((1 2) (3 4)) `((1 3) (3 4)))"),
+                BAtom.Nil,
+                "Dictionary equality does not fail correctly"
+            );
+            Assert.AreEqual(
+                _run("(/= `((1 2) (3 4)) `((1 2) (3 4)) `((1 3) (3 4)))"),
+                BAtom.Nil,
+                "Dictionary inequality does not fail correctly"
+            );
+            Assert.AreEqual(
+                _run("(/= `((1 2) (3 4)) `((1 2) (4 4)) `((1 3) (3 4)))"),
+                BAtom.True,
+                "Dictionary inequality does not fail correctly"
+            );
         }
 
         [TestMethod]
         public void TestComments() {
 #pragma warning disable IDE0022 // Use expression body for methods
-            Assert.AreEqual(_run("#| a #|;this is a comment.\n !@\r|#$%^&*()|#\n\"yey\""), new BString("yey"), "Comment does not work correctly");
+            Assert.AreEqual(
+                _run("#| a #|;this is a comment.\n !@\r|#$%^&*()|#\n\"yey\""),
+                new BString("yey"),
+                "Comment does not work correctly"
+            );
 #pragma warning restore IDE0022 // Use expression body for methods
         }
 
         [TestMethod]
         public void TestDicts() {
             Assert.AreEqual(_run("(mkdict)"), new BDictionary(), "mkdict fails");
-            Assert.AreEqual(_run("(setkey (mkdict) 1 2)"), new BDictionary{{(BInteger)1, (BInteger)2}},
-             "setkey fails to add key");
+            Assert.AreEqual(
+                _run("(setkey (mkdict) 1 2)"),
+                new BDictionary { { (BInteger) 1, (BInteger) 2 } },
+                "setkey fails to add key"
+            );
             _run("(:= %dict (setkey (mkdict) 1 2))");
-            Assert.AreEqual(_run("(setkey %dict 1 3)"), new BDictionary{{(BInteger)1, (BInteger)3}},
-             "setkey fails to change key");
+            Assert.AreEqual(
+                _run("(setkey %dict 1 3)"),
+                new BDictionary { { (BInteger) 1, (BInteger) 3 } },
+                "setkey fails to change key"
+            );
             Assert.AreEqual(_run("(rmkey %dict 1)"), new BDictionary(), "rmkey fails");
             Assert.AreEqual(_run("(haskey %dict 1)"), BAtom.True, "haskey fails");
             Assert.AreNotEqual(_run("(haskey %dict 42)"), BAtom.True, "haskey fails");
-            Assert.AreEqual(_run("(getkey %dict 1)"), (BInteger)2);
+            Assert.AreEqual(_run("(getkey %dict 1)"), (BInteger) 2);
             _run("(:= %dict (setkey %dict \"foo\" \"bar\"))");
-            CollectionAssert.AreEquivalent((BList)_run("(keys %dict)"), new BList((BInteger)1, (BString) "foo"));
-            CollectionAssert.AreEquivalent((BList)_run("(values %dict)"), new BList((BInteger)2, (BString) "bar"));
+            CollectionAssert.AreEquivalent((BList) _run("(keys %dict)"), new BList((BInteger) 1, (BString) "foo"));
+            CollectionAssert.AreEquivalent((BList) _run("(values %dict)"), new BList((BInteger) 2, (BString) "bar"));
             Assert.ThrowsException<Exception>(() => _run("(:= $s (mkdict))"), "Can assign dict to scalar var");
             Assert.ThrowsException<Exception>(() => _run("(:= %d 4)"), "Can assign scalar to dict var");
         }
@@ -440,7 +558,11 @@ namespace BroccoliTest {
             Assert.AreEqual(ReadOutput(_run("(print \"foo\")")), "foo", "Print does not work correctly for strings");
             Assert.AreEqual(ReadOutput(_run("(print 3.3)")), "3.3", "Print does not work correctly for numbers");
             Assert.AreEqual(ReadOutput(_run("(print '(foo bar))")), "(foo bar)", "Print does not work correctly for lists");
-            Assert.AreEqual(ReadOutput(_run("(p `((foo bar)(baz quux))")), "(foo: bar, baz: quux)", "Print does not work correctly for dictionaries");
+            Assert.AreEqual(
+                ReadOutput(_run("(p `((foo bar)(baz quux))")),
+                "(foo: bar, baz: quux)",
+                "Print does not work correctly for dictionaries"
+            );
         }
 
         [TestMethod]
@@ -450,21 +572,45 @@ namespace BroccoliTest {
             Assert.AreEqual(_run("$'(1 2 3 4)"), (BInteger) 4, "List to scalar conversion does not work");
             Assert.AreEqual(_run("%'(1 2 3 4)"), DictFrom((0, 1), (1, 2), (2, 3), (3, 4)), "List to dictionary conversion does not work");
             Assert.AreEqual(_run("$`((1 2) (3 4))"), (BInteger) 2, "Dictionary to scalar conversion does not work");
-            Assert.AreEqual(_run("@`((1 2) (3 4))"), ListFrom(ListFrom(1, 2), ListFrom(3, 4)), "Dictionary to list conversion does not work");
+            Assert.AreEqual(
+                _run("@`((1 2) (3 4))"),
+                ListFrom(ListFrom(1, 2), ListFrom(3, 4)),
+                "Dictionary to list conversion does not work"
+            );
         }
 
         [TestMethod]
         public void TestOOP() {
-            Assert.AreEqual(_run("(namespace foo (namespace bar (fn baz ($a $b) (+ $a $b)))) (. foo bar baz)").Inspect(), "baz($a $b)", "Nested namespaces do not work");
+            Assert.AreEqual(
+                _run("(namespace foo (namespace bar (fn baz ($a $b) (+ $a $b)))) (. foo bar baz)").Inspect(),
+                "baz($a $b)",
+                "Nested namespaces do not work"
+            );
             Assert.AreEqual(_run("(class !foo (fn bar ($i) (+ $i 1))) ((-> (new !foo) bar) 100)"), (BInteger) 101, "Classes do not work");
         }
 
         [TestMethod]
         public void TestInterop() {
-            Assert.AreEqual(ReadOutput(_run("(import System.Console) ((-> !Console Write) \"foo {0} {1}\" t '(1 2))")), "foo True (1 2)", "Calling static methods via type and name with c#-static does not work");
-            Assert.AreEqual(_run("(import System.Text.RegularExpressions) ((-> (new !Regex \"asdf+\") IsMatch) \"asdfghjkl\")"), BAtom.True, "Calling instance methods does not work");
-            Assert.AreEqual(_run("(import System.Text.RegularExpressions) ((-> (new !Regex \"asdf+\") IsMatch) \"asfdghjkl\")"), BAtom.Nil, "Calling instance methods does not work");
-            Assert.AreEqual(_run("(import System.Linq) @((-> !Enumerable Range) (c#-int 0) (c#-int 100))"), _run("(range 0 100)"), "Enumerable.Range does not match builtin range");
+            Assert.AreEqual(
+                ReadOutput(_run("(import System.Console) ((-> !Console Write) \"foo {0} {1}\" t '(1 2))")),
+                "foo True (1 2)",
+                "Calling static methods via type and name with c#-static does not work"
+            );
+            Assert.AreEqual(
+                _run("(import System.Text.RegularExpressions) ((-> (new !Regex \"asdf+\") IsMatch) \"asdfghjkl\")"),
+                BAtom.True,
+                "Calling instance methods does not work"
+            );
+            Assert.AreEqual(
+                _run("(import System.Text.RegularExpressions) ((-> (new !Regex \"asdf+\") IsMatch) \"asfdghjkl\")"),
+                BAtom.Nil,
+                "Calling instance methods does not work"
+            );
+            Assert.AreEqual(
+                _run("(import System.Linq) @((-> !Enumerable Range) (c#-int 0) (c#-int 100))"),
+                _run("(range 0 100)"),
+                "Enumerable.Range does not match builtin range"
+            );
         }
 
         [TestCleanup]
@@ -472,6 +618,17 @@ namespace BroccoliTest {
             _run = null;
             Console.SetOut(Console.Out);
             _output = null;
+        }
+
+        private class Writer : TextWriter {
+            private readonly StringBuilder _lastOutput = new StringBuilder();
+            public override  Encoding      Encoding => Encoding.UTF8;
+
+            public void Clear() => _lastOutput.Clear();
+
+            public override void Write(char c) => _lastOutput.Append(c);
+
+            public override string ToString() => _lastOutput.ToString();
         }
     }
 }

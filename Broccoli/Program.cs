@@ -10,27 +10,21 @@ namespace Broccoli {
     ///     The main class of the Broccoli .NET interpreter.
     /// </summary>
     public static class Program {
-
         public static void Main(string[] args) {
-            string file;
-            bool getHelp = false, useRepl = args.Length == 0, isCauliflower = false;
+            bool   getHelp = false, useRepl = args.Length == 0, isCauliflower = false;
 
             var options = new OptionSet {
-                {
-                    "h|help", "Show help", n => getHelp = n != null
-                }, {
-                    "r|repl", "Use REPL", n => useRepl = n != null
-                }, {
-                    "c|cauliflower", "Use Cauliflower", n => isCauliflower = n != null
-                }
+                { "h|help", "Show help", n => getHelp = n                    != null },
+                { "r|repl", "Use REPL", n => useRepl = n                     != null },
+                { "c|cauliflower", "Use Cauliflower", n => isCauliflower = n != null }
             };
             IEnumerable<string> argv = options.Parse(args);
             var interpreter = isCauliflower
                 ? new CauliflowerInterpreter(new BList(argv.Skip(1).Select(i => new BString(i))))
                 : new Interpreter();
-            var prompt = isCauliflower ? "cauliflower> " : "broccoli> ";
+            var prompt             = isCauliflower ? "cauliflower> " : "broccoli> ";
             var continuationPrompt = new string(' ', prompt.Length - 2) + "> ";
-            file = argv.FirstOrDefault();
+            var file = argv.FirstOrDefault();
             if (file is null)
                 useRepl = true;
 
@@ -82,7 +76,7 @@ namespace Broccoli {
                             WriteLine(result.Inspect());
                     } catch (Exception e) {
 #if DEBUG
-                            WriteLine(e);
+                        WriteLine(e);
 #else
                             WriteLine($"{e.GetType().ToString().Split('.').Last()}: {e.Message}");
 #endif

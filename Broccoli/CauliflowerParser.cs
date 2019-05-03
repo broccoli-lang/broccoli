@@ -5,34 +5,34 @@ using System.Text.RegularExpressions;
 
 namespace Broccoli {
     public partial class CauliflowerInterpreter {
-        private static Regex _rNewline = new Regex(@"(?<=[\r\n][\s\r\n]*[\r\n]|[\r\n])", RegexOptions.Compiled);
-        private static Regex _rComment = new Regex(@"\G;[\s\S]*$", RegexOptions.Compiled);
-        private static Regex _rBlockCommentStart = new Regex(@"\G#\|\s?", RegexOptions.Compiled);
-        private static Regex _rBlockCommentContinue = new Regex(@"\G[\s\S]*?(#\||\|#)", RegexOptions.Compiled);
-        private static Regex _rWhitespace = new Regex(@"\G\s+", RegexOptions.Compiled);
-        private static Regex _rString = new Regex(@"\G""(?:\\[\s\S]|[^""])*""", RegexOptions.Compiled);
-        private static Regex _rStringStart = new Regex(@"\G""(?:\\[\s\S]|[^""])*$", RegexOptions.Compiled);
-        private static Regex _rStringEnd = new Regex(@"^(?:\\[\s\S]|[^""])*""", RegexOptions.Compiled);
-        private static Regex _rNumber = new Regex(@"^\G-?(?:\d*\.\d+|\d+\.?\d*|\d+)$", RegexOptions.Compiled);
-        private static Regex _rScalar = new Regex(@"\G\$[^\s()$@%'`""]+", RegexOptions.Compiled);
-        private static Regex _rList = new Regex(@"\G@[^\s()$@%'`""]+", RegexOptions.Compiled);
-        private static Regex _rDict = new Regex(@"\G%[^\s()$@%'`""]+", RegexOptions.Compiled);
-        private static Regex _rType = new Regex(@"\G![^\s()$@%'`""]+", RegexOptions.Compiled);
-        private static Regex _rName = new Regex(@"\G[^\s()$@%'`""]+", RegexOptions.Compiled);
+        private static readonly Regex _rNewline              = new Regex(@"(?<=[\r\n][\s\r\n]*[\r\n]|[\r\n])", RegexOptions.Compiled);
+        private static readonly Regex _rComment              = new Regex(@"\G;[\s\S]*$", RegexOptions.Compiled);
+        private static readonly Regex _rBlockCommentStart    = new Regex(@"\G#\|\s?", RegexOptions.Compiled);
+        private static readonly Regex _rBlockCommentContinue = new Regex(@"\G[\s\S]*?(#\||\|#)", RegexOptions.Compiled);
+        private static readonly Regex _rWhitespace           = new Regex(@"\G\s+", RegexOptions.Compiled);
+        private static readonly Regex _rString               = new Regex(@"\G""(?:\\[\s\S]|[^""])*""", RegexOptions.Compiled);
+        private static readonly Regex _rStringStart          = new Regex(@"\G""(?:\\[\s\S]|[^""])*$", RegexOptions.Compiled);
+        private static readonly Regex _rStringEnd            = new Regex(@"^(?:\\[\s\S]|[^""])*""", RegexOptions.Compiled);
+        private static readonly Regex _rNumber               = new Regex(@"^\G-?(?:\d*\.\d+|\d+\.?\d*|\d+)$", RegexOptions.Compiled);
+        private static readonly Regex _rScalar               = new Regex(@"\G\$[^\s()$@%'`""]+", RegexOptions.Compiled);
+        private static readonly Regex _rList                 = new Regex(@"\G@[^\s()$@%'`""]+", RegexOptions.Compiled);
+        private static readonly Regex _rDict                 = new Regex(@"\G%[^\s()$@%'`""]+", RegexOptions.Compiled);
+        private static readonly Regex _rType                 = new Regex(@"\G![^\s()$@%'`""]+", RegexOptions.Compiled);
+        private static readonly Regex _rName                 = new Regex(@"\G[^\s()$@%'`""]+", RegexOptions.Compiled);
 
         /// <inheritdoc />
         public override ParseNode Parse(string s, ParseNode p = null, bool keepComments = false) {
-            var source = _rNewline.Split(s).ToList();
-            var result = new ParseNode();
-            var stack = new List<ParseNode> { result };
-            var current = result;
-            var depth = 0;
+            var source       = _rNewline.Split(s).ToList();
+            var result       = new ParseNode();
+            var stack        = new List<ParseNode> { result };
+            var current      = result;
+            var depth        = 0;
             var commentDepth = 0;
             if (p != null) {
-                result = p;
-                stack = new List<ParseNode> { p };
-                current = result;
-                depth = 1;
+                result       = p;
+                stack        = new List<ParseNode> { p };
+                current      = result;
+                depth        = 1;
                 commentDepth = current.CommentDepth;
                 while (true) {
                     if (current.Children.Count == 0)
@@ -46,32 +46,35 @@ namespace Broccoli {
                     commentDepth = current.CommentDepth;
                 }
             }
+
             foreach (var (line, row) in source.WithIndex()) {
                 var column = 0;
                 while (column < line.Length) {
-                    var c = line[column];
-                    var type = TokenType.None;
-                    Match rawMatch;
+                    var    c    = line[column];
+                    var    type = TokenType.None;
+                    Match  rawMatch;
                     string value = null;
                     string match;
                     if (current.UnfinishedString != null) {
                         rawMatch = _rStringEnd.Match(line);
                         if (!rawMatch.Success) {
                             current.UnfinishedString += Regex.Unescape(line);
-                            column = line.Length;
+                            column                   =  line.Length;
                             continue;
                         }
-                        match = rawMatch.ToString();
-                        value = current.UnfinishedString + Regex.Unescape(match.Substring(0, match.Length - 1));
+
+                        match                    = rawMatch.ToString();
+                        value                    = current.UnfinishedString + Regex.Unescape(match.Substring(0, match.Length - 1));
                         current.UnfinishedString = null;
-                        type = TokenType.String;
+                        type                     = TokenType.String;
                     } else if (commentDepth > 0) {
                         rawMatch = _rBlockCommentContinue.Match(line, column);
                         if (!rawMatch.Success) {
                             current.UnfinishedComment += line;
-                            column = line.Length;
+                            column                    =  line.Length;
                             continue;
                         }
+
                         match = rawMatch.ToString();
                         if (keepComments) {
                             value = current.UnfinishedComment;
@@ -85,12 +88,15 @@ namespace Broccoli {
                                 default:
                                     var start = match[0] == ' ' ? 1 : 0;
                                     value += match.Substring(
-                                        start, match.Length - (match[match.Length - 3] == ' ' ? 3 : 2) - start
+                                        start,
+                                        match.Length - (match[match.Length - 3] == ' ' ? 3 : 2) - start
                                     );
                                     break;
                             }
+
                             type = TokenType.Comment;
                         }
+
                         if (rawMatch.Groups[1].Value == "#|")
                             commentDepth++;
                         else
@@ -115,22 +121,30 @@ namespace Broccoli {
                                 stack.RemoveAt(stack.Count - 1);
                                 current = stack.Last();
                                 if (current.ExpectsList) {
-                                    finished.IsList = true;
+                                    finished.IsList     = true;
                                     current.ExpectsList = false;
                                 }
+
                                 if (current.ExpectsDictionary) {
-                                    finished.IsDictionary = true;
+                                    finished.IsDictionary     = true;
                                     current.ExpectsDictionary = false;
                                 }
-                                if (current.Children.Count > 1 && current.Children[current.Children.Count - 2].Token?.Type == TokenType.Cast) {
-                                    var castNode = new ParseNode(new[] {
-                                        new ParseNode(new Token(TokenType.Atom, current.Children[current.Children.Count - 2].Token.Literal)),
-                                        finished
-                                    });
+
+                                if (current.Children.Count                                   > 1 &&
+                                    current.Children[current.Children.Count - 2].Token?.Type == TokenType.Cast) {
+                                    var castNode = new ParseNode(
+                                        new[] {
+                                            new ParseNode(
+                                                new Token(TokenType.Atom, current.Children[current.Children.Count - 2].Token.Literal)
+                                            ),
+                                            finished
+                                        }
+                                    );
                                     castNode.Finish();
                                     current.Children[current.Children.Count - 2] = castNode;
                                     current.Children.RemoveAt(current.Children.Count - 1);
                                 }
+
                                 continue;
                             // Variables
                             case '$':
@@ -139,7 +153,7 @@ namespace Broccoli {
                                     throw new Exception("Unexpected '|#' outside of comment");
                                 if (match == "") {
                                     match = value = "$";
-                                    type = TokenType.Cast;
+                                    type  = TokenType.Cast;
                                 } else {
                                     value = match.Substring(1);
                                     if (_rNumber.Match(value).Success) {
@@ -148,6 +162,7 @@ namespace Broccoli {
                                     } else
                                         type = TokenType.ScalarName;
                                 }
+
                                 break;
                             case '@':
                                 match = _rList.Match(line, column).ToString();
@@ -155,7 +170,7 @@ namespace Broccoli {
                                     throw new Exception("Unexpected '|#' outside of comment");
                                 if (match == "") {
                                     match = value = "@";
-                                    type = TokenType.Cast;
+                                    type  = TokenType.Cast;
                                 } else {
                                     value = match.Substring(1);
                                     if (_rNumber.Match(value).Success) {
@@ -164,6 +179,7 @@ namespace Broccoli {
                                     } else
                                         type = TokenType.ListName;
                                 }
+
                                 break;
                             case '%':
                                 match = _rDict.Match(line, column).ToString();
@@ -171,7 +187,7 @@ namespace Broccoli {
                                     throw new Exception("Unexpected '|#' outside of comment");
                                 if (match == "") {
                                     match = value = "%";
-                                    type = TokenType.Cast;
+                                    type  = TokenType.Cast;
                                 } else {
                                     value = match.Substring(1);
                                     if (_rNumber.Match(value).Success) {
@@ -180,6 +196,7 @@ namespace Broccoli {
                                     } else
                                         type = TokenType.DictionaryName;
                                 }
+
                                 break;
                             case '!':
                                 match = _rType.Match(line, column).ToString();
@@ -210,12 +227,13 @@ namespace Broccoli {
                                 rawMatch = _rString.Match(line, column);
                                 if (!rawMatch.Success) {
                                     current.UnfinishedString = Regex.Unescape(_rStringStart.Match(line, column).ToString().Substring(1));
-                                    column = line.Length;
+                                    column                   = line.Length;
                                     continue;
                                 }
+
                                 match = rawMatch.ToString();
                                 value = Regex.Unescape(match.Substring(1, match.Length - 2));
-                                type = TokenType.String;
+                                type  = TokenType.String;
                                 break;
                             // Whitespace
                             case ' ':
@@ -231,27 +249,30 @@ namespace Broccoli {
                                 match = _rComment.Match(line, column).ToString();
                                 if (keepComments) {
                                     value = match.Substring(match.Length > 2 && match[1] == ' ' ? 2 : 1);
-                                    type = TokenType.Comment;
+                                    type  = TokenType.Comment;
                                 }
+
                                 break;
                             case '#':
                                 match = _rBlockCommentStart.Match(line, column).ToString();
                                 if (match == null) {
                                     match = value = _rName.Match(line, column).ToString();
-                                    type = TokenType.Atom;
+                                    type  = TokenType.Atom;
                                     break;
                                 }
+
                                 commentDepth++;
                                 if (keepComments) {
                                     current.UnfinishedComment = "";
                                     depth++;
                                     column += match.Length;
-                                    next = new ParseNode { IsComment = true };
+                                    next   =  new ParseNode { IsComment = true };
                                     current.Children.Add(next);
                                     current = next;
                                     stack.Add(current);
                                     continue;
                                 }
+
                                 break;
                             // Identifiers (default)
                             default:
@@ -260,41 +281,45 @@ namespace Broccoli {
                                     type = value.Contains('.') ? TokenType.Float : TokenType.Integer;
                                     break;
                                 }
+
                                 if (match.Contains("|#"))
                                     throw new Exception("Unexpected '|#' outside of comment");
                                 type = TokenType.Atom;
                                 break;
                         }
+
                     if (type != TokenType.None && (type != TokenType.Comment || value.Length != 0))
-                        if (current.Children.Count != 0 && current.Children.Last().Token?.Type == TokenType.Cast) {
-                            current.Children[current.Children.Count - 1] = new ParseNode(new[] {
-                                new ParseNode(new Token(TokenType.Atom, current.Children.Last().Token.Literal)),
-                                new ParseNode(new Token(type, value))
-                            });
-                        } else
+                        if (current.Children.Count != 0 && current.Children.Last().Token?.Type == TokenType.Cast)
+                            current.Children[current.Children.Count - 1] = new ParseNode(
+                                new[] {
+                                    new ParseNode(new Token(TokenType.Atom, current.Children.Last().Token.Literal)),
+                                    new ParseNode(new Token(type, value))
+                                }
+                            );
+                        else
                             current.Children.Add(new ParseNode(new Token(type, value)));
                     if (match.Length == 0)
                         throw new Exception($"Could not match token '{Regex.Escape("" + c)}' at {row + 1}:{column}");
                     column += match.Length;
-                    if (type == TokenType.Comment) {
-                        if (match.Contains("#|")) {
-                            current.UnfinishedComment = "";
-                            depth++;
-                            var next = new ParseNode { IsComment = true };
-                            current.Children.Add(next);
-                            current = next;
-                            stack.Add(current);
-                        } else {
-                            current.UnfinishedComment = "";
-                            depth--;
-                            current.Finish();
-                            stack.RemoveAt(stack.Count - 1);
-                            current = stack.Last();
-                        }
+                    if (type != TokenType.Comment) continue;
+                    if (match.Contains("#|")) {
+                        current.UnfinishedComment = "";
+                        depth++;
+                        var next = new ParseNode { IsComment = true };
+                        current.Children.Add(next);
+                        current = next;
+                        stack.Add(current);
+                    } else {
+                        current.UnfinishedComment = "";
+                        depth--;
+                        current.Finish();
+                        stack.RemoveAt(stack.Count - 1);
+                        current = stack.Last();
                     }
                 }
             }
-            if (commentDepth == 0 && current.UnfinishedString == null && (result.Children.Count() == 0 || result.Children.Last().Finished))
+
+            if (commentDepth == 0 && current.UnfinishedString == null && (!result.Children.Any() || result.Children.Last().Finished))
                 result.Finished = true;
             else
                 current.CommentDepth = commentDepth;

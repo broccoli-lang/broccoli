@@ -1,7 +1,8 @@
-﻿using System.Linq;
+﻿using System.Collections.Generic;
 using System.IO;
-using System.Collections.Generic;
+using System.Linq;
 using Broccoli;
+
 // ReSharper disable InconsistentNaming
 
 #pragma warning disable IDE1006
@@ -9,8 +10,8 @@ using Broccoli;
 // ReSharper disable once CheckNamespace
 namespace cauliflower.core {
     public static class fs {
-        private static Dictionary<string, IValue[]> args = new Dictionary<string, IValue[]> {
-            {"path", new IValue[] { (ScalarVar) "path" } }
+        private static readonly Dictionary<string, IValue[]> args = new Dictionary<string, IValue[]> {
+            { "path", new IValue[] { (ScalarVar) "path" } }
         };
 
         public static IValue exists(IValue path) {

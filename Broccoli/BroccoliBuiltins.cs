@@ -1,23 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.IO;
+using System.Linq;
 using System.Runtime.CompilerServices;
 
 namespace Broccoli {
     public partial class Interpreter {
         /// <summary>
-        /// Converts a .NET boolean into the Broccoli equivalent.
-        /// </summary>
-        /// <param name="b">The boolean to convert.</param>
-        /// <returns>The Broccoli equivalent of the boolean.</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static BAtom Boolean(bool b) => b ? BAtom.True : BAtom.Nil;
-
-        /// <summary>
         /// A dictionary containing all the builtin functions of Broccoli.
         /// </summary>
-        public static readonly Dictionary<string, IFunction> StaticBuiltins = new Dictionary<string, IFunction> {
+        protected static readonly Dictionary<string, IFunction> StaticBuiltins = new Dictionary<string, IFunction> {
             // Core Language Features
             {"", new ShortCircuitFunction("", 1, (broccoli, args) => {
                 var e = (ValueExpression) args[0];
@@ -26,12 +18,11 @@ namespace Broccoli {
                 if (e.Values.Length == 0)
                     throw new Exception("Expected function name");
                 var first = e.Values.First();
-                IFunction fn;
                 if (!(first is BAtom a))
                     throw new Exception($"Function name {first} must be an identifier");
 
                 var fnName = a.Value;
-                fn = broccoli.Scope[fnName] ?? broccoli.Builtins.GetValueOrDefault(fnName, null);
+                var fn = broccoli.Scope[fnName] ?? broccoli.Builtins.GetValueOrDefault(fnName, null);
                 if (fn == null)
                     throw new Exception($"Function {fnName} does not exist");
 
@@ -104,13 +95,12 @@ namespace Broccoli {
                 return broccoli.Run(s.Value);
             })},
             {"call", new ShortCircuitFunction("call", ~1, (broccoli, args) => {
-                IFunction fn;
                 var value = broccoli.Run(args[0]);
                 if (!(broccoli.Run(value) is BAtom a))
                     throw new ArgumentTypeException(args[0], "atom", 1, "call");
 
                 var fnName = a.Value;
-                fn = broccoli.Scope[fnName] ?? broccoli.Builtins.GetValueOrDefault(fnName, null);
+                var fn = broccoli.Scope[fnName] ?? broccoli.Builtins.GetValueOrDefault(fnName, null);
                 if (fn == null)
                     throw new Exception($"Function {fnName} does not exist");
 
@@ -136,6 +126,7 @@ namespace Broccoli {
                 foreach (var value in args) {
                     string print = null;
                     if (value is BAtom atom)
+                        // ReSharper disable once SwitchStatementMissingSomeCases
                         switch (atom.Value) {
                             case "tab":
                                 print = "\t";
@@ -272,9 +263,7 @@ namespace Broccoli {
                 return Boolean(args.Skip(1).All(element => args[0].Equals(element)));
             })},
             {"/=", new Function("/=", ~1, (broccoli, args) => {
-                if (args.Length == 1)
-                    return BAtom.Nil;
-                return Boolean(args.Skip(1).All(element => !args[0].Equals(element)));
+                return args.Length == 1 ? BAtom.Nil : Boolean(args.Skip(1).All(element => !args[0].Equals(element)));
             })},
             {"<", new Function("<", ~2, (broccoli, args) => {
                 foreach (var (value, index) in args.WithIndex())
@@ -282,7 +271,7 @@ namespace Broccoli {
                         throw new ArgumentTypeException(args[0], "integer or float", index + 11, "<");
                 var current = args[0];
                 var rest = args.Skip(1);
-                foreach (var next in rest) {
+                foreach (var next in rest)
                     switch (current) {
                         case BInteger i:
                             switch (next) {
@@ -317,7 +306,7 @@ namespace Broccoli {
                             }
                             break;
                     }
-                }
+
                 return BAtom.True;
             })},
             {">", new Function(">", -3, (broccoli, args) => {
@@ -326,7 +315,7 @@ namespace Broccoli {
                         throw new ArgumentTypeException(args[0], "integer or float", index + 11, ">");
                 var current = args[0];
                 var rest = args.Skip(1);
-                foreach (var next in rest) {
+                foreach (var next in rest)
                     switch (current) {
                         case BInteger i:
                             switch (next) {
@@ -361,7 +350,7 @@ namespace Broccoli {
                             }
                             break;
                     }
-                }
+
                 return BAtom.True;
             })},
             {"<=", new Function("<=", ~2, (broccoli, args) => {
@@ -370,7 +359,7 @@ namespace Broccoli {
                         throw new ArgumentTypeException(args[0], "integer or float", index + 11, "<=");
                 var current = args[0];
                 var rest = args.Skip(1);
-                foreach (var next in rest) {
+                foreach (var next in rest)
                     switch (current) {
                         case BInteger i:
                             switch (next) {
@@ -405,7 +394,7 @@ namespace Broccoli {
                             }
                             break;
                     }
-                }
+
                 return BAtom.True;
             })},
             {">=", new Function(">=", ~2, (broccoli, args) => {
@@ -416,7 +405,7 @@ namespace Broccoli {
                     return BAtom.Nil;
                 var current = args[0];
                 var rest = args.Skip(1);
-                foreach (var next in rest) {
+                foreach (var next in rest)
                     switch (current) {
                         case BInteger i:
                             switch (next) {
@@ -451,7 +440,7 @@ namespace Broccoli {
                             }
                             break;
                     }
-                }
+
                 return BAtom.True;
             })},
 
@@ -569,7 +558,15 @@ namespace Broccoli {
                 foreach (BList list in args)
                     result.AddRange(list);
                 return result;
-            })},
+            })}
         };
+
+        /// <summary>
+        /// Converts a .NET boolean into the Broccoli equivalent.
+        /// </summary>
+        /// <param name="b">The boolean to convert.</param>
+        /// <returns>The Broccoli equivalent of the boolean.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static BAtom Boolean(bool b) => b ? BAtom.True : BAtom.Nil;
     }
 }

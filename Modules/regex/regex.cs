@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using Broccoli;
+
 // ReSharper disable InconsistentNaming
 
 #pragma warning disable IDE1006
@@ -8,16 +10,29 @@ using Broccoli;
 // ReSharper disable once CheckNamespace
 namespace cauliflower.core {
     public class regex : IScalar {
-        public static Interpreter interpreter;
-        private static IValue[] ctorArgs = { (ScalarVar) "pattern" };
-        public Regex Value { get; }
+        public static           Interpreter interpreter;
+        private static readonly IValue[]    ctorArgs = { (ScalarVar) "pattern" };
 
-        public regex(IValue[] args) {
+        public regex(IReadOnlyList<IValue> args) {
             Function.ValidateArgs(1, ctorArgs, "regex#regex");
             if (!(args[0] is BString pattern))
                 throw new ArgumentTypeException(args[0], "string", 1, "match");
             Value = new Regex(pattern.Value);
         }
+
+        public Regex Value { get; }
+
+        public string Inspect() => ToString();
+
+        public object ToCSharp() => Value;
+
+        public Type Type() => typeof(Regex);
+
+        public IScalar ScalarContext() => this;
+
+        public IList ListContext() => throw new NoListContextException(this);
+
+        public IDictionary DictionaryContext() => throw new NoDictionaryContextException(this);
 
         public IValue match(IValue input) {
             if (!(input is BString inputS))
@@ -44,17 +59,5 @@ namespace cauliflower.core {
         }
 
         public override string ToString() => Value.ToString();
-
-        public string Inspect() => ToString();
-
-        public object ToCSharp() => Value;
-
-        public Type Type() => typeof(Regex);
-
-        public IScalar ScalarContext() => this;
-
-        public IList ListContext() => throw new NoListContextException(this);
-
-        public IDictionary DictionaryContext() => throw new NoDictionaryContextException(this);
     }
 }

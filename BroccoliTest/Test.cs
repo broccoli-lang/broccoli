@@ -1,31 +1,19 @@
 using System;
+using System.IO;
 using System.Linq;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Broccoli;
-using BString = Broccoli.BString;
 using System.Text;
+using Broccoli;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace BroccoliTest {
     [TestClass]
     public class Test {
+        private Writer               _output;
         private Func<string, IValue> _run;
-        private Writer _output;
-
-        private class Writer : System.IO.TextWriter {
-            public override Encoding Encoding => Encoding.UTF8;
-
-            private StringBuilder _lastOutput = new StringBuilder();
-
-            public void Clear() => _lastOutput.Clear();
-
-            public override void Write(char c) => _lastOutput.Append(c);
-
-            public override string ToString() => _lastOutput.ToString();
-        }
 
         private static BList ValueListFrom() => new BList();
 
-        private static BList ValueListFrom(params int[] a) => new BList(a.Select(i => (IValue)new BInteger(i)));
+        private static BList ValueListFrom(params int[] a) => new BList(a.Select(i => (IValue) new BInteger(i)));
 
         // ReSharper disable once UnusedParameter.Local
         private string ReadOutput(params object[] ignored) {
@@ -61,7 +49,11 @@ namespace BroccoliTest {
         }
 
         [TestMethod]
-        public void TestComments() => Assert.AreEqual(_run(";this is a comment. !@#$%^&*()\n\"yey\""), new BString("yey"), "Comment does not work correctly");
+        public void TestComments() => Assert.AreEqual(
+            _run(";this is a comment. !@#$%^&*()\n\"yey\""),
+            new BString("yey"),
+            "Comment does not work correctly"
+        );
 
         // Meta-commands
         [TestMethod]
@@ -86,7 +78,7 @@ namespace BroccoliTest {
         public void TestPlus() {
             Assert.AreEqual(_run("(+ 2 2)"), new BInteger(4), "+ does not work correctly");
             Assert.AreEqual(_run("(+ 2 -3)"), new BInteger(-1), "+ does not work correctly with negative");
-            Assert.AreEqual(_run("(+ 2 2.2)"), new BFloat(2 + 2.2), "+ does not work correctly with float");
+            Assert.AreEqual(_run("(+ 2 2.2)"), new BFloat(2  + 2.2), "+ does not work correctly with float");
             Assert.AreEqual(_run("(+ 2 -2.2)"), new BFloat(2 - 2.2), "+ does not work correctly with negative float");
             Assert.AreEqual(_run("(+ -2 -2)"), new BInteger(-4), "+ does not work correctly with both arguments negative");
             Assert.AreEqual(_run("(+ 2.2 2.2)"), new BFloat(2.2 + 2.2), "+ does not work correctly with both arguments negative");
@@ -98,7 +90,7 @@ namespace BroccoliTest {
         public void TestTimes() {
             Assert.AreEqual(_run("(* 2 2)"), new BInteger(4), "* does not work correctly");
             Assert.AreEqual(_run("(* 2 -3)"), new BInteger(-6), "* does not work correctly with negative");
-            Assert.AreEqual(_run("(* 2 2.2)"), new BFloat(2 * 2.2), "* does not work correctly with float");
+            Assert.AreEqual(_run("(* 2 2.2)"), new BFloat(2  * 2.2), "* does not work correctly with float");
             Assert.AreEqual(_run("(* 2 -2.2)"), new BFloat(2 * -2.2), "* does not work correctly with negative float");
             Assert.AreEqual(_run("(* -2 -2)"), new BInteger(4), "* does not work correctly with both arguments negative");
             Assert.AreEqual(_run("(* 2.2 2.2)"), new BFloat(2.2 * 2.2), "* does not work correctly with both arguments negative");
@@ -110,7 +102,7 @@ namespace BroccoliTest {
         public void TestMinus() {
             Assert.AreEqual(_run("(- 2 2)"), new BInteger(0), "- does not work correctly");
             Assert.AreEqual(_run("(- 2 -3)"), new BInteger(5), "- does not work correctly with negative");
-            Assert.AreEqual(_run("(- 2 2.2)"), new BFloat(2 - 2.2), "- does not work correctly with float");
+            Assert.AreEqual(_run("(- 2 2.2)"), new BFloat(2  - 2.2), "- does not work correctly with float");
             Assert.AreEqual(_run("(- 2 -2.2)"), new BFloat(2 - -2.2), "- does not work correctly with negative float");
             Assert.AreEqual(_run("(- -2 -2)"), new BInteger(0), "- does not work correctly with both arguments negative");
             Assert.AreEqual(_run("(- 2.2 2.2)"), new BFloat(2.2 - 2.2), "- does not work correctly with both arguments negative");
@@ -122,8 +114,8 @@ namespace BroccoliTest {
         public void TestDivide() {
             Assert.AreEqual(_run("(/ 2 2)"), new BFloat(1), "/ does not work correctly");
             Assert.AreEqual(_run("(/ 2 -3)"), new BFloat((double) 2 / -3), "/ does not work correctly with negative");
-            Assert.AreEqual(_run("(/ 2 2.2)"), new BFloat(2 / 2.2), "/ does not work correctly with float");
-            Assert.AreEqual(_run("(/ 2 -2.2)"), new BFloat(2 / -2.2), "/ does not work correctly with negative float");
+            Assert.AreEqual(_run("(/ 2 2.2)"), new BFloat(2         / 2.2), "/ does not work correctly with float");
+            Assert.AreEqual(_run("(/ 2 -2.2)"), new BFloat(2        / -2.2), "/ does not work correctly with negative float");
             Assert.AreEqual(_run("(/ -2 -2)"), new BFloat(1), "/ does not work correctly with both arguments negative");
             Assert.AreEqual(_run("(/ 2.2 2.2)"), new BFloat(1), "/ does not work correctly with both arguments negative");
             Assert.AreEqual(_run("(/ 2.2 2.2)"), new BFloat(1), "/ does not work correctly with multiple arguments");
@@ -245,7 +237,11 @@ namespace BroccoliTest {
         }
 
         [TestMethod]
-        public void TestFor() => Assert.AreEqual(_run("(:= $a 0) (for $i in (list 1 10 100) (:= $a (+ $a $i))) $a"), new BInteger(111), "For loop does not work correctly");
+        public void TestFor() => Assert.AreEqual(
+            _run("(:= $a 0) (for $i in (list 1 10 100) (:= $a (+ $a $i))) $a"),
+            new BInteger(111),
+            "For loop does not work correctly"
+        );
 
         // List Functions
 
@@ -283,33 +279,109 @@ namespace BroccoliTest {
         [TestMethod]
         public void TestSlice() {
             Assert.AreEqual(_run("(slice (list 0 1 2 3 4 5) 0 3)"), ValueListFrom(0, 1, 2), "Slice does not work correctly");
-            Assert.AreEqual(_run("(slice (list 0 1 2 3 4 5) -5 3)"), ValueListFrom(0, 1, 2), "Slice does not work correctly with negative start");
+            Assert.AreEqual(
+                _run("(slice (list 0 1 2 3 4 5) -5 3)"),
+                ValueListFrom(0, 1, 2),
+                "Slice does not work correctly with negative start"
+            );
             Assert.AreEqual(_run("(slice (list 0 1 2 3 4 5) -5 -3)"), ValueListFrom(), "Slice does not work correctly with negative end");
-            Assert.AreEqual(_run("(slice (list 0 1 2 3 4 5) 3 -5)"), ValueListFrom(), "Slice does not work correctly with end less than start");
+            Assert.AreEqual(
+                _run("(slice (list 0 1 2 3 4 5) 3 -5)"),
+                ValueListFrom(),
+                "Slice does not work correctly with end less than start"
+            );
             Assert.ThrowsException<Exception>(() => _run("(slice (list) 1)"), "Range does not fail with two arguments");
             Assert.ThrowsException<ArgumentTypeException>(() => _run("(slice (list) 1.1 2.1)"), "Range does not fail with non-integers");
         }
 
         [TestMethod]
         public void TestRange() {
-            Assert.AreEqual(_run("(range 0 5)"), ValueListFrom(0, 1, 2, 3, 4, 5), "Range does not work correctly");
-            Assert.AreEqual(_run("(range -5 5)"), ValueListFrom(-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5), "Negative range does not work correctly");
-            Assert.AreEqual(_run("(range -5 -1)"), ValueListFrom(-5, -4, -3, -2, -1), "Negative to negative range does not work correctly");
+            Assert.AreEqual(
+                _run("(range 0 5)"),
+                ValueListFrom(
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                ),
+                "Range does not work correctly"
+            );
+            Assert.AreEqual(
+                _run("(range -5 5)"),
+                ValueListFrom(
+                    -5,
+                    -4,
+                    -3,
+                    -2,
+                    -1,
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                ),
+                "Negative range does not work correctly"
+            );
+            Assert.AreEqual(
+                _run("(range -5 -1)"),
+                ValueListFrom(
+                    -5,
+                    -4,
+                    -3,
+                    -2,
+                    -1
+                ),
+                "Negative to negative range does not work correctly"
+            );
             Assert.ThrowsException<Exception>(() => _run("(range 1)"), "Range does not fail with one argument");
             Assert.ThrowsException<ArgumentTypeException>(() => _run("(range 1.1 2.1)"), "Range does not fail with non-integers");
         }
 
         [TestMethod]
         public void TestCat() {
-            Assert.AreEqual(_run("(cat (list 0 1 2) (list 3 4 5))"), ValueListFrom(0, 1, 2, 3, 4, 5), "Cat does not work correctly");
-            Assert.AreEqual(_run("(cat (list 0 1) (list 2 3) (list 4 5))"), ValueListFrom(0, 1, 2, 3, 4, 5), "Cat does not work correctly with multiple arguments");
+            Assert.AreEqual(
+                _run("(cat (list 0 1 2) (list 3 4 5))"),
+                ValueListFrom(
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                ),
+                "Cat does not work correctly"
+            );
+            Assert.AreEqual(
+                _run("(cat (list 0 1) (list 2 3) (list 4 5))"),
+                ValueListFrom(
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                ),
+                "Cat does not work correctly with multiple arguments"
+            );
             Assert.ThrowsException<Exception>(() => _run("(cat (list 0 1 2))"), "Cat does not fail with one argument");
             Assert.ThrowsException<ArgumentTypeException>(() => _run("(cat 0 1 2)"), "Cat does not fail with non-lists");
         }
 
         [TestCleanup]
-        public void Cleanup() {
-            _run = null;
+        public void Cleanup() => _run = null;
+
+        private class Writer : TextWriter {
+            private readonly StringBuilder _lastOutput = new StringBuilder();
+            public override  Encoding      Encoding => Encoding.UTF8;
+
+            public void Clear() => _lastOutput.Clear();
+
+            public override void Write(char c) => _lastOutput.Append(c);
+
+            public override string ToString() => _lastOutput.ToString();
         }
     }
 }

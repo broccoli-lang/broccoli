@@ -4,11 +4,11 @@ using System.Linq;
 
 namespace Broccoli {
     /// <summary>
-    /// Represents a class that can act as a Broccoli function.
+    ///     Represents a class that can act as a Broccoli function.
     /// </summary>
     public interface IFunction : IScalar {
         /// <summary>
-        /// Invokes the Broccoli function with the given arguments.
+        ///     Invokes the Broccoli function with the given arguments.
         /// </summary>
         /// <param name="broccoli">The current Broccoli interpreter context.</param>
         /// <param name="args">The arguments to evaluate the function with.</param>
@@ -17,14 +17,14 @@ namespace Broccoli {
     }
 
     /// <summary>
-    /// Represents the main type of Broccoli function that evaluates all subexpressions.
+    ///     Represents the main type of Broccoli function that evaluates all subexpressions.
     /// </summary>
     public struct Function : IFunction {
         public delegate IValue Call(Interpreter broccoli, IValue[] args);
 
-        private readonly string _name;
-        private readonly int _argc;
-        private readonly Call _call;
+        private readonly string                         _name;
+        private readonly int                            _argc;
+        private readonly Call                           _call;
         private readonly IEnumerable<IValueExpressible> _args;
 
         // If the function has variadic arguments, argc is -n - 1, where n is the number of required args
@@ -43,7 +43,7 @@ namespace Broccoli {
         }
 
         /// <summary>
-        /// Validates that a function is being supplied the correct number of arguments.
+        ///     Validates that a function is being supplied the correct number of arguments.
         /// </summary>
         /// <param name="argc">
         ///     The total argument count.
@@ -54,14 +54,18 @@ namespace Broccoli {
         /// <typeparam name="T">The type of the arguments.</typeparam>
         /// <exception cref="Exception">Throws when the amount of arguments given does not match with the given argument count.</exception>
         public static void ValidateArgs<T>(int argc, T[] args, string name) {
-            var isVariadic = argc < 0;
+            var isVariadic   = argc < 0;
             var requiredArgc = isVariadic ? -argc - 1 : argc;
 
             if (isVariadic ? args.Length < requiredArgc : args.Length != requiredArgc)
-                throw new Exception($"Function '{name}' requires {(isVariadic ? "at least" : "exactly")} {requiredArgc} arguments, {args.Length} provided");
+                throw new Exception(
+                    $"Function '{name}' requires {(isVariadic ? "at least" : "exactly")} {requiredArgc} arguments, {args.Length} provided"
+                );
         }
 
-        public override string ToString() => _args == null ? $"{_name}({(_argc < 0 ? (~_argc).ToString() + '+' : _argc.ToString())} argument{(_argc == 1 ? "" : "s")})" : $"{_name}({string.Join(' ', _args.Select(arg => arg.Inspect()))})";
+        public override string ToString() => _args == null
+            ? $"{_name}({(_argc < 0 ? (~_argc).ToString() + '+' : _argc.ToString())} argument{(_argc == 1 ? "" : "s")})"
+            : $"{_name}({string.Join(' ', _args.Select(arg => arg.Inspect()))})";
 
         public string Inspect() => ToString();
 
@@ -77,14 +81,14 @@ namespace Broccoli {
     }
 
     /// <summary>
-    /// Represents a Broccoli function that keeps all subexpressions unevaluated.
+    ///     Represents a Broccoli function that keeps all subexpressions unevaluated.
     /// </summary>
     public struct ShortCircuitFunction : IFunction {
         public delegate IValue Call(Interpreter broccoli, IValueExpressible[] args);
 
-        private readonly string _name;
-        private readonly int _argc;
-        private readonly Call _call;
+        private readonly string                         _name;
+        private readonly int                            _argc;
+        private readonly Call                           _call;
         private readonly IEnumerable<IValueExpressible> _args;
 
         // If the function has variadic arguments, argc is -n-1, where n is the number of required args
@@ -101,7 +105,9 @@ namespace Broccoli {
             return _call(broccoli, args);
         }
 
-        public override string ToString() => _args == null ? $"{_name}({(_argc < 0 ? (~_argc).ToString() + '+' : _argc.ToString())} argument{(_argc == 1 ? "" : "s")})" : $"{_name}({string.Join(' ', _args.Select(arg => arg.Inspect()))})";
+        public override string ToString() => _args == null
+            ? $"{_name}({(_argc < 0 ? (~_argc).ToString() + '+' : _argc.ToString())} argument{(_argc == 1 ? "" : "s")})"
+            : $"{_name}({string.Join(' ', _args.Select(arg => arg.Inspect()))})";
 
         public string Inspect() => ToString();
 
@@ -117,13 +123,13 @@ namespace Broccoli {
     }
 
     /// <summary>
-    /// Represents a Cauliflower function that is also a value.
+    ///     Represents a Cauliflower function that is also a value.
     /// </summary>
     public struct AnonymousFunction : IFunction {
         public delegate IValue Call(IValue[] args);
 
-        private readonly int _argc;
-        private readonly Call _call;
+        private readonly int                            _argc;
+        private readonly Call                           _call;
         private readonly IEnumerable<IValueExpressible> _args;
 
         public AnonymousFunction(int argc, Call call, IEnumerable<IValueExpressible> args = null) {
@@ -138,7 +144,9 @@ namespace Broccoli {
             return _call(runArgs);
         }
 
-        public override string ToString() => _args == null ? $"<anonymous>({(_argc < 0 ? (~_argc).ToString() + '+' : _argc.ToString())} argument{(_argc == 1 ? "" : "s")})" : $"<anonymous>({string.Join(' ', _args.Select(arg => arg.Inspect()))})";
+        public override string ToString() => _args == null
+            ? $"<anonymous>({(_argc < 0 ? (~_argc).ToString() + '+' : _argc.ToString())} argument{(_argc == 1 ? "" : "s")})"
+            : $"<anonymous>({string.Join(' ', _args.Select(arg => arg.Inspect()))})";
 
         public string Inspect() => ToString();
 

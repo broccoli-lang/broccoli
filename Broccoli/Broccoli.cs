@@ -4,21 +4,21 @@ using System.Linq;
 
 namespace Broccoli {
     /// <summary>
-    /// The interpreter for the Broccoli language.
+    ///     The interpreter for the Broccoli language.
     /// </summary>
     public partial class Interpreter {
-        public Scope Scope = new Scope();
         public Dictionary<string, IFunction> Builtins = StaticBuiltins;
+        public Scope                         Scope    = new Scope();
 
         /// <summary>
-        /// Runs the given string as Broccoli code.
+        ///     Runs the given string as Broccoli code.
         /// </summary>
         /// <param name="code">The code to run.</param>
         /// <returns>The final value returned by the overall expression.</returns>
         public virtual IValue Run(string code) => Run(Parse(code));
 
         /// <summary>
-        /// Evaluates the already-parsed tree as Broccoli code.
+        ///     Evaluates the already-parsed tree as Broccoli code.
         /// </summary>
         /// <param name="node">The node to evaluate.</param>
         /// <returns>The final value returned by the root node.</returns>
@@ -30,7 +30,7 @@ namespace Broccoli {
         }
 
         /// <summary>
-        /// Takes an expression or value and evaluates it.
+        ///     Takes an expression or value and evaluates it.
         /// </summary>
         /// <param name="expr">The expression or value to evaluate.</param>
         /// <returns>The value represented by the expression or value.</returns>
