@@ -78,8 +78,7 @@ namespace Broccoli {
                 if (e.Values.Length == 0)
                     throw new Exception("Expected function name");
                 var first = cauliflower.Run(e.Values[0]);
-                switch (first)
-                {
+                switch (first) {
                     case BCauliflowerMethod cauliflowerMethod:
                         try {
                             return CauliflowerMethod(cauliflowerMethod.Value.type, cauliflowerMethod.Value.name, null, e.Values.Skip(1).Select(cauliflower.Run));
@@ -305,8 +304,7 @@ namespace Broccoli {
             // Meta-commands
             {"new", new Function("new", -2, (cauliflower, args) => {
                 var type = cauliflower.Run(args[0]);
-                switch (type)
-                {
+                switch (type) {
                     case BCauliflowerType ctype:
                         return CauliflowerCreate(ctype, args.Skip(1));
                     case BCSharpType cstype:
@@ -400,7 +398,7 @@ namespace Broccoli {
                             break;
                         case ListVar _:
                             if (result == null) {
-                                args = args.Concat(new[] { result = new BList()}).ToArray();
+                                args = args.Concat(new[] { result = new BList() }).ToArray();
                                 break;
                             }
                             if (!(result is IList list))
@@ -409,7 +407,7 @@ namespace Broccoli {
                             break;
                         case DictVar _:
                             if (result == null) {
-                                args = args.Concat(new[] { result = new BDictionary()}).ToArray();
+                                args = args.Concat(new[] { result = new BDictionary() }).ToArray();
                                 break;
                             }
                             if (!(result is IDictionary dict))
@@ -643,6 +641,124 @@ namespace Broccoli {
                     FieldAttributes.Private | FieldAttributes.Static
                 );
 
+                // Emit helpers that use the interpreter field
+
+                void LoadInterpreterInvocationSingle(Emit emit, IValueExpressible expr) =>
+                    emit
+                        .LoadField(interpreterField)
+                        .LoadConstant(expr.Inspect())
+                        .Call(typeof(CauliflowerInterpreter).GetMethod("Run", new[] {typeof(string)}));
+
+                void LoadInterpreterInvocationMultiple(Emit emit, IEnumerable<IValueExpressible> exprs) =>
+                    emit
+                        .LoadField(interpreterField)
+                        .LoadConstant(string.Join(' ', exprs.Select(e => e.Inspect())))
+                        .Call(typeof(CauliflowerInterpreter).GetMethod("Run", new[] {typeof(string)}));
+
+                void LoadScopeReference(Emit emit) =>
+                    emit
+                        .LoadField(interpreterField)
+                        .LoadField(typeof(Interpreter).GetField("Scope"));
+
+                void CreateNewScope(Emit emit) {
+                    emit.LoadField(interpreterField);
+                    LoadScopeReference(emit); // Load to get scope value
+                    emit
+                        .NewObject<Scope, Scope>() // Create new scope
+                        .StoreField(typeof(Interpreter).GetField("Scope"));
+                    LoadScopeReference(emit);
+                    emit
+                        .Call(typeof(MethodBase).GetMethod("GetCurrentMethod", BindingFlags.Public | BindingFlags.Static))
+                        .Call(typeof(MemberInfo).GetProperty("DeclaringType").GetGetMethod())
+                        .Call(typeof(Scope).GetProperty("SurroundingClass").GetSetMethod());
+                }
+
+                void ReturnToParentScope(Emit emit) {
+                    emit.LoadField(interpreterField);
+                    LoadScopeReference(emit);
+                    emit
+                        .LoadField(typeof(Scope).GetField("Parent"))
+                        .StoreField(typeof(Interpreter).GetField("Scope"));
+                }
+
+                void AddThisToScope(Emit emit) {
+                    FieldInfo scopeField;
+                    Type      dictType;
+
+                    if (isScalar) {
+                        scopeField = typeof(Scope).GetField("Scalars");
+                        dictType   = typeof(Dictionary<string, IScalar>);
+                    } else if (isList) {
+                        scopeField = typeof(Scope).GetField("Lists");
+                        dictType   = typeof(Dictionary<string, IList>);
+                    } else if (isDictionary) {
+                        scopeField = typeof(Scope).GetField("Dictionaries");
+                        dictType   = typeof(Dictionary<string, IDictionary>);
+                    } else
+                        throw new NotImplementedException();
+
+                    LoadScopeReference(emit);
+                    emit
+                        .LoadField(scopeField)
+                        .LoadConstant("this")
+                        .LoadArgument(0)
+                        .CallVirtual(dictType.GetProperty("Item").GetSetMethod());
+                }
+
+                void AddParametersToScope(Emit methodEmit, ValueExpression paramExp, bool isStatic = false) {
+                    foreach (var (param, _index) in paramExp.Values.WithIndex()) {
+                        var index = isStatic ? _index : _index + 1;
+                        LoadScopeReference(methodEmit);
+                        string scopeFieldName;
+                        string varName;
+                        Type   dictType;
+                        switch (param) {
+                            case ScalarVar s:
+                                scopeFieldName = "Scalars";
+                                varName        = s.Value;
+                                dictType       = typeof(Dictionary<string, IScalar>);
+                                break;
+                            case ListVar l:
+                                scopeFieldName = "Lists";
+                                varName        = l.Value;
+                                dictType       = typeof(Dictionary<string, IList>);
+                                break;
+                            case DictVar d:
+                                scopeFieldName = "Dictionaries";
+                                varName        = d.Value;
+                                dictType       = typeof(Dictionary<string, IDictionary>);
+                                break;
+                            case BAtom a:
+                                scopeFieldName = "Functions";
+                                varName        = a.Value;
+                                dictType       = typeof(Dictionary<string, IFunction>);
+                                break;
+                            // Rest args
+                            case ValueExpression v:
+                                if (!(v.Values.ElementAtOrDefault(0) is ListVar rest))
+                                    throw new ArgumentTypeException(
+                                        v.Values.ElementAtOrDefault(0),
+                                        "rest arguments list variable",
+                                        index + 1,
+                                        "fn parameters"
+                                    );
+
+                                scopeFieldName = "Lists";
+                                varName        = rest.Value;
+                                dictType       = typeof(Dictionary<string, IList>);
+                                break;
+                            default:
+                                throw new ArgumentTypeException(param, "variable name", index + 1, "fn parameters");
+                        }
+
+                        methodEmit
+                            .LoadField(typeof(Scope).GetField(scopeFieldName))
+                            .LoadConstant(varName)
+                            .LoadArgument((ushort) index)
+                            .CallVirtual(dictType.GetProperty("Item").GetSetMethod());
+                    }
+                }
+
                 // Generate static initializer
                 var staticInitEmit = Emit.BuildStaticMethod(
                     typeof(void),
@@ -678,7 +794,7 @@ namespace Broccoli {
                                 var initCtorEmit = isStatic ? staticInitEmit : ctorEmit;
                                 if (!isStatic) initCtorEmit.LoadArgument(0);
 
-                                CauliflowerInline.LoadInterpreterInvocation(initCtorEmit, interpreterField, initFieldVal);
+                                LoadInterpreterInvocationSingle(initCtorEmit, initFieldVal);
                                 initCtorEmit.StoreField(newField);
                             }
                             break;
@@ -747,10 +863,10 @@ namespace Broccoli {
                                             if (!isStatic) getterEmit.LoadArgument(0);
                                             getterEmit.LoadField(backingField);
                                         } else {
-                                            CauliflowerInline.CreateNewScope(getterEmit, interpreterField);
-                                            if (!isStatic) CauliflowerInline.AddThisToScope(getterEmit, interpreterField, isScalar, isList, isDictionary);
-                                            CauliflowerInline.LoadInterpreterInvocation(getterEmit, interpreterField, aArgs.Values);
-                                            CauliflowerInline.ReturnToParentScope(getterEmit, interpreterField);
+                                            CreateNewScope(getterEmit);
+                                            if (!isStatic) AddThisToScope(getterEmit);
+                                            LoadInterpreterInvocationMultiple(getterEmit, aArgs.Values);
+                                            ReturnToParentScope(getterEmit);
                                         }
 
                                         getterEmit.Return();
@@ -771,11 +887,11 @@ namespace Broccoli {
                                             if (!isStatic) setterEmit.LoadArgument(1); // Arg 1 is value for instance, undefined for static
                                             setterEmit.LoadField(backingField);
                                         } else {
-                                            CauliflowerInline.CreateNewScope(setterEmit, interpreterField);
-                                            if (!isStatic) CauliflowerInline.AddThisToScope(setterEmit, interpreterField, isScalar, isList, isDictionary);
-                                            CauliflowerInline.LoadInterpreterInvocation(setterEmit, interpreterField, aArgs.Values);
+                                            CreateNewScope(setterEmit);
+                                            if (!isStatic) AddThisToScope(setterEmit);
+                                            LoadInterpreterInvocationMultiple(setterEmit, aArgs.Values);
                                             setterEmit.Pop();
-                                            CauliflowerInline.ReturnToParentScope(setterEmit, interpreterField);
+                                            ReturnToParentScope(setterEmit);
                                         }
 
                                         setterEmit.Return();
@@ -796,9 +912,9 @@ namespace Broccoli {
                                 var initCtorEmit = isStatic ? staticInitEmit : ctorEmit;
 
                                 if (!isStatic) initCtorEmit.LoadArgument(0);
-                                CauliflowerInline.CreateNewScope(initCtorEmit, interpreterField);
-                                CauliflowerInline.LoadInterpreterInvocation(initCtorEmit, interpreterField, initPropVal);
-                                CauliflowerInline.ReturnToParentScope(initCtorEmit, interpreterField);
+                                CreateNewScope(initCtorEmit);
+                                LoadInterpreterInvocationSingle(initCtorEmit, initPropVal);
+                                ReturnToParentScope(initCtorEmit);
                                 initCtorEmit.StoreField(backingField);
                             }
                             break;
@@ -881,13 +997,13 @@ namespace Broccoli {
                             }
 
                             // Add new function scope + populate
-                            CauliflowerInline.CreateNewScope(methodEmit, interpreterField);
-                            if (!isStatic) CauliflowerInline.AddThisToScope(methodEmit, interpreterField, isScalar, isList, isDictionary);
-                            CauliflowerInline.AddParametersToScope(methodEmit, interpreterField, vexp2, isStatic);
+                            CreateNewScope(methodEmit);
+                            if (!isStatic) AddThisToScope(methodEmit);
+                            AddParametersToScope(methodEmit, vexp2, isStatic);
 
                             // Invoke interpreter, back out of scope, return
-                            CauliflowerInline.LoadInterpreterInvocation(methodEmit, interpreterField, sArgs.Values.Skip(2));
-                            CauliflowerInline.ReturnToParentScope(methodEmit, interpreterField);
+                            LoadInterpreterInvocationMultiple(methodEmit, sArgs.Values.Skip(2));
+                            ReturnToParentScope(methodEmit);
                             var methodBuilder = methodEmit.Return().CreateMethod();
 
                             foreach (var context in contextOverrides) typeBuilder.DefineMethodOverride(methodBuilder, typeof(IValue).GetMethod(context));
@@ -1016,12 +1132,12 @@ namespace Broccoli {
 
                 // Custom constructor implementation (after initial values)
                 if (isCustomCtor) {
-                    CauliflowerInline.AddThisToScope(ctorEmit, interpreterField, isScalar, isList, isDictionary);
-                    CauliflowerInline.AddParametersToScope(ctorEmit, interpreterField, ctorParamDecl);
-                    CauliflowerInline.CreateNewScope(ctorEmit, interpreterField);
-                    CauliflowerInline.LoadInterpreterInvocation(ctorEmit, interpreterField, ctorParamTuple.Item3.Values.Skip(2));
+                    AddThisToScope(ctorEmit);
+                    AddParametersToScope(ctorEmit, ctorParamDecl);
+                    CreateNewScope(ctorEmit);
+                    LoadInterpreterInvocationMultiple(ctorEmit, ctorParamTuple.Item3.Values.Skip(2));
                     ctorEmit.Pop();
-                    CauliflowerInline.ReturnToParentScope(ctorEmit, interpreterField);
+                    ReturnToParentScope(ctorEmit);
                 }
 
                 ctorEmit.Return().CreateConstructor();
@@ -1899,108 +2015,6 @@ namespace Broccoli {
         }
 
         /// <summary>
-        /// IScalar wrapper for C# objects.
-        /// </summary>
-        public class BCSharpValue : IScalar {
-            public BCSharpValue(object value) => Value = value;
-
-            // ReSharper disable once MemberCanBePrivate.Global
-            public object Value { get; }
-
-            public string Inspect() => $"C#Value<{Value.GetType().FullName}>({Value})";
-
-            public object ToCSharp() => Value;
-
-            public Type Type() => Value.GetType();
-
-            public IScalar ScalarContext() => this;
-
-            public IList ListContext() => throw new NoListContextException(this);
-
-            public IDictionary DictionaryContext() => throw new NoDictionaryContextException(this);
-
-            public override string ToString() => Value.ToString();
-        }
-
-        /// <summary>
-        /// IScalar wrapper for C# types.
-        /// </summary>
-        public class BCSharpType : IScalar {
-            // ReSharper disable once MemberCanBeProtected.Global
-            public BCSharpType(Type value) => Value = value;
-            public Type Value { get; }
-
-            public virtual string Inspect() => $"C#Type({Value.FullName})";
-
-            public object ToCSharp() => Value;
-
-            public Type Type() => typeof(Type);
-
-            public IScalar ScalarContext() => this;
-
-            public IList ListContext() => throw new NoListContextException(this);
-
-            public IDictionary DictionaryContext() => throw new NoDictionaryContextException(this);
-
-            public static implicit operator BCSharpType(Type type) => new BCSharpType(type);
-
-            public static implicit operator Type(BCSharpType type) => type.Value;
-
-            public override string ToString() => Value.FullName;
-        }
-
-        /// <inheritdoc />
-        /// <summary>
-        /// IScalar wrapper for Cauliflower native module types.
-        /// </summary>
-        public class BCauliflowerType : BCSharpType {
-            // ReSharper disable once MemberCanBePrivate.Global
-            public BCauliflowerType(Type value) : base(value) { }
-
-            public static implicit operator BCauliflowerType(Type type) => new BCauliflowerType(type);
-
-            public static implicit operator Type(BCauliflowerType type) => type.Value;
-
-            public override string Inspect() => $"CauliflowerType({Value.FullName.Replace('+', '.')})";
-        }
-
-
-        /// <summary>
-        /// IScalar wrapper for C# methods.
-        /// </summary>
-        private class BCSharpMethod : IScalar {
-            // ReSharper disable once MemberCanBeProtected.Local
-            public BCSharpMethod(Type type, string name) => Value = (type, name);
-            public (Type type, string name) Value { get; }
-
-            public virtual string Inspect() => $"C#Method({Value.type.FullName}.{Value.name})";
-
-            public object ToCSharp() => Value;
-
-            public Type Type() => typeof(Tuple<Type, string>);
-
-            public IScalar ScalarContext() => this;
-
-            public IList ListContext() => throw new NoListContextException(this);
-
-            public IDictionary DictionaryContext() => throw new NoDictionaryContextException(this);
-
-            public override string ToString() => $"{Value.type.FullName}.{Value.name}";
-        }
-
-
-        /// <inheritdoc />
-        /// <summary>
-        /// IScalar wrapper for Cauliflower native method types.
-        /// </summary>
-        // ReSharper disable once ClassNeverInstantiated.Local
-        private class BCauliflowerMethod : BCSharpMethod {
-            public BCauliflowerMethod(Type type, string name) : base(type, name) { }
-
-            public override string Inspect() => $"CauliflowerMethod({Value.type.FullName.Replace('+', '.')}.{Value.name})";
-        }
-
-        /// <summary>
         /// Helper functions for Cauliflower that can be inlined.
         /// </summary>
         private static class CauliflowerInline {
@@ -2204,136 +2218,6 @@ namespace Broccoli {
                     }
 
                 return results;
-            }
-
-            // TODO: Maybe make all these local functions (to access the interpreterField)?
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private static void LoadScopeReference(Emit emit, FieldInfo interpreterField) =>
-                emit
-                    .LoadField(interpreterField)
-                    .LoadField(typeof(Interpreter).GetField("Scope"));
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static void CreateNewScope(Emit emit, FieldInfo interpreterField) {
-                emit.LoadField(interpreterField);
-                LoadScopeReference(emit, interpreterField); // Load to get scope value
-                emit
-                    .NewObject<Scope, Scope>() // Create new scope
-                    .StoreField(typeof(Interpreter).GetField("Scope"));
-                LoadScopeReference(emit, interpreterField);
-                emit
-                    .Call(typeof(MethodBase).GetMethod("GetCurrentMethod", BindingFlags.Public | BindingFlags.Static))
-                    .Call(typeof(MemberInfo).GetProperty("DeclaringType").GetGetMethod())
-                    .Call(typeof(Scope).GetProperty("SurroundingClass").GetSetMethod());
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static void ReturnToParentScope(Emit emit, FieldInfo interpreterField) {
-                emit.LoadField(interpreterField);
-                LoadScopeReference(emit, interpreterField);
-                emit
-                    .LoadField(typeof(Scope).GetField("Parent"))
-                    .StoreField(typeof(Interpreter).GetField("Scope"));
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static void AddThisToScope(Emit emit, FieldInfo interpreterField, bool isScalar = true, bool isList = false,
-                bool isDictionary = false) {
-                FieldInfo scopeField;
-                Type dictType;
-
-                if (isScalar) {
-                    scopeField = typeof(Scope).GetField("Scalars");
-                    dictType = typeof(Dictionary<string, IScalar>);
-                } else if (isList) {
-                    scopeField = typeof(Scope).GetField("Lists");
-                    dictType = typeof(Dictionary<string, IList>);
-                } else if (isDictionary) {
-                    scopeField = typeof(Scope).GetField("Dictionaries");
-                    dictType = typeof(Dictionary<string, IDictionary>);
-                } else
-                    throw new NotImplementedException();
-
-                LoadScopeReference(emit, interpreterField);
-                emit
-                    .LoadField(scopeField)
-                    .LoadConstant("this")
-                    .LoadArgument(0)
-                    .CallVirtual(dictType.GetProperty("Item").GetSetMethod());
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static void LoadInterpreterInvocation(Emit emit, FieldInfo interpreterField, IValueExpressible expr) =>
-                emit
-                    .LoadField(interpreterField)
-                    .LoadConstant(expr.Inspect())
-                    .Call(typeof(CauliflowerInterpreter).GetMethod("Run", new[] {typeof(string)}));
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static void LoadInterpreterInvocation(Emit emit, FieldInfo interpreterField, IEnumerable<IValueExpressible> exprs) =>
-                emit
-                    .LoadField(interpreterField)
-                    .LoadConstant(string.Join(' ', exprs.Select(e => e.Inspect())))
-                    .Call(typeof(CauliflowerInterpreter).GetMethod("Run", new[] {typeof(string)}));
-
-            /// <summary>
-            /// Populates a function's scope with values from the given parameter expression.
-            /// </summary>
-            /// <param name="methodEmit"></param>
-            /// <param name="interpreterField">The <see cref="FieldInfo"/> that represents the interpreter field in the class.</param>
-            /// <param name="paramExp">The parameter expression.</param>
-            /// <param name="isStatic">Whether the parameters are for a Cauliflower static class function.</param>
-            /// <exception cref="ArgumentTypeException">Throws when parameter types are invalid.</exception>
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static void AddParametersToScope(Emit methodEmit, FieldInfo interpreterField, ValueExpression paramExp,
-                bool isStatic = false) {
-                foreach (var (param, _index) in paramExp.Values.WithIndex()) {
-                    var index = isStatic ? _index : _index + 1;
-                    LoadScopeReference(methodEmit, interpreterField);
-                    string scopeFieldName;
-                    string varName;
-                    Type dictType;
-                    switch (param) {
-                        case ScalarVar s:
-                            scopeFieldName = "Scalars";
-                            varName = s.Value;
-                            dictType = typeof(Dictionary<string, IScalar>);
-                            break;
-                        case ListVar l:
-                            scopeFieldName = "Lists";
-                            varName = l.Value;
-                            dictType = typeof(Dictionary<string, IList>);
-                            break;
-                        case DictVar d:
-                            scopeFieldName = "Dictionaries";
-                            varName = d.Value;
-                            dictType = typeof(Dictionary<string, IDictionary>);
-                            break;
-                        case BAtom a:
-                            scopeFieldName = "Functions";
-                            varName = a.Value;
-                            dictType = typeof(Dictionary<string, IFunction>);
-                            break;
-                        // Rest args
-                        case ValueExpression v:
-                            if (!(v.Values.ElementAtOrDefault(0) is ListVar rest))
-                                throw new ArgumentTypeException(v.Values.ElementAtOrDefault(0), "rest arguments list variable", index + 1, "fn parameters");
-
-                            scopeFieldName = "Lists";
-                            varName = rest.Value;
-                            dictType = typeof(Dictionary<string, IList>);
-                            break;
-                        default:
-                            throw new ArgumentTypeException(param, "variable name", index + 1, "fn parameters");
-                    }
-
-                    methodEmit
-                        .LoadField(typeof(Scope).GetField(scopeFieldName))
-                        .LoadConstant(varName)
-                        .LoadArgument((ushort) index)
-                        .CallVirtual(dictType.GetProperty("Item").GetSetMethod());
-                }
             }
         }
     }

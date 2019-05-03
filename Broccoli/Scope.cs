@@ -14,8 +14,8 @@ namespace Broccoli {
 
         public readonly Dictionary<string, IScalar> Scalars = new Dictionary<string, IScalar>();
 
-        public readonly Dictionary<string, CauliflowerInterpreter.BCSharpType> Types =
-            new Dictionary<string, CauliflowerInterpreter.BCSharpType>();
+        public readonly Dictionary<string, BCSharpType> Types =
+            new Dictionary<string, BCSharpType>();
 
         private Type _surroundingClass;
 
@@ -121,7 +121,7 @@ namespace Broccoli {
         ///     Gets the type corresponding to the given type name.
         /// </summary>
         /// <param name="t">The type name to retrieve.</param>
-        public CauliflowerInterpreter.BCSharpType this[TypeName t] {
+        public BCSharpType this[TypeName t] {
             get => Types.ContainsKey(t) ? Types[t] : Parent?[t];
 
             set => Types[t] = value;

@@ -403,11 +403,11 @@ namespace Broccoli {
 
         public IScalar ScalarContext() => (BInteger) Count;
 
-        public IList ListContext() => new BList(this.Select(item => new CauliflowerInterpreter.BCSharpValue(item)));
+        public IList ListContext() => new BList(this.Select(item => new BCSharpValue(item)));
 
         public IDictionary DictionaryContext() => new BDictionary(
             this.WithIndex()
-                .ToDictionary(item => (IValue) (BInteger) item.index, item => (IValue) new CauliflowerInterpreter.BCSharpValue(item.value))
+                .ToDictionary(item => (IValue) (BInteger) item.index, item => (IValue) new BCSharpValue(item.value))
         );
 
         public static bool operator ==(BCSharpList left, object right) => right is BCSharpList list && left.Equals(list);
@@ -502,14 +502,14 @@ namespace Broccoli {
 
         public IList ListContext() => new BList(
             this.Select(
-                kvp => new BList(new CauliflowerInterpreter.BCSharpValue(kvp.Key), new CauliflowerInterpreter.BCSharpValue(kvp.Value))
+                kvp => new BList(new BCSharpValue(kvp.Key), new BCSharpValue(kvp.Value))
             )
         );
 
         public IDictionary DictionaryContext() => new BDictionary(
             this.ToDictionary(
-                kvp => (IValue) new CauliflowerInterpreter.BCSharpValue(kvp.Key),
-                kvp => (IValue) new CauliflowerInterpreter.BCSharpValue(kvp.Value)
+                kvp => (IValue) new BCSharpValue(kvp.Key),
+                kvp => (IValue) new BCSharpValue(kvp.Value)
             )
         );
 
@@ -532,5 +532,105 @@ namespace Broccoli {
             sb.Append(")");
             return sb.ToString();
         }
+    }
+
+    /// <summary>
+    /// IScalar wrapper for C# objects.
+    /// </summary>
+    public class BCSharpValue : IScalar {
+        public BCSharpValue(object value) => Value = value;
+
+        // ReSharper disable once MemberCanBePrivate.Global
+        public object Value { get; }
+
+        public string Inspect() => $"C#Value<{Value.GetType().FullName}>({Value})";
+
+        public object ToCSharp() => Value;
+
+        public Type Type() => Value.GetType();
+
+        public IScalar ScalarContext() => this;
+
+        public IList ListContext() => throw new NoListContextException(this);
+
+        public IDictionary DictionaryContext() => throw new NoDictionaryContextException(this);
+
+        public override string ToString() => Value.ToString();
+    }
+
+    /// <summary>
+    /// IScalar wrapper for C# types.
+    /// </summary>
+    public class BCSharpType : IScalar {
+        // ReSharper disable once MemberCanBeProtected.Global
+        public BCSharpType(Type value) => Value = value;
+        public Type Value { get; }
+
+        public virtual string Inspect() => $"C#Type({Value.FullName})";
+
+        public object ToCSharp() => Value;
+
+        public Type Type() => typeof(Type);
+
+        public IScalar ScalarContext() => this;
+
+        public IList ListContext() => throw new NoListContextException(this);
+
+        public IDictionary DictionaryContext() => throw new NoDictionaryContextException(this);
+
+        public static implicit operator BCSharpType(Type type) => new BCSharpType(type);
+
+        public static implicit operator Type(BCSharpType type) => type.Value;
+
+        public override string ToString() => Value.FullName;
+    }
+
+    /// <inheritdoc />
+    /// <summary>
+    /// IScalar wrapper for Cauliflower native module types.
+    /// </summary>
+    public class BCauliflowerType : BCSharpType {
+        // ReSharper disable once MemberCanBePrivate.Global
+        public BCauliflowerType(Type value) : base(value) { }
+
+        public static implicit operator BCauliflowerType(Type type) => new BCauliflowerType(type);
+
+        public static implicit operator Type(BCauliflowerType type) => type.Value;
+
+        public override string Inspect() => $"CauliflowerType({Value.FullName.Replace('+', '.')})";
+    }
+
+    /// <summary>
+    /// IScalar wrapper for C# methods.
+    /// </summary>
+    public class BCSharpMethod : IScalar {
+        // ReSharper disable once MemberCanBeProtected.Local
+        public BCSharpMethod(Type type, string name) => Value = (type, name);
+        public (Type type, string name) Value { get; }
+
+        public virtual string Inspect() => $"C#Method({Value.type.FullName}.{Value.name})";
+
+        public object ToCSharp() => Value;
+
+        public Type Type() => typeof(Tuple<Type, string>);
+
+        public IScalar ScalarContext() => this;
+
+        public IList ListContext() => throw new NoListContextException(this);
+
+        public IDictionary DictionaryContext() => throw new NoDictionaryContextException(this);
+
+        public override string ToString() => $"{Value.type.FullName}.{Value.name}";
+    }
+
+    /// <inheritdoc />
+    /// <summary>
+    /// IScalar wrapper for Cauliflower native method types.
+    /// </summary>
+    // ReSharper disable once ClassNeverInstantiated.Local
+    public class BCauliflowerMethod : BCSharpMethod {
+        public BCauliflowerMethod(Type type, string name) : base(type, name) { }
+
+        public override string Inspect() => $"CauliflowerMethod({Value.type.FullName.Replace('+', '.')}.{Value.name})";
     }
 }
