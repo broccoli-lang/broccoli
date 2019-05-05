@@ -632,7 +632,7 @@ namespace Broccoli {
                     typeBuilder,
                     MethodAttrsFromAllMods(ctorParamTuple.Item2 ?? new List<string>(), isConstructor: true)
                 );
-                ctorEmit.LoadArgument(0).Call(typeof(object).GetConstructor(Type.EmptyTypes));
+//                ctorEmit.LoadArgument(0).NewObject<object>();
 
                 // Add (interpreter) field
                 var interpreterField = typeBuilder.DefineField(
@@ -669,7 +669,7 @@ namespace Broccoli {
                     LoadScopeReference(emit);
                     emit
                         .Call(typeof(MethodBase).GetMethod("GetCurrentMethod", BindingFlags.Public | BindingFlags.Static))
-                        .Call(typeof(MemberInfo).GetProperty("DeclaringType").GetGetMethod())
+                        .CallVirtual(typeof(MemberInfo).GetProperty("ReflectedType").GetGetMethod())
                         .Call(typeof(Scope).GetProperty("SurroundingClass").GetSetMethod());
                 }
 
@@ -928,7 +928,7 @@ namespace Broccoli {
                                 throw new ArgumentTypeException(sArgs.Values.ElementAtOrDefault(1), "expression", 2, "fn");
 
                             Emit methodEmit;
-                            var contextOverrides = new List<string>();
+                            var contextOverrides = new List<(Type, string)>();
 
                             if (sModifiers.Contains("operator")) {
                                 if (isStatic) throw new Exception("Custom contexts cannot be static");
@@ -946,7 +946,7 @@ namespace Broccoli {
                                             MethodAttrsFromAllMods(sModifiers),
                                             callingConventions
                                         );
-                                        contextOverrides.Add("ScalarContext");
+                                        contextOverrides.Add((typeof(IScalar), "ScalarContext"));
                                         hasCustomScalarContext = true;
                                         break;
                                     case "list":
@@ -962,7 +962,7 @@ namespace Broccoli {
                                             MethodAttrsFromAllMods(sModifiers),
                                             callingConventions
                                         );
-                                        contextOverrides.Add("ListContext");
+                                        contextOverrides.Add((typeof(IList), "ListContext"));
                                         hasCustomListContext = true;
                                         break;
                                     case "dictionary":
@@ -978,7 +978,7 @@ namespace Broccoli {
                                             MethodAttrsFromAllMods(sModifiers),
                                             callingConventions
                                         );
-                                        contextOverrides.Add("DictionaryContext");
+                                        contextOverrides.Add((typeof(IDictionary), "DictionaryContext"));
                                         hasCustomDictionaryContext = true;
                                         break;
                                     default:
@@ -1004,9 +1004,14 @@ namespace Broccoli {
                             // Invoke interpreter, back out of scope, return
                             LoadInterpreterInvocationMultiple(methodEmit, sArgs.Values.Skip(2));
                             ReturnToParentScope(methodEmit);
-                            var methodBuilder = methodEmit.Return().CreateMethod();
 
-                            foreach (var context in contextOverrides) typeBuilder.DefineMethodOverride(methodBuilder, typeof(IValue).GetMethod(context));
+                            foreach (var (contextType, contextMethod) in contextOverrides) {
+                                var methodBuilder = methodEmit
+                                                    .CastClass(contextType)
+                                                    .Return()
+                                                    .CreateMethod();
+                                typeBuilder.DefineMethodOverride(methodBuilder, typeof(IValue).GetMethod(contextMethod));
+                            }
                             break;
                         default:
                             throw new Exception($"Unrecognized class definition statement '{sName}'");
@@ -1145,10 +1150,10 @@ namespace Broccoli {
 
                 var classType = typeBuilder.CreateType();
 
-                new AssemblyGenerator().GenerateAssembly(asmBuilder, "cauliflower.dll");
+                new AssemblyGenerator().GenerateAssembly(asmBuilder, $"cauliflower-{name.Value}.dll");
 
                 classType.GetMethod("(init)", BindingFlags.NonPublic | BindingFlags.Static)
-                    .Invoke(null, new [] {cauliflower});
+                    .Invoke(null, new [] { cauliflower });
 
                 cauliflower.Scope.Types[name.Value] = (BCauliflowerType) classType;
 
