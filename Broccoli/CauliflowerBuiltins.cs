@@ -930,7 +930,8 @@ namespace Broccoli {
                             Emit methodEmit;
                             var contextOverrides = new List<(Type, string)>();
 
-                            if (sModifiers.Contains("operator")) {
+                            var isOperatorFn = sModifiers.Contains("operator");
+                            if (isOperatorFn) {
                                 if (isStatic) throw new Exception("Custom contexts cannot be static");
                                 switch (fnName.Value) {
                                     case "scalar":
@@ -1004,6 +1005,8 @@ namespace Broccoli {
                             // Invoke interpreter, back out of scope, return
                             LoadInterpreterInvocationMultiple(methodEmit, sArgs.Values.Skip(2));
                             ReturnToParentScope(methodEmit);
+
+                            if (!isOperatorFn) methodEmit.Return().CreateMethod();
 
                             foreach (var (contextType, contextMethod) in contextOverrides) {
                                 var methodBuilder = methodEmit
