@@ -587,6 +587,15 @@ namespace BroccoliTest {
                 "Nested namespaces do not work"
             );
             Assert.AreEqual(_run("(class !foo (fn bar ($i) (+ $i 1))) ((-> (new !foo) bar) 100)"), (BInteger) 101, "Classes do not work");
+            _run(
+                "(class !asdf (field num) (fn init ($num) (:= (-> $this num) $num)) (fn inc () (:= (-> $this num) (+ (-> $this num) 1))))"
+            );
+            _run("(:= $bar (new !asdf 1)) ((-> $bar inc))");
+            Assert.AreEqual(
+                _run("(-> $bar num)"),
+                (BInteger) 2,
+                "Class fields do not work"
+            );
         }
 
         [TestMethod]

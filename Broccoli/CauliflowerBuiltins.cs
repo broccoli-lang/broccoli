@@ -22,12 +22,7 @@ namespace Broccoli {
         /// <summary>
         /// Array of all assembles used by this project.
         /// </summary>
-        private static Assembly[] assemblies;
-
-        /// <summary>
-        /// Dictionary of assembly full name to Assembly object.
-        /// </summary>
-        private static Dictionary<string, Assembly> assemblyLookup;
+        private static IEnumerable<Assembly> assemblies;
 
         /// <summary>
         /// Base path of Cauliflower module storage.
@@ -166,7 +161,7 @@ namespace Broccoli {
                                         methods[type][name] = type.GetMethod(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
                                     var method = methods[type][name];
                                     var obj = result;
-                                    result = new Function(name, -1, (_, innerArgs) => CreateValue(method.Invoke(obj, innerArgs)));
+                                    result = new Function(name, -1, (_, innerArgs) => CreateValue(method.Invoke(obj, innerArgs.Select(arg => arg is BCSharpValue ? arg.ToCSharp() : arg).ToArray())));
                                     type = null;
                                     break;
                                 case MemberTypes.Field:
@@ -1922,8 +1917,7 @@ namespace Broccoli {
         private static void CSharpImport(Interpreter interpreter, BAtom name) {
             // Basically lazy load assemblies
             if (assemblies == null) {
-                assemblies = AppDomain.CurrentDomain.GetAssemblies();
-                assemblyLookup = new Dictionary<string, Assembly>(assemblies.ToDictionary(a => new AssemblyName(a.FullName).Name, a => a));
+                assemblies = AppDomain.CurrentDomain.GetAssemblies().Where(a => !a.IsDynamic);
             }
             var path = name.Value;
 
@@ -1935,7 +1929,7 @@ namespace Broccoli {
             }
 
             // ReSharper disable once ImplicitlyCapturedClosure
-            var directSubtypes = assemblyLookup.Values.SelectMany(v => v.ExportedTypes).Where(a => a.Namespace == path);
+            var directSubtypes = assemblies.SelectMany(v => v.ExportedTypes).Where(a => a.Namespace == path);
             foreach (var subtype in directSubtypes)
                 CSharpAddType(interpreter, subtype);
 
